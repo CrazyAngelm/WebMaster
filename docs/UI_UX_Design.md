@@ -55,3 +55,5 @@ The "Chat-like" interface for interacting with the world.
 - **Offline Mode:** UI elements should clearly indicate when data is being synced to IndexedDB.
 - **Animations:** Subtle CSS transitions for state changes (damage flashes, buff applications).
 
+
+

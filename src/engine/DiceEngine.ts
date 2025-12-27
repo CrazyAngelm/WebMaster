@@ -48,5 +48,13 @@ export class DiceEngine {
   public static d100(): number {
     return this.roll(100);
   }
+
+  /**
+   * * Special roll that respects a minimum value (used in Champion Ranks).
+   */
+  public static rollWithMin(sides: number, min: number): number {
+    const value = this.roll(sides);
+    return Math.max(value, min);
+  }
 }
 

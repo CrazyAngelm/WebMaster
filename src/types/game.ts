@@ -32,6 +32,10 @@ export enum BattleStatus {
 export enum EffectType {
   BUFF = 'BUFF',
   DEBUFF = 'DEBUFF',
+  PERIODIC_DAMAGE = 'PERIODIC_DAMAGE',
+  PERIODIC_HEAL = 'PERIODIC_HEAL',
+  STUN = 'STUN',
+  CONTROL = 'CONTROL',
 }
 
 export enum ItemType {
@@ -39,7 +43,17 @@ export enum ItemType {
   ARMOR = 'ARMOR',
   ARTIFACT = 'ARTIFACT',
   CONSUMABLE = 'CONSUMABLE',
-  INGREDIENT = 'INGREDIENT',
+  MATERIAL = 'MATERIAL', // Plants, Ore, Fabrics, Ingredients
+  BAG = 'BAG',
+  SHIELD = 'SHIELD',
+}
+
+export enum ItemCategory {
+  WEAPON = 'WEAPON',
+  ARMOR = 'ARMOR',
+  ARTIFACT = 'ARTIFACT',
+  CONSUMABLE = 'CONSUMABLE',
+  MATERIAL = 'MATERIAL',
   BAG = 'BAG',
   SHIELD = 'SHIELD',
 }
@@ -48,7 +62,6 @@ export enum WeaponCategory {
   ONE_HANDED = 'ONE_HANDED',
   TWO_HANDED = 'TWO_HANDED',
   MAGIC_STABILIZER = 'MAGIC_STABILIZER',
-  SHIELD = 'SHIELD',
 }
 
 export enum ArmorCategory {
@@ -56,6 +69,36 @@ export enum ArmorCategory {
   MEDIUM = 'MEDIUM',
   HEAVY = 'HEAVY',
   SUPER_HEAVY = 'SUPER_HEAVY',
+}
+
+export enum ShieldCategory {
+  LIGHT = 'LIGHT',
+  MEDIUM = 'MEDIUM',
+  HEAVY = 'HEAVY',
+  SUPER_HEAVY = 'SUPER_HEAVY',
+}
+
+export enum ConsumableCategory {
+  FOOD = 'FOOD',
+  POTION = 'POTION',
+  SCROLL = 'SCROLL',
+  REPAIR = 'REPAIR',
+  TREATMENT = 'TREATMENT', // Binds, kits
+}
+
+export enum PenetrationType {
+  NONE = 'NONE',
+  LIGHT = 'LIGHT',
+  MEDIUM = 'MEDIUM',
+  HEAVY = 'HEAVY',
+  VERY_HEAVY = 'VERY_HEAVY',
+}
+
+export enum DistanceType {
+  CLOSE = 'CLOSE', // 0-5m
+  MEDIUM = 'MEDIUM', // 5-20m
+  FAR = 'FAR', // 20-50m
+  SNIPER = 'SNIPER', // 50-200m
 }
 
 export enum SpeedCategory {
@@ -113,6 +156,7 @@ export interface Character {
     position: string;
   };
   isDead: boolean;
+  money: number;
   bonuses: CharacterBonuses;
 }
 
@@ -121,6 +165,7 @@ export interface Location {
   name: string;
   description: string;
   zoneType: ZoneType;
+  buildings?: UUID[];
 }
 
 export interface Building {
@@ -129,12 +174,13 @@ export interface Building {
   name: string;
   description: string;
   hasShop: boolean;
+  shopInventory?: UUID; // Optional shop reference
 }
 
 export interface LocationConnection {
   id: UUID;
   fromLocationId: UUID;
-  toLocationIds: UUID[];
+  toLocationId: UUID; // Simplified to single target
 }
 
 export interface Rank {
@@ -142,6 +188,7 @@ export interface Rank {
   order: number;
   name: string;
   maxEssence: number;
+  minEssenceRoll?: number; // * Champion rank feature
   maxArtifacts: number;
   maxSkills: number;
   breakthroughConditions: string[];
@@ -167,19 +214,105 @@ export interface ItemTemplate {
   id: UUID;
   name: string;
   type: ItemType;
-  category?: WeaponCategory | ArmorCategory;
+  category?: WeaponCategory | ArmorCategory | ShieldCategory | ConsumableCategory;
   rarity: Rarity;
   weight: number;
+  stackSize: number;
   isUnique: boolean;
-  baseEssence?: number; // Starting essence for weapons
-  maxEssence?: number; // Max possible essence through mastery
+  
+  // Weapon specific
+  baseEssence?: number;
+  maxEssence?: number;
+  penetration?: PenetrationType;
+  distance?: DistanceType;
+  
+  // Armor/Shield specific
   baseDurability?: number;
-  penetration?: number; // For weapons
-  armorType?: ArmorCategory; // For armor
-  ignoreDamage?: number; // For armor
-  hitPenalty?: number; // For armor
-  evasionPenalty?: number; // For armor
-  speedPenalty?: number; // For armor
+  ignoreDamage?: number;
+  hitPenalty?: number;
+  evasionPenalty?: number;
+  speedPenalty?: number;
+  
+  // Bag specific
+  slotCount?: number;
+
+  // Consumable/Artifact specific
+  effects?: UUID[];
+  
+  description?: string;
+  basePrice?: number;
+}
+
+/**
+ * * Quests and Events
+ */
+
+export enum QuestStatus {
+  NOT_STARTED = 'NOT_STARTED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+}
+
+export interface QuestObjective {
+  id: UUID;
+  description: string;
+  type: 'KILL' | 'COLLECT' | 'VISIT' | 'INTERACT';
+  targetId: UUID; // MonsterTemplate ID, ItemTemplate ID, or Location ID
+  requiredAmount: number;
+  currentAmount: number;
+  isCompleted: boolean;
+}
+
+export interface Quest {
+  id: UUID;
+  title: string;
+  description: string;
+  objectives: QuestObjective[];
+  rewards: {
+    money?: number;
+    essence?: number;
+    items?: { templateId: UUID; quantity: number }[];
+  };
+  status: QuestStatus;
+  rankRequired: number;
+}
+
+export interface GameEventChoice {
+  id: UUID;
+  text: string;
+  outcome: (state: any) => void; // This is a bit tricky for serialization, maybe use eventId for next step
+  nextEventId?: UUID;
+  requirement?: {
+    type: 'ESSENCE' | 'MONEY' | 'ITEM';
+    value: number | UUID;
+  };
+}
+
+export interface GameEvent {
+  id: UUID;
+  title: string;
+  description: string;
+  rarity: Rarity; // * Added for breakthrough requirements
+  image?: string;
+  choices?: GameEventChoice[];
+  autoTriggerNextId?: UUID;
+  triggerCondition?: string; // Simple logic string or type
+}
+
+export interface MonsterTemplate {
+  id: UUID;
+  name: string;
+  rankOrder: number; // 1 to 6 (Champion ranks)
+  baseEssence: number;
+  description?: string;
+  skills: UUID[];
+  lootTable: {
+    templateId: UUID;
+    chance: number;
+    minQuantity: number;
+    maxQuantity: number;
+  }[];
 }
 
 export interface ExistingItem {
@@ -227,9 +360,22 @@ export interface Effect {
   id: UUID;
   name: string;
   type: EffectType;
-  duration: number; // in ticks or turns
+  duration: number; // in turns, -1 for permanent/passive
   triggerCondition?: string;
   value: number;
-  parameter: string; // e.g., 'essence', 'speed', etc.
+  parameter: string; // e.g., 'essence', 'speed', 'evasion', etc.
+  description?: string;
+}
+
+export interface Recipe {
+  id: UUID;
+  resultTemplateId: UUID;
+  profession: string;
+  rankRequired: number;
+  ingredients: {
+    templateId: UUID;
+    quantity: number;
+  }[];
+  stationRequired?: string;
 }
 

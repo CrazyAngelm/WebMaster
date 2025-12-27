@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .fantasy-panel {
+    @apply bg-fantasy-surface border border-fantasy-border rounded shadow-lg;
+  }
+  
+  .fantasy-button {
+    @apply px-4 py-2 bg-fantasy-surface border border-fantasy-accent/30 text-fantasy-accent hover:bg-fantasy-accent hover:text-fantasy-dark transition-all duration-200 uppercase tracking-wider text-sm font-bold;
+  }
+}
+
+
+

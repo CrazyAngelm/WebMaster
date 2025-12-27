@@ -9,9 +9,12 @@ import {
   CharacterStats, 
   Speed, 
   SpeedCategory,
-  CharacterBonuses
+  CharacterBonuses,
+  Inventory,
+  Rarity
 } from '../types/game';
 import { DiceEngine } from '../engine/DiceEngine';
+import { StaticDataService } from './StaticDataService';
 
 export class CharacterService {
   /**
@@ -36,24 +39,59 @@ export class CharacterService {
 
   /**
    * * Checks if a character meets the conditions for a rank breakthrough.
-   * * Breakthrough conditions are currently stored as strings in Rank.
    */
-  public static canBreakthrough(character: Character, nextRank: Rank, completedEvents: string[]): boolean {
-    // * In a real implementation, this would parse the Rank's breakthroughConditions
-    // * For now, we simulate the 1d100 check mentioned in the docs
-    
-    // * Example from docs: Rank 2 requires 1 event + 1d100 > 50
-    const roll = DiceEngine.d100();
-    
-    // * Simplified logic for demonstration
-    if (nextRank.order === 2) {
-      return completedEvents.length >= 1 && roll > 50;
+  public static canBreakthrough(
+    character: Character, 
+    inventory: Inventory,
+    nextRank: Rank, 
+    completedEventIds: string[]
+  ): { success: boolean; reason?: string } {
+    // * 1. Potion Check: breakthroughConditions might contain item IDs like 'con-essence-potion'
+    const potionId = nextRank.breakthroughConditions.find(c => c.startsWith('con-'));
+    if (potionId) {
+      const hasPotion = inventory.items.some(i => i.templateId === potionId);
+      if (!hasPotion) {
+        return { success: false, reason: `Requires ${potionId} in inventory.` };
+      }
     }
-    if (nextRank.order === 3) {
-      return completedEvents.length >= 1 && roll > 60;
+
+    // * 2. Event Requirement: Check if character completed enough events of required rarity
+    const eventReq = nextRank.breakthroughConditions.find(c => c.toLowerCase().includes('event'));
+    if (eventReq) {
+      const requiredRarity = this.parseRarity(eventReq);
+      const completedEvents = completedEventIds
+        .map(id => StaticDataService.getEvent(id))
+        .filter(e => e && e.rarity === requiredRarity);
+      
+      if (completedEvents.length < 1) {
+        return { success: false, reason: `Requires at least one ${requiredRarity} event completion.` };
+      }
     }
-    
-    return false;
+
+    // * 3. Probability Check: 1d100 > Threshold
+    const probReq = nextRank.breakthroughConditions.find(c => c.includes('1d100 >'));
+    if (probReq) {
+      const threshold = parseInt(probReq.split('>')[1].trim());
+      const roll = DiceEngine.d100();
+      if (roll <= threshold) {
+        return { success: false, reason: `Breakthrough failed! Roll: ${roll} (Needed > ${threshold}).` };
+      }
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * * Helper to parse rarity from condition string
+   */
+  private static parseRarity(str: string): Rarity {
+    const s = str.toLowerCase();
+    if (s.includes('divine')) return Rarity.DIVINE;
+    if (s.includes('legendary')) return Rarity.LEGENDARY;
+    if (s.includes('mythic')) return Rarity.MYTHIC;
+    if (s.includes('epic')) return Rarity.EPIC;
+    if (s.includes('rare')) return Rarity.RARE;
+    return Rarity.COMMON;
   }
 
   /**

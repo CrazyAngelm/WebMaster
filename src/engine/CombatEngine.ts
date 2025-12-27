@@ -8,13 +8,14 @@ import {
   Participant, 
   Character, 
   BattleStatus, 
-  DiceEngine,
   ItemTemplate,
   ExistingItem,
   ArmorCategory,
-  ItemType
+  ItemType,
+  PenetrationType
 } from '../types/game';
 import { DiceEngine as DICE } from './DiceEngine';
+import { StaticDataService } from '../services/StaticDataService';
 
 export class CombatEngine {
   /**
@@ -67,14 +68,25 @@ export class CombatEngine {
     const armorHitPenalty = armorTemplate?.hitPenalty || 0;
     const weaponEssence = attackerWeapon?.currentEssence || 0;
     const hitSides = Math.max(1, attacker.stats.essence.current + weaponEssence - armorHitPenalty);
-    const hitRoll = DICE.roll(hitSides);
+    
+    // * Handle Champion Rank minimum roll
+    const attackerRank = StaticDataService.getRank(attacker.rankId);
+    const hitRoll = attackerRank?.minEssenceRoll 
+      ? DICE.rollWithMin(hitSides, attackerRank.minEssenceRoll)
+      : DICE.roll(hitSides);
 
     // * Evasion Roll: 1d(Essence - Armor Evasion Penalty)
     const armorEvasionPenalty = armorTemplate?.evasionPenalty || 0;
     const evasionSides = Math.max(1, defender.stats.essence.current - armorEvasionPenalty);
-    const evasionRoll = DICE.roll(evasionSides);
+    
+    // * Handle Champion Rank minimum roll for defender
+    const defenderRank = StaticDataService.getRank(defender.rankId);
+    const evasionRoll = defenderRank?.minEssenceRoll
+      ? DICE.rollWithMin(evasionSides, defenderRank.minEssenceRoll)
+      : DICE.roll(evasionSides);
 
-    if (hitRoll < evasionRoll) {
+    // * Tie-breaker: If results are equal, defender wins (counts as miss)
+    if (hitRoll <= evasionRoll) {
       return { hit: false, damageDealt: 0, log: 'Attack missed (Evasion)!' };
     }
 
@@ -84,8 +96,9 @@ export class CombatEngine {
     let logMessage = '';
 
     // * Check Penetration
-    const weaponPen = 0; // In a real app, this would come from weapon template
-    const armorTypeLevel = this.getArmorLevel(armorTemplate?.armorType);
+    const weaponTemplate = attackerWeapon ? StaticDataService.getItemTemplate(attackerWeapon.templateId) : null;
+    const weaponPen = this.getPenetrationLevel(weaponTemplate?.penetration);
+    const armorTypeLevel = this.getArmorLevel(armorTemplate?.category as ArmorCategory);
 
     if (weaponPen >= armorTypeLevel || !defenderArmor || defenderArmor.currentDurability <= 0) {
       // * Penetrates or no armor: Apply damage to Protection then Essence
@@ -134,6 +147,19 @@ export class CombatEngine {
       case ArmorCategory.MEDIUM: return 2;
       case ArmorCategory.HEAVY: return 3;
       case ArmorCategory.SUPER_HEAVY: return 4;
+      default: return 0;
+    }
+  }
+
+  /**
+   * * Maps PenetrationType to a numerical level for penetration checks.
+   */
+  private static getPenetrationLevel(type?: PenetrationType): number {
+    switch (type) {
+      case PenetrationType.LIGHT: return 1;
+      case PenetrationType.MEDIUM: return 2;
+      case PenetrationType.HEAVY: return 3;
+      case PenetrationType.VERY_HEAVY: return 4;
       default: return 0;
     }
   }
