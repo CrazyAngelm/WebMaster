@@ -11,14 +11,19 @@ import { CombatEngine } from '../engine/CombatEngine';
 
 interface CombatState {
   battle: Battle | null;
-  attacker: Character | null;
-  defender: Character | null;
+  player: Character | null;
+  enemy: Character | null;
   
   // Actions
-  initiateBattle: (participants: Participant[], attacker: Character, defender: Character) => void;
+  initiateBattle: (participants: Participant[], player: Character, enemy: Character) => void;
   nextTurn: () => void;
-  executeAttack: (
-    attackerWeapon: ExistingItem | null,
+  executePlayerAttack: (
+    weapon: ExistingItem | null,
+    defenderArmor: ExistingItem | null,
+    armorTemplate: ItemTemplate | null
+  ) => void;
+  executeEnemyAttack: (
+    weapon: ExistingItem | null,
     defenderArmor: ExistingItem | null,
     armorTemplate: ItemTemplate | null
   ) => void;
@@ -27,12 +32,12 @@ interface CombatState {
 
 export const useCombatStore = create<CombatState>((set, get) => ({
   battle: null,
-  attacker: null,
-  defender: null,
+  player: null,
+  enemy: null,
 
-  initiateBattle: (participants, attacker, defender) => {
+  initiateBattle: (participants, player, enemy) => {
     const battle = CombatEngine.startBattle(participants);
-    set({ battle, attacker, defender });
+    set({ battle, player, enemy });
   },
 
   nextTurn: () => {
@@ -44,34 +49,58 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     set({ battle: updatedBattle });
   },
 
-  executeAttack: (attackerWeapon, defenderArmor, armorTemplate) => {
-    const { battle, attacker, defender } = get();
-    if (!battle || !attacker || !defender) return;
+  executePlayerAttack: (weapon, defenderArmor, armorTemplate) => {
+    const { battle, player, enemy } = get();
+    if (!battle || !player || !enemy) return;
 
     const result = CombatEngine.resolveAttack(
-      attacker,
-      attackerWeapon,
-      defender,
+      player,
+      weapon,
+      enemy,
       defenderArmor,
       armorTemplate
     );
 
     const updatedBattle = { 
       ...battle, 
-      log: [...battle.log, result.log] 
+      log: [...battle.log, `Player: ${result.log}`] 
     };
 
-    // If defender died, end battle
-    if (defender.isDead) {
+    if (enemy.isDead) {
       updatedBattle.status = BattleStatus.FINISHED;
-      updatedBattle.log.push(`${defender.name} has been defeated!`);
+      updatedBattle.log.push(`${enemy.name} has been defeated!`);
     }
 
-    set({ battle: updatedBattle, defender: { ...defender } });
+    set({ battle: updatedBattle, enemy: { ...enemy } });
+  },
+
+  executeEnemyAttack: (weapon, defenderArmor, armorTemplate) => {
+    const { battle, player, enemy } = get();
+    if (!battle || !player || !enemy) return;
+
+    const result = CombatEngine.resolveAttack(
+      enemy,
+      weapon,
+      player,
+      defenderArmor,
+      armorTemplate
+    );
+
+    const updatedBattle = { 
+      ...battle, 
+      log: [...battle.log, `Enemy: ${result.log}`] 
+    };
+
+    if (player.isDead) {
+      updatedBattle.status = BattleStatus.FINISHED;
+      updatedBattle.log.push(`${player.name} has fallen in battle...`);
+    }
+
+    set({ battle: updatedBattle, player: { ...player } });
   },
 
   endBattle: () => {
-    set({ battle: null, attacker: null, defender: null });
+    set({ battle: null, player: null, enemy: null });
   }
 }));
 

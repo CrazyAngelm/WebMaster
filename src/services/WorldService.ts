@@ -10,11 +10,18 @@ export const WorldService = {
   /**
    * * Checks if a character can move from their current location to a target location
    */
-  canMoveTo(character: Character, targetLocationId: UUID): { allowed: boolean; reason?: string } {
+  canMoveTo(character: Character, targetLocationId: UUID): { allowed: boolean; reason?: string; energyCost?: number; timeCost?: number } {
     const currentLocId = character.location.locationId;
     
     if (currentLocId === targetLocationId) {
       return { allowed: false, reason: "You are already there." };
+    }
+
+    const ENERGY_COST = 10;
+    const TIME_COST = 1; // 1 hour per movement
+
+    if (character.stats.energy.current < ENERGY_COST) {
+      return { allowed: false, reason: "You are too tired to travel. Rest first." };
     }
 
     const connections = StaticDataService.getConnections(currentLocId);
@@ -24,25 +31,33 @@ export const WorldService = {
       return { allowed: false, reason: "There is no direct path to that location." };
     }
 
-    // You can add more complex rules here (e.g., rank requirements, item requirements)
     const targetLoc = StaticDataService.getLocation(targetLocationId);
     if (!targetLoc) {
       return { allowed: false, reason: "Target location does not exist." };
     }
 
-    return { allowed: true };
+    return { allowed: true, energyCost: ENERGY_COST, timeCost: TIME_COST };
   },
 
   /**
    * * Updates character's location state
    */
-  moveCharacter(character: Character, targetLocationId: UUID): Character {
+  moveCharacter(character: Character, targetLocationId: UUID, energyCost: number = 0): Character {
     return {
       ...character,
+      stats: {
+        ...character.stats,
+        essence: { ...character.stats.essence },
+        energy: {
+          ...character.stats.energy,
+          current: Math.max(0, character.stats.energy.current - energyCost)
+        },
+        protection: { ...character.stats.protection }
+      },
       location: {
         ...character.location,
         locationId: targetLocationId,
-        buildingId: undefined, // Always exit building when moving to a new location
+        buildingId: undefined, 
         position: 'Center'
       }
     };

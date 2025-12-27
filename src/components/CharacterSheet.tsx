@@ -1,14 +1,21 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Shield, Zap, TrendingUp, Info } from 'lucide-react';
+import { Shield, Zap, TrendingUp, Info, Battery, Moon, Lock } from 'lucide-react';
+import { StaticDataService } from '../services/StaticDataService';
 import { clsx } from 'clsx';
 
 export const CharacterSheet: React.FC = () => {
-  const { character, ranks } = useGameStore();
+  const { character, ranks, rest, worldTime } = useGameStore();
   
   if (!character) return null;
   
   const rank = ranks.find(r => r.id === character.rankId);
+  const building = character.location.buildingId ? StaticDataService.getBuilding(character.location.buildingId) : null;
+  const canRestHere = building?.canRest || false;
+  
+  const TRAIN_COOLDOWN = 12;
+  const timeSinceLastTrain = character.lastTrainTime !== undefined ? worldTime - character.lastTrainTime : 999;
+  const trainCooldownRemaining = Math.max(0, TRAIN_COOLDOWN - timeSinceLastTrain);
 
   return (
     <div className="space-y-6">
@@ -34,12 +41,35 @@ export const CharacterSheet: React.FC = () => {
             <span className="text-fantasy-essence flex items-center gap-1">
               <Zap size={12} /> Сущность
             </span>
-            <span>{character.stats.essence.current} / {character.stats.essence.max}</span>
+            <div className="flex flex-col items-end">
+              <span>{character.stats.essence.current} / {character.stats.essence.max}</span>
+              {trainCooldownRemaining > 0 && (
+                <span className="text-[9px] text-amber-500 opacity-70">
+                  Откат культивации: {trainCooldownRemaining}ч
+                </span>
+              )}
+            </div>
           </div>
           <div className="h-2 bg-black/50 border border-fantasy-border rounded-full overflow-hidden">
             <div 
               className="h-full bg-gradient-to-r from-emerald-900 to-fantasy-essence transition-all duration-500"
               style={{ width: `${(character.stats.essence.current / character.stats.essence.max) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Energy Bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs uppercase font-bold tracking-tighter">
+            <span className="text-amber-500 flex items-center gap-1">
+              <Battery size={12} /> Энергия
+            </span>
+            <span>{character.stats.energy.current} / {character.stats.energy.max}</span>
+          </div>
+          <div className="h-2 bg-black/50 border border-fantasy-border rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-amber-900 to-amber-500 transition-all duration-500"
+              style={{ width: `${(character.stats.energy.current / character.stats.energy.max) * 100}%` }}
             />
           </div>
         </div>
@@ -59,6 +89,36 @@ export const CharacterSheet: React.FC = () => {
             />
           </div>
         </div>
+      </div>
+
+      {/* Rest Button with Restrictions */}
+      <div className="space-y-2">
+        <button 
+          disabled={!canRestHere || character.money < 10}
+          onClick={rest}
+          className={clsx(
+            "w-full fantasy-button py-2 flex items-center justify-center gap-2 text-xs",
+            (!canRestHere || character.money < 10) && "opacity-50 cursor-not-allowed grayscale"
+          )}
+        >
+          {canRestHere ? <Moon size={14} /> : <Lock size={14} />}
+          Отдохнуть (10 монет, 8ч)
+        </button>
+        {!canRestHere && (
+          <div className="space-y-1">
+            <p className="text-[10px] text-center text-fantasy-blood italic">
+              * Отдых доступен только в тавернах
+            </p>
+            <p className="text-[9px] text-center text-gray-600 italic">
+              Войдите в таверну через раздел "Мир"
+            </p>
+          </div>
+        )}
+        {canRestHere && character.money < 10 && (
+          <p className="text-[10px] text-center text-fantasy-blood italic">
+            * Недостаточно монет для отдыха (нужно 10)
+          </p>
+        )}
       </div>
 
       {/* Bonuses Grid */}

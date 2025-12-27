@@ -6,18 +6,54 @@ import { clsx } from 'clsx';
 import { BattleStatus } from '../types/game';
 
 export const CombatScreen: React.FC = () => {
-  const { battle, attacker, defender, executeAttack, nextTurn, initiateBattle, endBattle } = useCombatStore();
-  const { character, inventory, itemTemplates } = useGameStore();
+  const { 
+    battle, 
+    player, 
+    enemy, 
+    executePlayerAttack, 
+    executeEnemyAttack, 
+    nextTurn, 
+    initiateBattle, 
+    endBattle 
+  } = useCombatStore();
+  const { character, inventory, itemTemplates, setCharacter } = useGameStore();
+
+  // * Auto-handle enemy turns
+  useEffect(() => {
+    if (battle && battle.status === BattleStatus.ACTIVE) {
+      const currentParticipant = battle.turnOrder[battle.currentTurnIndex];
+      const isPlayerTurn = currentParticipant.characterId === character?.id;
+
+      if (!isPlayerTurn) {
+        // * Enemy AI Turn
+        const timer = setTimeout(() => {
+          // Simple AI: always attack
+          executeEnemyAttack(null, null, null);
+          nextTurn();
+        }, 1500); // 1.5s delay for readability
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [battle?.currentTurnIndex, battle?.status]);
+
+  // * Sync player health back to game store if changed
+  useEffect(() => {
+    if (player && character && (player.stats.essence.current !== character.stats.essence.current || player.stats.protection.current !== character.stats.protection.current)) {
+      setCharacter(player);
+    }
+  }, [player?.stats.essence.current, player?.stats.protection.current]);
 
   const handleStartBattle = () => {
     if (!character) return;
     
     // Mocking an enemy for the battle
-    const enemy: any = {
+    const mockEnemy: any = {
       id: 'enemy-wolf',
       name: 'Лесной волк',
+      isDead: false,
       stats: {
         essence: { current: 30, max: 30 },
+        energy: { current: 100, max: 100 },
         protection: { current: 0, max: 0 },
         speedId: 'speed-ordinary'
       },
@@ -34,15 +70,16 @@ export const CombatScreen: React.FC = () => {
       { id: 'p2', characterId: 'enemy-wolf', teamId: 'enemy', initiative: 0, currentActions: { main: 1, bonus: 1 } }
     ];
 
-    initiateBattle(participants, character, enemy);
+    initiateBattle(participants, character, mockEnemy);
   };
 
   const handleAttack = () => {
-    if (!battle || !attacker || !defender) return;
+    if (!battle || !player || !enemy) return;
     
     const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON') || null;
     // We'd also need the defender's armor template, but for now we simplify
-    executeAttack(equippedWeapon, null, null);
+    executePlayerAttack(equippedWeapon, null, null);
+    nextTurn();
   };
 
   if (!battle) {
@@ -72,8 +109,8 @@ export const CombatScreen: React.FC = () => {
               className={clsx(
                 "px-3 py-1 rounded border transition-all text-xs font-bold uppercase flex items-center gap-2",
                 i === battle.currentTurnIndex 
-                  ? "bg-fantasy-accent text-fantasy-dark border-white scale-110 z-10" 
-                  : "bg-black/30 border-fantasy-border text-gray-500"
+                ? "bg-fantasy-accent text-fantasy-dark border-white scale-110 z-10" 
+                : "bg-black/30 border-fantasy-border text-gray-500"
               )}
             >
               {p.characterId === character?.id ? <UserIcon /> : <Skull size={14} />}
@@ -86,39 +123,39 @@ export const CombatScreen: React.FC = () => {
 
       {/* Battle Scene */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-8">
-        {/* Attacker (Player) */}
+        {/* Player */}
         <div className={clsx("flex flex-col items-center gap-4 transition-transform duration-300", isPlayerTurn && "scale-105")}>
           <div className="relative">
-            <div className="w-24 h-24 rounded-full border-4 border-fantasy-accent bg-fantasy-surface flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full border-4 border-fantasy-accent bg-fantasy-surface flex items-center justify-center overflow-hidden">
               <UserIcon size={40} className="text-fantasy-accent" />
             </div>
-            {isPlayerTurn && (
+            {isPlayerTurn && battle.status === BattleStatus.ACTIVE && (
               <div className="absolute -top-2 -right-2 bg-fantasy-accent text-fantasy-dark p-1 rounded-full animate-bounce">
                 <ChevronRight size={16} className="rotate-90" />
               </div>
             )}
           </div>
           <div className="text-center">
-            <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{attacker?.name}</div>
-            <StatSmall label="Сущность" current={attacker?.stats.essence.current || 0} max={attacker?.stats.essence.max || 1} color="bg-fantasy-essence" />
+            <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{player?.name}</div>
+            <StatSmall label="Сущность" current={player?.stats.essence.current || 0} max={player?.stats.essence.max || 1} color="bg-fantasy-essence" />
           </div>
         </div>
 
-        {/* Defender (Foe) */}
+        {/* Enemy */}
         <div className={clsx("flex flex-col items-center gap-4 transition-transform duration-300", !isPlayerTurn && "scale-105")}>
           <div className="relative">
-            <div className="w-24 h-24 rounded-full border-4 border-fantasy-blood bg-fantasy-surface flex items-center justify-center">
+            <div className="w-24 h-24 rounded-full border-4 border-fantasy-blood bg-fantasy-surface flex items-center justify-center overflow-hidden">
               <Skull size={40} className="text-fantasy-blood" />
             </div>
-            {!isPlayerTurn && (
+            {!isPlayerTurn && battle.status === BattleStatus.ACTIVE && (
               <div className="absolute -top-2 -right-2 bg-fantasy-blood text-white p-1 rounded-full animate-bounce">
                 <ChevronRight size={16} className="rotate-90" />
               </div>
             )}
           </div>
           <div className="text-center">
-            <div className="font-serif text-lg text-fantasy-blood uppercase tracking-wider">{defender?.name}</div>
-            <StatSmall label="Сущность" current={defender?.stats.essence.current || 0} max={defender?.stats.essence.max || 1} color="bg-fantasy-blood" />
+            <div className="font-serif text-lg text-fantasy-blood uppercase tracking-wider">{enemy?.name}</div>
+            <StatSmall label="Сущность" current={enemy?.stats.essence.current || 0} max={enemy?.stats.essence.max || 1} color="bg-fantasy-blood" />
           </div>
         </div>
       </div>
@@ -142,7 +179,7 @@ export const CombatScreen: React.FC = () => {
             </button>
             <button 
               disabled={!isPlayerTurn} 
-              onClick={nextTurn}
+              onClick={() => nextTurn()}
               className={clsx("fantasy-button flex items-center gap-2", !isPlayerTurn && "opacity-30 cursor-not-allowed")}
             >
               Ждать
@@ -150,9 +187,11 @@ export const CombatScreen: React.FC = () => {
           </>
         ) : (
           <div className="text-center">
-            <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">Бой завершён</h4>
+            <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">
+              {player?.isDead ? 'Вы проиграли' : 'Победа!'}
+            </h4>
             <button onClick={endBattle} className="fantasy-button">
-              Вернуться в убежище
+              {player?.isDead ? 'Вернуться в город' : 'Завершить бой'}
             </button>
           </div>
         )}

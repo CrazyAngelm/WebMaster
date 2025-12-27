@@ -57,6 +57,7 @@ export const MOCK_CHARACTER: Character = {
   bio: 'Рождённый на окраинах Хорниграда, Каэлен стремится овладеть сущностью.',
   stats: {
     essence: { current: 50, max: 100 },
+    energy: { current: 100, max: 100 },
     protection: { current: 20, max: 20 },
     speedId: 'speed-ordinary'
   },
@@ -73,6 +74,7 @@ export const MOCK_CHARACTER: Character = {
     damageResistance: 0,
     initiative: 0
   }
+  // * lastTrainTime is undefined for new characters (allows first training)
 };
 
 export const MOCK_INVENTORY: Inventory = {

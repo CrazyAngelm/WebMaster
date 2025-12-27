@@ -42,21 +42,24 @@ export const BUILDINGS: Building[] = [
     locationId: 'loc-outskirts',
     name: 'Таверна "Ржавый якорь"',
     description: 'Тускло освещённая таверна, пахнущая дешёвым элем и отчаянными мечтами.',
-    hasShop: true
+    hasShop: true,
+    canRest: true
   },
   {
     id: 'build-guard-post',
     locationId: 'loc-city-gates',
     name: 'Караульный пост восточных ворот',
     description: 'Прочное каменное здание, где стража следит за всем трафиком, входящим в город.',
-    hasShop: false
+    hasShop: false,
+    canRest: false
   },
   {
     id: 'build-district-market',
     locationId: 'loc-merchant-district',
     name: 'Универсальный магазин',
     description: 'Хорошо укомплектованный магазин, обслуживающий как путешественников, так и жителей.',
-    hasShop: true
+    hasShop: true,
+    canRest: false
   }
 ];
 

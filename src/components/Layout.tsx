@@ -1,8 +1,9 @@
 import React, { ReactNode } from 'react';
-import { Shield, User, Package, Map as MapIcon, Sword } from 'lucide-react';
+import { Shield, User, Package, Map as MapIcon, Sword, Clock } from 'lucide-react';
 import { CharacterSheet } from './CharacterSheet';
 import { SaveManager } from './SaveManager';
 import { useCombatStore } from '../store/combatStore';
+import { useGameStore } from '../store/gameStore';
 import { clsx } from 'clsx';
 
 interface LayoutProps {
@@ -13,14 +14,28 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView }) => {
   const { battle } = useCombatStore();
+  const { worldTime } = useGameStore();
+
+  const formatTime = (totalHours: number) => {
+    const days = Math.floor(totalHours / 24) + 1;
+    const hours = totalHours % 24;
+    return `День ${days}, ${hours.toString().padStart(2, '0')}:00`;
+  };
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Top Header */}
       <header className="h-14 bg-fantasy-surface border-b border-fantasy-border flex items-center justify-between px-6 z-10">
-        <div className="flex items-center gap-2">
-          <Shield className="text-fantasy-accent w-6 h-6" />
-          <span className="font-serif text-xl tracking-widest text-fantasy-accent">WEBMASTER</span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Shield className="text-fantasy-accent w-6 h-6" />
+            <span className="font-serif text-xl tracking-widest text-fantasy-accent">WEBMASTER</span>
+          </div>
+          
+          <div className="hidden md:flex items-center gap-2 px-4 py-1 bg-black/30 border border-fantasy-border rounded text-xs text-fantasy-accent font-mono">
+            <Clock size={14} />
+            {formatTime(worldTime)}
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <SaveManager />

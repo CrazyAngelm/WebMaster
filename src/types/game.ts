@@ -129,6 +129,7 @@ export interface Speed {
 
 export interface CharacterStats {
   essence: { current: number; max: number };
+  energy: { current: number; max: number }; // * Added for time/activity system
   protection: { current: number; max: number };
   speedId: UUID;
 }
@@ -158,6 +159,7 @@ export interface Character {
   isDead: boolean;
   money: number;
   bonuses: CharacterBonuses;
+  lastTrainTime?: number; // * Added to track training cooldown (in worldTime)
 }
 
 export interface Location {
@@ -174,6 +176,7 @@ export interface Building {
   name: string;
   description: string;
   hasShop: boolean;
+  canRest?: boolean; // * Added for rest restrictions
   shopInventory?: UUID; // Optional shop reference
 }
 

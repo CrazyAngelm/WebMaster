@@ -45,6 +45,21 @@ export const EventService = {
       }
     }
 
+    if (choiceId === 'choice-meditate') {
+      const ENERGY_COST = 30;
+      if (updatedCharacter.stats.energy.current >= ENERGY_COST) {
+        updatedCharacter.stats.energy.current -= ENERGY_COST;
+        const gain = 10;
+        updatedCharacter.stats.essence.current = Math.min(
+          updatedCharacter.stats.essence.max,
+          updatedCharacter.stats.essence.current + gain
+        );
+        message = "You meditate and feel your inner essence stabilize. (Essence +10, Energy -30)";
+      } else {
+        message = "You are too exhausted to meditate effectively.";
+      }
+    }
+
     return { character: updatedCharacter, message };
   }
 };

@@ -27,6 +27,7 @@ interface GameState {
   activeQuests: Quest[];
   activeEvent: GameEvent | null;
   isLoading: boolean;
+  worldTime: number; // * Total hours passed since start
   
   // Actions
   setCharacter: (character: Character) => void;
@@ -41,6 +42,7 @@ interface GameState {
   
   // Game Logic Actions
   trainCharacter: () => void;
+  rest: () => void;
   equipItem: (itemId: UUID) => void;
   unequipItem: (itemId: UUID) => void;
 
@@ -70,6 +72,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeQuests: [],
   activeEvent: null,
   isLoading: true,
+  worldTime: 0,
 
   initializeData: () => {
     const templates = StaticDataService.getAllItemTemplates();
@@ -99,13 +102,49 @@ export const useGameStore = create<GameState>((set, get) => ({
       get().initializeData();
 
       const charId = await StorageService.getMeta('activeCharacterId');
+      
+      // * Load saved quest states
+      const savedQuests = await StorageService.getMeta('activeQuests') as Quest[] | undefined;
+      const allQuests = StaticDataService.getAllQuests();
+      
+      // * Merge saved quest states with quest templates
+      let questsToLoad: Quest[];
+      if (savedQuests && savedQuests.length > 0) {
+        // * Merge: use saved state if quest exists, otherwise use template
+        questsToLoad = allQuests.map(templateQuest => {
+          const savedQuest = savedQuests.find(q => q.id === templateQuest.id);
+          if (savedQuest) {
+            // * Preserve saved state but update objectives from template (in case template changed)
+            return {
+              ...savedQuest,
+              objectives: templateQuest.objectives.map(templateObj => {
+                const savedObj = savedQuest.objectives.find(o => o.id === templateObj.id);
+                return savedObj || templateObj;
+              })
+            };
+          }
+          return templateQuest;
+        });
+      } else {
+        questsToLoad = allQuests;
+      }
+      
       if (charId) {
         const character = await StorageService.getCharacter(charId);
         if (character) {
           const inventory = await StorageService.getInventory(character.id);
-          // In real app, load quests from DB too
-          set({ character, inventory, activeQuests: StaticDataService.getAllQuests() });
+          const worldTime = await StorageService.getMeta('worldTime') || 0;
+          
+          set({ 
+            character, 
+            inventory, 
+            worldTime, 
+            activeQuests: questsToLoad 
+          });
         }
+      } else {
+        // * Even without character, we can load quests
+        set({ activeQuests: questsToLoad });
       }
     } catch (error) {
       console.error('Error loading game:', error);
@@ -115,7 +154,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   saveGame: async () => {
-    const { character, inventory } = get();
+    const { character, inventory, worldTime, activeQuests } = get();
     if (character) {
       await StorageService.saveCharacter(character);
       await StorageService.saveMeta('activeCharacterId', character.id);
@@ -123,6 +162,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (inventory) {
       await StorageService.saveInventory(inventory);
     }
+    await StorageService.saveMeta('worldTime', worldTime);
+    await StorageService.saveMeta('activeQuests', activeQuests);
   },
 
   exportSave: async () => {
@@ -138,14 +179,88 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   trainCharacter: () => {
-    const { character } = get();
+    const { character, worldTime } = get();
     if (!character) return;
 
-    const updatedCharacter = { ...character };
-    const gain = CharacterService.trainEssence(updatedCharacter);
+    // * Check training cooldown (e.g., once every 12 hours)
+    const TRAIN_COOLDOWN = 12;
+    if (character.lastTrainTime !== undefined && (worldTime - character.lastTrainTime) < TRAIN_COOLDOWN) {
+      console.log(`You need more time to recover from previous training. Next available in ${TRAIN_COOLDOWN - (worldTime - character.lastTrainTime)} hours.`);
+      return;
+    }
+
+    // * Deep copy stats to avoid mutations
+    const updatedCharacter = { 
+      ...character,
+      stats: {
+        ...character.stats,
+        essence: { ...character.stats.essence },
+        energy: { ...character.stats.energy },
+        protection: { ...character.stats.protection }
+      }
+    };
     
-    set({ character: updatedCharacter });
+    const result = CharacterService.trainEssence(updatedCharacter);
+    
+    if (result) {
+      updatedCharacter.lastTrainTime = worldTime; // Update training time
+      set({ 
+        character: updatedCharacter,
+        worldTime: worldTime + 2 // Training takes 2 hours
+      });
+      StorageService.saveCharacter(updatedCharacter);
+      StorageService.saveMeta('worldTime', worldTime + 2);
+    } else {
+      console.log("Not enough energy to train!");
+    }
+  },
+
+  rest: () => {
+    const { character, worldTime } = get();
+    if (!character) return;
+
+    // * 1. Check Location
+    if (!character.location.buildingId) {
+      console.log("You can't rest in the open. Find a safe building (e.g., a Tavern).");
+      return;
+    }
+
+    const building = StaticDataService.getBuilding(character.location.buildingId);
+    if (!building || !building.canRest) {
+      console.log("This building is not suitable for resting.");
+      return;
+    }
+
+    // * 2. Check Money
+    const REST_COST = 10;
+    if (character.money < REST_COST) {
+      console.log(`Resting costs ${REST_COST} coins. You are too poor.`);
+      return;
+    }
+
+    // * 3. Update Character
+    const updatedCharacter = { 
+      ...character,
+      money: character.money - REST_COST,
+      stats: {
+        ...character.stats,
+        energy: { ...character.stats.energy },
+        protection: { ...character.stats.protection }
+      }
+    };
+    
+    updatedCharacter.stats.energy.current = updatedCharacter.stats.energy.max;
+    updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
+    
+    const nextWorldTime = worldTime + 8; // Resting takes 8 hours
+    
+    set({ 
+      character: updatedCharacter,
+      worldTime: nextWorldTime 
+    });
     StorageService.saveCharacter(updatedCharacter);
+    StorageService.saveMeta('worldTime', nextWorldTime);
+    console.log(`You spent ${REST_COST} coins and rested for 8 hours. Energy restored.`);
   },
 
   equipItem: (itemId: UUID) => {
@@ -196,13 +311,24 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   moveToLocation: (locationId: UUID) => {
-    const { character, activeQuests } = get();
-    if (!character) return;
+    const { character, activeQuests, worldTime } = get();
+    if (!character) {
+      console.warn('Cannot move: no character');
+      return;
+    }
 
+    // * Use original character for check (no need for deep copy here, canMoveTo doesn't mutate)
     const moveResult = WorldService.canMoveTo(character, locationId);
     if (moveResult.allowed) {
-      const updatedCharacter = WorldService.moveCharacter(character, locationId);
+      // * moveCharacter creates a new object, so we can use the original character
+      const updatedCharacter = WorldService.moveCharacter(
+        character, 
+        locationId, 
+        moveResult.energyCost || 0
+      );
       
+      const nextWorldTime = worldTime + (moveResult.timeCost || 0);
+
       // Update Visit objectives
       const { updatedQuests } = QuestService.updateProgress(activeQuests, 'VISIT', locationId);
       
@@ -212,9 +338,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ 
         character: updatedCharacter, 
         activeQuests: updatedQuests,
-        activeEvent: event 
+        activeEvent: event,
+        worldTime: nextWorldTime
       });
       StorageService.saveCharacter(updatedCharacter);
+      StorageService.saveMeta('worldTime', nextWorldTime);
+      StorageService.saveMeta('activeQuests', updatedQuests);
+      
+      console.log(`Moved to ${locationId}. Energy: ${updatedCharacter.stats.energy.current}/${updatedCharacter.stats.energy.max}`);
+    } else {
+      console.warn('Cannot move:', moveResult.reason || 'Unknown reason');
     }
   },
 
@@ -254,6 +387,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       StorageService.saveCharacter(result.character);
       StorageService.saveInventory(result.inventory);
+      StorageService.saveMeta('activeQuests', updatedQuests);
     }
   },
 
@@ -271,10 +405,25 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   acceptQuest: (questId: UUID) => {
     const { activeQuests } = get();
+    
+    // * Check if quest exists and is not already accepted
+    const quest = activeQuests.find(q => q.id === questId);
+    if (!quest) {
+      console.warn(`Quest ${questId} not found in activeQuests`);
+      return;
+    }
+    
+    if (quest.status === QuestStatus.IN_PROGRESS || quest.status === QuestStatus.COMPLETED) {
+      console.log(`Quest ${questId} is already accepted`);
+      return;
+    }
+    
     const updatedQuests = activeQuests.map(q => 
       q.id === questId ? { ...q, status: QuestStatus.IN_PROGRESS } : q
     );
+    
     set({ activeQuests: updatedQuests });
+    StorageService.saveMeta('activeQuests', updatedQuests);
   },
 
   completeQuest: (questId: UUID) => {
@@ -295,6 +444,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
       StorageService.saveCharacter(updatedCharacter);
       StorageService.saveInventory(updatedInventory);
+      StorageService.saveMeta('activeQuests', updatedQuests);
     }
   },
 
@@ -304,7 +454,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { character, activeEvent } = get();
     if (!character || !activeEvent) return;
 
-    const { character: updatedCharacter, message } = EventService.processChoice(character, choiceId);
+    // * Deep copy stats
+    const characterToProcess = { 
+      ...character,
+      stats: {
+        ...character.stats,
+        essence: { ...character.stats.essence },
+        energy: { ...character.stats.energy },
+        protection: { ...character.stats.protection }
+      }
+    };
+
+    const { character: updatedCharacter, message } = EventService.processChoice(characterToProcess, choiceId);
     
     // In real app, show message to user
     console.log(message);

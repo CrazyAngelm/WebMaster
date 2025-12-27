@@ -6,7 +6,9 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
+import { WorldService } from '../services/WorldService';
 import { ShopView } from './ShopView';
+import { clsx } from 'clsx';
 
 export const WorldNavigation: React.FC = () => {
   const { character, moveToLocation, enterBuilding, exitBuilding } = useGameStore();
@@ -31,6 +33,11 @@ export const WorldNavigation: React.FC = () => {
               {currentBuilding.name}
             </h2>
             <p className="text-gray-400 italic text-sm">{currentBuilding.description}</p>
+            {currentBuilding.canRest && (
+              <p className="text-xs text-fantasy-accent mt-2 flex items-center gap-1">
+                <span>🌙</span> Здесь можно отдохнуть (кнопка в боковой панели)
+              </p>
+            )}
           </div>
           <button 
             onClick={() => exitBuilding()}
@@ -93,19 +100,42 @@ export const WorldNavigation: React.FC = () => {
 
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Пути перемещения</h3>
-            {connections.map(c => {
-              const target = StaticDataService.getLocation(c.toLocationId);
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => moveToLocation(c.toLocationId)}
-                  className="fantasy-panel p-4 text-left border-dashed hover:border-solid hover:border-fantasy-accent/50 transition-all group"
-                >
-                  <div className="text-sm font-bold group-hover:text-fantasy-accent">{target?.name}</div>
-                  <div className="text-[10px] text-gray-500 uppercase mt-1">{target?.zoneType === 'GREEN' ? 'Зелёная' : target?.zoneType === 'YELLOW' ? 'Жёлтая' : 'Красная'} зона</div>
-                </button>
-              );
-            })}
+            {connections.length === 0 ? (
+              <div className="text-[10px] text-gray-600 italic px-2">Нет доступных путей.</div>
+            ) : (
+              connections.map(c => {
+                const target = StaticDataService.getLocation(c.toLocationId);
+                const canMove = WorldService.canMoveTo(character, c.toLocationId);
+                const isDisabled = !canMove.allowed;
+                
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => moveToLocation(c.toLocationId)}
+                    disabled={isDisabled}
+                    className={clsx(
+                      "fantasy-panel p-4 text-left border-dashed transition-all group",
+                      isDisabled 
+                        ? "opacity-50 cursor-not-allowed grayscale" 
+                        : "hover:border-solid hover:border-fantasy-accent/50"
+                    )}
+                    title={isDisabled ? canMove.reason : undefined}
+                  >
+                    <div className="text-sm font-bold group-hover:text-fantasy-accent">{target?.name}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] text-gray-500 uppercase mt-1">
+                        {target?.zoneType === 'GREEN' ? 'Зелёная' : target?.zoneType === 'YELLOW' ? 'Жёлтая' : 'Красная'} зона
+                      </div>
+                      {isDisabled && (
+                        <span className="text-[9px] text-red-500 italic ml-2">
+                          {canMove.reason}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

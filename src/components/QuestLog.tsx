@@ -18,17 +18,42 @@ const translateQuestStatus = (status: QuestStatus): string => {
 };
 
 export const QuestLog: React.FC = () => {
-  const { activeQuests, completeQuest } = useGameStore();
+  const { activeQuests, completeQuest, acceptQuest } = useGameStore();
 
   const inProgress = activeQuests.filter(q => q.status === QuestStatus.IN_PROGRESS || q.status === QuestStatus.COMPLETED);
+  const available = activeQuests.filter(q => q.status === QuestStatus.NOT_STARTED);
 
   return (
     <div className="flex flex-col h-full gap-4">
       <h2 className="text-xl font-serif text-fantasy-accent uppercase tracking-tight mb-2">Журнал заданий</h2>
       
+      {/* Available Quests */}
+      {available.length > 0 && (
+        <div className="mb-4">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Доступные задания</h3>
+          <div className="space-y-2">
+            {available.map(quest => (
+              <div key={quest.id} className="fantasy-panel p-3 border-l-4 border-l-yellow-900/50">
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="font-bold text-white text-sm">{quest.title}</h4>
+                </div>
+                <p className="text-[10px] text-gray-400 mb-2 italic">{quest.description}</p>
+                <button
+                  onClick={() => acceptQuest(quest.id)}
+                  className="fantasy-button w-full py-1 text-[10px]"
+                >
+                  ПРИНЯТЬ ЗАДАНИЕ
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Active Quests */}
       {inProgress.length === 0 ? (
         <div className="fantasy-panel p-6 text-center text-gray-500 italic">
-          Нет активных заданий. Посетите НПС, чтобы найти работу.
+          {available.length === 0 ? 'Нет активных заданий. Посетите НПС, чтобы найти работу.' : 'Нет активных заданий.'}
         </div>
       ) : (
         <div className="space-y-4 overflow-y-auto custom-scrollbar pr-2">

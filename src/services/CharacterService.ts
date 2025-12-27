@@ -96,13 +96,21 @@ export class CharacterService {
 
   /**
    * * Applies essence training.
-   * * Docs: Training increases essence by 1-20 once per day.
+   * * Docs: Training increases essence by 1-20, costs energy.
    */
-  public static trainEssence(character: Character): number {
+  public static trainEssence(character: Character): { gain: number; energyCost: number } | null {
+    const ENERGY_COST = 20;
+    
+    if (character.stats.energy.current < ENERGY_COST) {
+      return null;
+    }
+
     const gain = DiceEngine.roll(20);
     character.stats.essence.max += gain;
     character.stats.essence.current += gain;
-    return gain;
+    character.stats.energy.current -= ENERGY_COST;
+    
+    return { gain, energyCost: ENERGY_COST };
   }
 
   /**
