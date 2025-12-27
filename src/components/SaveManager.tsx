@@ -36,10 +36,10 @@ export const SaveManager: React.FC = () => {
       const content = e.target?.result as string;
       const success = await importSave(content);
       if (success) {
-        alert('Save imported successfully!');
+        alert('Сохранение успешно импортировано!');
         window.location.reload(); // Reload to refresh state
       } else {
-        alert('Failed to import save.');
+        alert('Не удалось импортировать сохранение.');
       }
     };
     reader.readAsText(file);
@@ -50,21 +50,21 @@ export const SaveManager: React.FC = () => {
       <button 
         onClick={() => saveGame()}
         className="p-1 hover:text-fantasy-accent text-gray-400 transition-colors"
-        title="Quick Save"
+        title="Быстрое сохранение"
       >
         <Save size={16} />
       </button>
       <button 
         onClick={handleExport}
         className="p-1 hover:text-fantasy-accent text-gray-400 transition-colors"
-        title="Export Save"
+        title="Экспорт сохранения"
       >
         <Download size={16} />
       </button>
       <button 
         onClick={handleImportClick}
         className="p-1 hover:text-fantasy-accent text-gray-400 transition-colors"
-        title="Import Save"
+        title="Импорт сохранения"
       >
         <Upload size={16} />
       </button>

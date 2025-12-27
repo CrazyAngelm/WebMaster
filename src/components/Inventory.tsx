@@ -37,14 +37,39 @@ export const Inventory: React.FC = () => {
     }
   };
 
+  const translateRarity = (rarity: Rarity): string => {
+    switch (rarity) {
+      case Rarity.COMMON: return 'Обычное';
+      case Rarity.RARE: return 'Редкое';
+      case Rarity.EPIC: return 'Эпическое';
+      case Rarity.MYTHIC: return 'Мифическое';
+      case Rarity.LEGENDARY: return 'Легендарное';
+      case Rarity.DIVINE: return 'Божественное';
+      default: return rarity;
+    }
+  };
+
+  const translateItemType = (type: ItemType): string => {
+    switch (type) {
+      case ItemType.WEAPON: return 'Оружие';
+      case ItemType.ARMOR: return 'Броня';
+      case ItemType.ARTIFACT: return 'Артефакт';
+      case ItemType.CONSUMABLE: return 'Расходник';
+      case ItemType.MATERIAL: return 'Материал';
+      case ItemType.BAG: return 'Сумка';
+      case ItemType.SHIELD: return 'Щит';
+      default: return type;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-serif text-fantasy-accent uppercase tracking-widest flex items-center gap-2">
-          <Package size={24} /> Inventory
+          <Package size={24} /> Инвентарь
         </h2>
         <div className="text-xs text-gray-500 uppercase font-bold tracking-tighter">
-          Weight: {slots.filter(s => s).reduce((acc, s) => acc + (itemTemplates.get(s.templateId)?.weight || 0), 0)} / {inventory.maxWeight}
+          Вес: {slots.filter(s => s).reduce((acc, s) => acc + (itemTemplates.get(s.templateId)?.weight || 0), 0)} / {inventory.maxWeight}
         </div>
       </div>
 
@@ -97,7 +122,7 @@ export const Inventory: React.FC = () => {
           <div className="flex justify-between items-start mb-2">
             <div>
               <h3 className="text-fantasy-accent font-serif text-lg leading-tight uppercase tracking-wider">{hoveredItem.template.name}</h3>
-              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{hoveredItem.template.rarity} {hoveredItem.template.type}</div>
+              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{translateRarity(hoveredItem.template.rarity)} {translateItemType(hoveredItem.template.type)}</div>
             </div>
             <div className="text-xs bg-black/30 px-2 py-1 rounded border border-fantasy-border text-gray-400">
               {hoveredItem.template.weight}kg
@@ -107,25 +132,25 @@ export const Inventory: React.FC = () => {
           <div className="space-y-2 text-sm text-gray-300">
             {hoveredItem.template.baseEssence && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
-                <span className="text-gray-500">Weapon Essence:</span>
+                <span className="text-gray-500">Сущность оружия:</span>
                 <span className="text-fantasy-essence font-bold">{hoveredItem.item.currentEssence} / {hoveredItem.template.maxEssence}</span>
               </div>
             )}
             {hoveredItem.template.ignoreDamage && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
-                <span className="text-gray-500">Damage Mitigation:</span>
+                <span className="text-gray-500">Снижение урона:</span>
                 <span className="text-fantasy-protection font-bold">{hoveredItem.template.ignoreDamage}</span>
               </div>
             )}
             <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
-              <span className="text-gray-500">Durability:</span>
+              <span className="text-gray-500">Прочность:</span>
               <span>{hoveredItem.item.currentDurability} / {hoveredItem.template.baseDurability || '∞'}</span>
             </div>
           </div>
 
           <div className="mt-3 flex items-center gap-2 text-[10px] text-gray-500 italic">
             <Info size={12} />
-            Click to {hoveredItem.item.isEquipped ? 'unequip' : 'equip'}
+            Нажмите, чтобы {hoveredItem.item.isEquipped ? 'снять' : 'экипировать'}
           </div>
         </div>
       )}

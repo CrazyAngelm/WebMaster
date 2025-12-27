@@ -15,7 +15,7 @@ export const CombatScreen: React.FC = () => {
     // Mocking an enemy for the battle
     const enemy: any = {
       id: 'enemy-wolf',
-      name: 'Forest Wolf',
+      name: 'Лесной волк',
       stats: {
         essence: { current: 30, max: 30 },
         protection: { current: 0, max: 0 },
@@ -49,9 +49,9 @@ export const CombatScreen: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-fantasy-border rounded bg-black/10">
         <Sword size={48} className="text-fantasy-border mb-4" />
-        <h3 className="text-xl font-serif text-gray-500 mb-4 uppercase tracking-widest">No Active Battle</h3>
+        <h3 className="text-xl font-serif text-gray-500 mb-4 uppercase tracking-widest">Нет активного боя</h3>
         <button onClick={handleStartBattle} className="fantasy-button">
-          Seek Conflict
+          Искать конфликт
         </button>
       </div>
     );
@@ -65,7 +65,7 @@ export const CombatScreen: React.FC = () => {
       {/* Initiative Timeline */}
       <div className="bg-fantasy-surface border border-fantasy-border rounded p-2 overflow-x-auto">
         <div className="flex items-center gap-4 min-w-max">
-          <div className="text-[10px] uppercase font-bold text-gray-600 px-2 border-r border-fantasy-border">Initiative</div>
+          <div className="text-[10px] uppercase font-bold text-gray-600 px-2 border-r border-fantasy-border">Инициатива</div>
           {battle.turnOrder.map((p, i) => (
             <div 
               key={p.id}
@@ -77,7 +77,7 @@ export const CombatScreen: React.FC = () => {
               )}
             >
               {p.characterId === character?.id ? <UserIcon /> : <Skull size={14} />}
-              <span>{p.characterId === character?.id ? 'You' : 'Foe'}</span>
+              <span>{p.characterId === character?.id ? 'Вы' : 'Враг'}</span>
               <span className="opacity-50">#{p.initiative}</span>
             </div>
           ))}
@@ -100,7 +100,7 @@ export const CombatScreen: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{attacker?.name}</div>
-            <StatSmall label="Essence" current={attacker?.stats.essence.current || 0} max={attacker?.stats.essence.max || 1} color="bg-fantasy-essence" />
+            <StatSmall label="Сущность" current={attacker?.stats.essence.current || 0} max={attacker?.stats.essence.max || 1} color="bg-fantasy-essence" />
           </div>
         </div>
 
@@ -118,7 +118,7 @@ export const CombatScreen: React.FC = () => {
           </div>
           <div className="text-center">
             <div className="font-serif text-lg text-fantasy-blood uppercase tracking-wider">{defender?.name}</div>
-            <StatSmall label="Essence" current={defender?.stats.essence.current || 0} max={defender?.stats.essence.max || 1} color="bg-fantasy-blood" />
+            <StatSmall label="Сущность" current={defender?.stats.essence.current || 0} max={defender?.stats.essence.max || 1} color="bg-fantasy-blood" />
           </div>
         </div>
       </div>
@@ -132,27 +132,27 @@ export const CombatScreen: React.FC = () => {
               onClick={handleAttack}
               className={clsx("fantasy-button flex items-center gap-2 px-8", !isPlayerTurn && "opacity-30 cursor-not-allowed")}
             >
-              <Sword size={18} /> Attack
+              <Sword size={18} /> Атака
             </button>
             <button 
               disabled={!isPlayerTurn} 
               className={clsx("fantasy-button flex items-center gap-2 opacity-30 cursor-not-allowed")}
             >
-              <Zap size={18} /> Skill
+              <Zap size={18} /> Умение
             </button>
             <button 
               disabled={!isPlayerTurn} 
               onClick={nextTurn}
               className={clsx("fantasy-button flex items-center gap-2", !isPlayerTurn && "opacity-30 cursor-not-allowed")}
             >
-              Wait
+              Ждать
             </button>
           </>
         ) : (
           <div className="text-center">
-            <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">Battle Finished</h4>
+            <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">Бой завершён</h4>
             <button onClick={endBattle} className="fantasy-button">
-              Return to Hub
+              Вернуться в убежище
             </button>
           </div>
         )}
@@ -161,7 +161,7 @@ export const CombatScreen: React.FC = () => {
       {/* Battle Log */}
       <div className="bg-black/40 border border-fantasy-border rounded p-4 h-48 flex flex-col">
         <div className="text-[10px] uppercase font-bold text-gray-600 mb-2 tracking-widest flex items-center gap-2">
-          <ChevronRight size={12} /> Battle History
+          <ChevronRight size={12} /> История боя
         </div>
         <div className="flex-1 overflow-y-auto space-y-1 font-mono text-xs">
           {battle.log.map((log, i) => (

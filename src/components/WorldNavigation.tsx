@@ -36,7 +36,7 @@ export const WorldNavigation: React.FC = () => {
             onClick={() => exitBuilding()}
             className="fantasy-button px-6"
           >
-            Leave Building
+            Покинуть здание
           </button>
         </div>
 
@@ -45,7 +45,7 @@ export const WorldNavigation: React.FC = () => {
             <ShopView />
           ) : (
             <div className="fantasy-panel p-8 text-center text-gray-500 italic">
-              There is nothing to do here right now.
+              Здесь пока нечего делать.
             </div>
           )}
         </div>
@@ -58,7 +58,7 @@ export const WorldNavigation: React.FC = () => {
       {/* Current Location Info */}
       <div className="md:col-span-2 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
         <div className="fantasy-panel p-6">
-          <div className="text-[10px] text-fantasy-accent uppercase tracking-[0.2em] mb-2">Current Location</div>
+          <div className="text-[10px] text-fantasy-accent uppercase tracking-[0.2em] mb-2">Текущая локация</div>
           <h2 className="text-3xl font-serif text-white uppercase mb-4">{currentLoc?.name}</h2>
           <p className="text-gray-400 mb-6 leading-relaxed">{currentLoc?.description}</p>
           <div className="flex gap-2">
@@ -67,16 +67,16 @@ export const WorldNavigation: React.FC = () => {
               currentLoc?.zoneType === 'YELLOW' ? 'border-yellow-900/50 text-yellow-500' : 
               'border-red-900/50 text-red-500'
             }`}>
-              {currentLoc?.zoneType} ZONE
+              {currentLoc?.zoneType === 'GREEN' ? 'ЗЕЛЁНАЯ' : currentLoc?.zoneType === 'YELLOW' ? 'ЖЁЛТАЯ' : 'КРАСНАЯ'} ЗОНА
             </span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Buildings</h3>
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Здания</h3>
             {buildings.length === 0 ? (
-              <div className="text-[10px] text-gray-600 italic px-2">No accessible buildings.</div>
+              <div className="text-[10px] text-gray-600 italic px-2">Нет доступных зданий.</div>
             ) : (
               buildings.map(b => (
                 <button
@@ -85,14 +85,14 @@ export const WorldNavigation: React.FC = () => {
                   className="fantasy-panel p-4 text-left hover:border-fantasy-accent/50 transition-all group"
                 >
                   <div className="text-sm font-bold group-hover:text-fantasy-accent">{b.name}</div>
-                  <div className="text-[10px] text-gray-500 uppercase mt-1">{b.hasShop ? 'Shop' : 'Point of Interest'}</div>
+                  <div className="text-[10px] text-gray-500 uppercase mt-1">{b.hasShop ? 'Магазин' : 'Точка интереса'}</div>
                 </button>
               ))
             )}
           </div>
 
           <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Travel Paths</h3>
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest px-2">Пути перемещения</h3>
             {connections.map(c => {
               const target = StaticDataService.getLocation(c.toLocationId);
               return (
@@ -102,7 +102,7 @@ export const WorldNavigation: React.FC = () => {
                   className="fantasy-panel p-4 text-left border-dashed hover:border-solid hover:border-fantasy-accent/50 transition-all group"
                 >
                   <div className="text-sm font-bold group-hover:text-fantasy-accent">{target?.name}</div>
-                  <div className="text-[10px] text-gray-500 uppercase mt-1">{target?.zoneType} Zone</div>
+                  <div className="text-[10px] text-gray-500 uppercase mt-1">{target?.zoneType === 'GREEN' ? 'Зелёная' : target?.zoneType === 'YELLOW' ? 'Жёлтая' : 'Красная'} зона</div>
                 </button>
               );
             })}
@@ -116,8 +116,8 @@ export const WorldNavigation: React.FC = () => {
           <div className="w-12 h-12 border border-fantasy-border rounded-full flex items-center justify-center mb-4">
             <span className="text-xl">🔍</span>
           </div>
-          <div className="text-sm font-serif uppercase tracking-widest">Search Area</div>
-          <div className="text-[10px] text-gray-500 mt-2">NOT IMPLEMENTED</div>
+          <div className="text-sm font-serif uppercase tracking-widest">Поиск области</div>
+          <div className="text-[10px] text-gray-500 mt-2">НЕ РЕАЛИЗОВАНО</div>
         </div>
       </div>
     </div>

@@ -8,13 +8,13 @@ import { GameEvent, Rarity } from '../types/game';
 export const EVENTS: GameEvent[] = [
   {
     id: 'evt-mysterious-traveler',
-    title: 'A Mysterious Traveler',
-    description: 'A hooded figure approaches you on the road. They offer a strange, glowing fruit in exchange for a few coins.',
+    title: 'Таинственный путешественник',
+    description: 'Закутанная фигура приближается к вам на дороге. Они предлагают странный светящийся фрукт в обмен на несколько монет.',
     rarity: Rarity.COMMON,
     choices: [
       {
         id: 'choice-buy-fruit',
-        text: 'Pay 10 coins for the fruit',
+        text: 'Заплатить 10 монет за фрукт',
         outcome: (state: any) => {
           // Logic handled in EventService
         },
@@ -22,79 +22,79 @@ export const EVENTS: GameEvent[] = [
       },
       {
         id: 'choice-ignore',
-        text: 'Politely decline and walk away',
+        text: 'Вежливо отказаться и уйти',
         outcome: (state: any) => {}
       }
     ]
   },
   {
     id: 'evt-ambush-wolves',
-    title: 'Sudden Ambush!',
-    description: 'A pack of hungry wolves emerges from the shadows! You have no choice but to fight.',
+    title: 'Внезапная засада!',
+    description: 'Стая голодных волков выходит из теней! У вас нет выбора, кроме как сражаться.',
     rarity: Rarity.COMMON,
     autoTriggerNextId: undefined // Could lead to combat screen
   },
   {
     id: 'evt-ancient-shrine',
-    title: 'Ancient Shrine',
-    description: 'You discover a hidden shrine overgrown with moss. A faint magical energy pulsates from the altar.',
+    title: 'Древнее святилище',
+    description: 'Вы обнаруживаете скрытое святилище, заросшее мхом. Слабая магическая энергия пульсирует от алтаря.',
     rarity: Rarity.RARE,
     choices: [
       {
         id: 'choice-meditate',
-        text: 'Meditate at the altar',
+        text: 'Медитировать у алтаря',
         outcome: (state: any) => {}
       }
     ]
   },
   {
     id: 'evt-meteor-impact',
-    title: 'Meteor Impact',
-    description: 'A streak of light tears through the sky and crashes nearby. You find a crater with a glowing metal core.',
+    title: 'Падение метеорита',
+    description: 'Полоса света пронзает небо и падает поблизости. Вы находите кратер со светящимся металлическим ядром.',
     rarity: Rarity.EPIC,
     choices: [
       {
         id: 'choice-extract-ore',
-        text: 'Attempt to extract the celestial ore',
+        text: 'Попытаться извлечь небесную руду',
         outcome: (state: any) => {}
       }
     ]
   },
   {
     id: 'evt-dimensional-rift',
-    title: 'Dimensional Rift',
-    description: 'The air shimmers and a crack in reality opens before you. Strange whispers echo from the void.',
+    title: 'Разлом измерений',
+    description: 'Воздух мерцает, и трещина в реальности открывается перед вами. Странные шёпоты эхом отдаются из пустоты.',
     rarity: Rarity.MYTHIC,
     choices: [
       {
         id: 'choice-step-through',
-        text: 'Step into the rift',
+        text: 'Шагнуть в разлом',
         outcome: (state: any) => {}
       }
     ]
   },
   {
     id: 'evt-celestial-trial',
-    title: 'Celestial Trial',
-    description: 'The clouds part and a beam of golden light descends. A celestial guardian appears to test your worth.',
+    title: 'Небесное испытание',
+    description: 'Облака расступаются, и луч золотого света опускается. Появляется небесный страж, чтобы испытать вашу ценность.',
     rarity: Rarity.LEGENDARY,
     choices: [
       {
         id: 'choice-accept-trial',
-        text: 'Accept the trial',
+        text: 'Принять испытание',
         outcome: (state: any) => {}
       }
     ]
   },
   {
     id: 'evt-divine-ascension',
-    title: 'Divine Ascension',
-    description: 'You stand at the threshold of divinity. The world around you begins to dissolve into pure light.',
+    title: 'Божественное вознесение',
+    description: 'Вы стоите на пороге божественности. Мир вокруг вас начинает растворяться в чистом свете.',
     rarity: Rarity.DIVINE,
     choices: [
       {
         id: 'choice-embrace-divinity',
-        text: 'Embrace the light',
+        text: 'Принять свет',
         outcome: (state: any) => {}
       }
     ]

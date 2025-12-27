@@ -8,14 +8,14 @@ import { Quest, QuestStatus } from '../types/game';
 export const QUESTS: Quest[] = [
   {
     id: 'quest-tutorial-1',
-    title: 'Welcome to Hornygrad',
-    description: 'Find your bearings in the outskirts of the city.',
+    title: 'Добро пожаловать в Хорниград',
+    description: 'Ориентируйтесь на окраинах города.',
     status: QuestStatus.NOT_STARTED,
     rankRequired: 1,
     objectives: [
       {
         id: 'obj-1',
-        description: 'Visit the City Gates',
+        description: 'Посетите городские ворота',
         type: 'VISIT',
         targetId: 'loc-city-gates',
         requiredAmount: 1,
@@ -30,14 +30,14 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'quest-merchant-aid',
-    title: 'Merchant Assistance',
-    description: 'The local merchant needs some copper ore for a custom order.',
+    title: 'Помощь торговцу',
+    description: 'Местному торговцу нужна медная руда для индивидуального заказа.',
     status: QuestStatus.NOT_STARTED,
     rankRequired: 1,
     objectives: [
       {
         id: 'obj-2',
-        description: 'Collect Copper Ore',
+        description: 'Соберите медную руду',
         type: 'COLLECT',
         targetId: 'mat-copper-ore',
         requiredAmount: 5,

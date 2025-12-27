@@ -17,28 +17,28 @@ export const MOCK_RANKS: Rank[] = [
   {
     id: 'rank-1',
     order: 1,
-    name: 'Novice',
+    name: 'Новичок',
     maxEssence: 100,
     maxArtifacts: 1,
     maxSkills: 2,
-    breakthroughConditions: ['Complete tutorial']
+    breakthroughConditions: ['Завершить обучение']
   },
   {
     id: 'rank-2',
     order: 2,
-    name: 'Disciple',
+    name: 'Ученик',
     maxEssence: 500,
     maxArtifacts: 2,
     maxSkills: 4,
-    breakthroughConditions: ['Defeat 10 wolves', '1d100 > 50']
+    breakthroughConditions: ['Победить 10 волков', '1d100 > 50']
   }
 ];
 
 export const MOCK_RACES: Race[] = [
   {
     id: 'race-human',
-    name: 'Human',
-    description: 'Versatile and ambitious.',
+    name: 'Человек',
+    description: 'Универсальный и амбициозный.',
     baseSpeedId: 'speed-ordinary',
     innateSkills: [],
     passiveEffects: []
@@ -53,8 +53,8 @@ export const MOCK_CHARACTER: Character = {
   name: 'Kaelen',
   raceId: 'race-human',
   rankId: 'rank-1',
-  description: 'A young seeker of power.',
-  bio: 'Born in the outskirts of Hornygrad, Kaelen seeks to master the essence.',
+  description: 'Молодой искатель силы.',
+  bio: 'Рождённый на окраинах Хорниграда, Каэлен стремится овладеть сущностью.',
   stats: {
     essence: { current: 50, max: 100 },
     protection: { current: 20, max: 20 },
@@ -63,7 +63,7 @@ export const MOCK_CHARACTER: Character = {
   inventoryId: 'inv-1',
   location: {
     locationId: 'loc-outskirts',
-    position: 'Center'
+    position: 'Центр'
   },
   isDead: false,
   money: 100,

@@ -76,7 +76,7 @@ function App() {
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-fantasy-dark flex items-center justify-center text-fantasy-accent font-serif tracking-widest animate-pulse">
-        LOADING DATA...
+ЗАГРУЗКА ДАННЫХ...
       </div>
     );
   }
@@ -93,25 +93,25 @@ function App() {
           onClick={() => setView('hub')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'hub' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Overview
+Обзор
         </button>
         <button 
           onClick={() => setView('explore')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'explore' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Explore
+Исследовать
         </button>
         <button 
           onClick={() => setView('inventory')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'inventory' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Inventory
+Инвентарь
         </button>
         <button 
           onClick={() => setView('combat')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'combat' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-          Combat
+Бой
         </button>
       </div>
 
@@ -121,26 +121,26 @@ function App() {
           {view === 'hub' && (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
               <h1 className="text-5xl font-serif text-fantasy-accent mb-4 uppercase tracking-tighter">Hornygrad</h1>
-              <p className="text-gray-400 max-w-md italic mb-10">"Where steel meets essence, and mortality is but a threshold."</p>
+              <p className="text-gray-400 max-w-md italic mb-10">"Где сталь встречается с сущностью, а смертность — лишь порог."</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl w-full">
                 <div className="fantasy-panel p-6 flex flex-col items-center gap-3">
-                  <div className="text-fantasy-accent font-serif text-lg">Daily Meditation</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">Connect with your essence</div>
+                  <div className="text-fantasy-accent font-serif text-lg">Ежедневная медитация</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">Соединись со своей сущностью</div>
                   <button 
                     onClick={() => trainCharacter()}
                     className="fantasy-button w-full mt-2"
                   >
-                    Meditate
+                    Медитировать
                   </button>
                 </div>
                 <div className="fantasy-panel p-6 flex flex-col items-center gap-3">
-                  <div className="text-fantasy-accent font-serif text-lg">Venture Out</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">The world awaits</div>
+                  <div className="text-fantasy-accent font-serif text-lg">Отправиться в путь</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-widest">Мир ждёт</div>
                   <button 
                     onClick={() => setView('explore')}
                     className="fantasy-button w-full mt-2"
                   >
-                    Leave Hub
+                    Покинуть убежище
                   </button>
                 </div>
               </div>
@@ -157,13 +157,13 @@ function App() {
           <QuestLog />
           
           <div className="mt-8 fantasy-panel p-4 bg-fantasy-accent/5 border-fantasy-accent/20">
-            <h4 className="text-[10px] font-bold text-fantasy-accent uppercase mb-2">Character Info</h4>
+            <h4 className="text-[10px] font-bold text-fantasy-accent uppercase mb-2">Информация о персонаже</h4>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-500">Money:</span>
+              <span className="text-gray-500">Деньги:</span>
               <span className="text-white font-bold">{character?.money}</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-gray-500">Location:</span>
+              <span className="text-gray-500">Локация:</span>
               <span className="text-white">{character?.location.position}</span>
             </div>
           </div>

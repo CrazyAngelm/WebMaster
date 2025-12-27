@@ -32,7 +32,7 @@ export const CharacterSheet: React.FC = () => {
         <div className="space-y-1">
           <div className="flex justify-between text-xs uppercase font-bold tracking-tighter">
             <span className="text-fantasy-essence flex items-center gap-1">
-              <Zap size={12} /> Essence
+              <Zap size={12} /> Сущность
             </span>
             <span>{character.stats.essence.current} / {character.stats.essence.max}</span>
           </div>
@@ -48,7 +48,7 @@ export const CharacterSheet: React.FC = () => {
         <div className="space-y-1">
           <div className="flex justify-between text-xs uppercase font-bold tracking-tighter">
             <span className="text-fantasy-protection flex items-center gap-1">
-              <Shield size={12} /> Protection
+              <Shield size={12} /> Защита
             </span>
             <span>{character.stats.protection.current} / {character.stats.protection.max}</span>
           </div>
@@ -63,16 +63,16 @@ export const CharacterSheet: React.FC = () => {
 
       {/* Bonuses Grid */}
       <div className="grid grid-cols-2 gap-2">
-        <StatBox label="Evasion" value={character.bonuses.evasion} color="text-gray-400" />
-        <StatBox label="Accuracy" value={character.bonuses.accuracy} color="text-gray-400" />
-        <StatBox label="Resistance" value={character.bonuses.damageResistance} color="text-gray-400" />
-        <StatBox label="Initiative" value={character.bonuses.initiative} color="text-gray-400" />
+        <StatBox label="Уклонение" value={character.bonuses.evasion} color="text-gray-400" />
+        <StatBox label="Точность" value={character.bonuses.accuracy} color="text-gray-400" />
+        <StatBox label="Сопротивление" value={character.bonuses.damageResistance} color="text-gray-400" />
+        <StatBox label="Инициатива" value={character.bonuses.initiative} color="text-gray-400" />
       </div>
 
       {/* Bio / Description */}
       <div className="p-3 bg-black/30 border border-fantasy-border rounded text-sm text-gray-400 italic leading-relaxed">
         <div className="flex items-center gap-1 not-italic text-xs font-bold uppercase text-gray-500 mb-1">
-          <Info size={12} /> Biography
+          <Info size={12} /> Биография
         </div>
         {character.bio}
       </div>

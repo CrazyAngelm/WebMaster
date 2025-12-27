@@ -34,7 +34,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               }`}
             >
               <User size={18} />
-              <span className="text-xs uppercase font-bold tracking-tighter">Character</span>
+              <span className="text-xs uppercase font-bold tracking-tighter">Персонаж</span>
             </button>
             <button 
               onClick={() => onNavigate?.('inventory')}
@@ -45,7 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               }`}
             >
               <Package size={18} />
-              <span className="text-xs uppercase font-bold tracking-tighter">Inventory</span>
+              <span className="text-xs uppercase font-bold tracking-tighter">Инвентарь</span>
             </button>
             <button 
               onClick={() => onNavigate?.('world')}
@@ -56,7 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               }`}
             >
               <MapIcon size={18} />
-              <span className="text-xs uppercase font-bold tracking-tighter">World</span>
+              <span className="text-xs uppercase font-bold tracking-tighter">Мир</span>
             </button>
             <button 
               onClick={() => onNavigate?.('combat')}
@@ -67,7 +67,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               }`}
             >
               <Sword size={18} />
-              <span className="text-xs uppercase font-bold tracking-tighter">Combat</span>
+              <span className="text-xs uppercase font-bold tracking-tighter">Бой</span>
             </button>
           </nav>
         </div>
@@ -89,7 +89,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
         <aside className="w-80 bg-fantasy-surface border-l border-fantasy-border flex flex-col overflow-hidden hidden xl:flex">
           <div className="p-3 border-b border-fantasy-border bg-fantasy-surface/50">
             <div className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-              {battle ? 'Battle Log' : 'Global Log'}
+              {battle ? 'Журнал боя' : 'Общий журнал'}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2 text-[10px] font-mono uppercase tracking-tighter">
@@ -101,9 +101,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               ))
             ) : (
               <>
-                <div className="text-gray-500">[System] Welcome to Hornygrad.</div>
-                <div className="text-gray-500">[System] Assets loaded.</div>
-                <div className="text-gray-500">[System] Ready for cultivation.</div>
+                <div className="text-gray-500">[Система] Добро пожаловать в Хорниград.</div>
+                <div className="text-gray-500">[Система] Ресурсы загружены.</div>
+                <div className="text-gray-500">[Система] Готов к культивации.</div>
               </>
             )}
           </div>

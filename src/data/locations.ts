@@ -8,29 +8,29 @@ import { Location, Building, LocationConnection, ZoneType } from '../types/game'
 export const LOCATIONS: Location[] = [
   {
     id: 'loc-outskirts',
-    name: 'Hornygrad Outskirts',
-    description: 'The dusty, neglected edges of the city. A place for those who wish to remain unnoticed.',
+    name: 'Окраины Хорниграда',
+    description: 'Пыльные, заброшенные окраины города. Место для тех, кто хочет остаться незамеченным.',
     zoneType: ZoneType.GREEN,
     buildings: ['build-rusty-anchor']
   },
   {
     id: 'loc-city-gates',
-    name: 'City Gates',
-    description: 'The massive iron-bound gates of Hornygrad. Heavily guarded and always busy.',
+    name: 'Городские ворота',
+    description: 'Массивные железные ворота Хорниграда. Сильно охраняемые и всегда оживлённые.',
     zoneType: ZoneType.GREEN,
     buildings: ['build-guard-post']
   },
   {
     id: 'loc-merchant-district',
-    name: 'Merchant District',
-    description: 'The heart of commerce. Stalls and shops line the streets, selling everything from exotic spices to basic steel.',
+    name: 'Торговый район',
+    description: 'Сердце коммерции. Прилавки и магазины выстроились вдоль улиц, продавая всё от экзотических специй до обычной стали.',
     zoneType: ZoneType.GREEN,
     buildings: ['build-district-market']
   },
   {
     id: 'loc-forsaken-woods',
-    name: 'Forsaken Woods',
-    description: 'A dark, twisted forest where the essence feels heavy and hostile.',
+    name: 'Заброшенный лес',
+    description: 'Тёмный, извилистый лес, где сущность ощущается тяжёлой и враждебной.',
     zoneType: ZoneType.YELLOW,
     buildings: []
   }
@@ -40,22 +40,22 @@ export const BUILDINGS: Building[] = [
   {
     id: 'build-rusty-anchor',
     locationId: 'loc-outskirts',
-    name: 'The Rusty Anchor Tavern',
-    description: 'A dimly lit tavern smelling of cheap ale and desperate dreams.',
+    name: 'Таверна "Ржавый якорь"',
+    description: 'Тускло освещённая таверна, пахнущая дешёвым элем и отчаянными мечтами.',
     hasShop: true
   },
   {
     id: 'build-guard-post',
     locationId: 'loc-city-gates',
-    name: 'East Gate Guard Post',
-    description: 'A sturdy stone building where guards monitor all traffic entering the city.',
+    name: 'Караульный пост восточных ворот',
+    description: 'Прочное каменное здание, где стража следит за всем трафиком, входящим в город.',
     hasShop: false
   },
   {
     id: 'build-district-market',
     locationId: 'loc-merchant-district',
-    name: 'General Store',
-    description: 'A well-stocked shop catering to travelers and residents alike.',
+    name: 'Универсальный магазин',
+    description: 'Хорошо укомплектованный магазин, обслуживающий как путешественников, так и жителей.',
     hasShop: true
   }
 ];

@@ -14,7 +14,7 @@ export const EventOverlay: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div className="fantasy-panel max-w-2xl w-full p-8 relative animate-in fade-in zoom-in duration-300">
-        <div className="text-[10px] text-fantasy-accent uppercase tracking-[0.3em] mb-4 text-center">World Event</div>
+        <div className="text-[10px] text-fantasy-accent uppercase tracking-[0.3em] mb-4 text-center">Событие мира</div>
         
         <h2 className="text-3xl font-serif text-white uppercase text-center mb-6 tracking-tight">
           {activeEvent.title}
@@ -24,7 +24,7 @@ export const EventOverlay: React.FC = () => {
           <div className="w-full h-48 mb-6 border border-fantasy-border bg-black/50 overflow-hidden">
             {/* Event image placeholder */}
             <div className="w-full h-full flex items-center justify-center text-gray-700 italic">
-              [Visualizing Scene...]
+              [Визуализация сцены...]
             </div>
           </div>
         )}
@@ -54,7 +54,7 @@ export const EventOverlay: React.FC = () => {
               onClick={() => handleEventChoice('auto-dismiss')}
               className="w-full fantasy-button py-3"
             >
-              CONTINUE
+              ПРОДОЛЖИТЬ
             </button>
           )}
         </div>

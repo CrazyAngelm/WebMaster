@@ -18,29 +18,29 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- MATERIALS ---
   {
     id: 'mat-copper-ore',
-    name: 'Copper Ore',
+    name: 'Медная руда',
     type: ItemType.MATERIAL,
     rarity: Rarity.COMMON,
     weight: 5,
     stackSize: 20,
     isUnique: false,
-    description: 'A common ore used for basic smithing.',
+    description: 'Обычная руда, используемая для базовой ковки.',
     basePrice: 10
   },
   {
     id: 'mat-iron-ore',
-    name: 'Iron Ore',
+    name: 'Железная руда',
     type: ItemType.MATERIAL,
     rarity: Rarity.RARE,
     weight: 7,
     stackSize: 20,
     isUnique: false,
-    description: 'A sturdy ore for quality weapons and armor.',
+    description: 'Прочная руда для качественного оружия и доспехов.',
     basePrice: 50
   },
   {
     id: 'mat-linen-fabric',
-    name: 'Linen Fabric',
+    name: 'Льняная ткань',
     type: ItemType.MATERIAL,
     rarity: Rarity.COMMON,
     weight: 2,
@@ -50,7 +50,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'mat-wolf-heart',
-    name: 'Wolf Heart',
+    name: 'Сердце волка',
     type: ItemType.MATERIAL,
     rarity: Rarity.COMMON,
     weight: 2,
@@ -60,7 +60,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'mat-tin-ore',
-    name: 'Tin Ore',
+    name: 'Оловянная руда',
     type: ItemType.MATERIAL,
     rarity: Rarity.COMMON,
     weight: 5,
@@ -70,7 +70,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'mat-adamantite-ore',
-    name: 'Adamantite Ore',
+    name: 'Адамантитовая руда',
     type: ItemType.MATERIAL,
     rarity: Rarity.MYTHIC,
     weight: 15,
@@ -80,7 +80,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'mat-silk-fabric',
-    name: 'Silk Fabric',
+    name: 'Шёлковая ткань',
     type: ItemType.MATERIAL,
     rarity: Rarity.EPIC,
     weight: 3,
@@ -92,7 +92,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- WEAPONS ---
   {
     id: 'wpn-thief-dagger',
-    name: 'Thief Dagger',
+    name: 'Кинжал вора',
     type: ItemType.WEAPON,
     category: WeaponCategory.ONE_HANDED,
     rarity: Rarity.COMMON,
@@ -107,7 +107,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'wpn-gross-messer',
-    name: 'Gross-Messer',
+    name: 'Гросс-мессер',
     type: ItemType.WEAPON,
     category: WeaponCategory.ONE_HANDED,
     rarity: Rarity.EPIC,
@@ -118,12 +118,12 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
     maxEssence: 300,
     penetration: PenetrationType.MEDIUM,
     distance: DistanceType.CLOSE,
-    description: '+80 Initiative',
+    description: '+80 Инициатива',
     basePrice: 850
   },
   {
     id: 'wpn-poleaxe',
-    name: 'Poleaxe',
+    name: 'Полэкс',
     type: ItemType.WEAPON,
     category: WeaponCategory.TWO_HANDED,
     rarity: Rarity.MYTHIC,
@@ -134,12 +134,12 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
     maxEssence: 800,
     penetration: PenetrationType.HEAVY,
     distance: DistanceType.CLOSE,
-    description: '+70 Accuracy, +30 Initiative, +100 Protection',
+    description: '+70 Точность, +30 Инициатива, +100 Защита',
     basePrice: 2500
   },
   {
     id: 'wpn-impaler-bow',
-    name: 'Impaler Short Bow',
+    name: 'Короткий лук "Пронзатель"',
     type: ItemType.WEAPON,
     category: WeaponCategory.TWO_HANDED,
     rarity: Rarity.COMMON,
@@ -156,7 +156,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- ARMOR ---
   {
     id: 'arm-light-leather',
-    name: 'Light Leather Armor',
+    name: 'Лёгкая кожаная броня',
     type: ItemType.ARMOR,
     category: ArmorCategory.LIGHT,
     rarity: Rarity.COMMON,
@@ -169,7 +169,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'arm-medium-chain',
-    name: 'Medium Chainmail',
+    name: 'Средняя кольчуга',
     type: ItemType.ARMOR,
     category: ArmorCategory.MEDIUM,
     rarity: Rarity.RARE,
@@ -184,7 +184,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'arm-heavy-plate',
-    name: 'Heavy Plate Armor',
+    name: 'Тяжёлые латы',
     type: ItemType.ARMOR,
     category: ArmorCategory.HEAVY,
     rarity: Rarity.EPIC,
@@ -200,7 +200,7 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   },
   {
     id: 'arm-super-heavy-bastion',
-    name: 'Super Heavy Bastion',
+    name: 'Сверхтяжёлый бастион',
     type: ItemType.ARMOR,
     category: ArmorCategory.SUPER_HEAVY,
     rarity: Rarity.LEGENDARY,
@@ -218,19 +218,19 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
   // --- CONSUMABLES ---
   {
     id: 'con-simple-stew',
-    name: 'Simple Stew',
+    name: 'Простое рагу',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.FOOD,
     rarity: Rarity.COMMON,
     weight: 2,
     stackSize: 4,
     isUnique: false,
-    description: 'Restores 30 HP.',
+    description: 'Восстанавливает 30 ОЗ.',
     basePrice: 15
   },
   {
     id: 'con-healing-potion-small',
-    name: 'Small Healing Potion',
+    name: 'Малое зелье лечения',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.COMMON,
@@ -238,100 +238,100 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
     stackSize: 6,
     isUnique: false,
     baseEssence: 100,
-    description: 'Restores health.',
+    description: 'Восстанавливает здоровье.',
     basePrice: 50
   },
 
   // --- BREAKTHROUGH POTIONS ---
   {
     id: 'con-essence-potion',
-    name: 'Essence Potion',
+    name: 'Зелье сущности',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.RARE,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Rank 2 breakthrough.',
+    description: 'Требуется для прорыва ранга 2.',
     basePrice: 500
   },
   {
     id: 'con-spirit-potion',
-    name: 'Concentrated Spirit Potion',
+    name: 'Концентрированное зелье духа',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.EPIC,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Rank 3 breakthrough.',
+    description: 'Требуется для прорыва ранга 3.',
     basePrice: 1500
   },
   {
     id: 'con-phoenix-potion',
-    name: 'Phoenix Potion',
+    name: 'Зелье феникса',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.MYTHIC,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Rank 4 breakthrough.',
+    description: 'Требуется для прорыва ранга 4.',
     basePrice: 5000
   },
   {
     id: 'con-demonic-potion',
-    name: 'Demonic Essence Potion',
+    name: 'Зелье демонической сущности',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.LEGENDARY,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Rank 5 breakthrough.',
+    description: 'Требуется для прорыва ранга 5.',
     basePrice: 15000
   },
   {
     id: 'con-element-potion',
-    name: 'Enclosed Element Potion',
+    name: 'Зелье заключённого элемента',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.DIVINE,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Champion Rank 1 breakthrough.',
+    description: 'Требуется для прорыва ранга чемпиона 1.',
     basePrice: 50000
   },
   {
     id: 'con-chaos-potion',
-    name: 'Chaos Potion',
+    name: 'Зелье хаоса',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.DIVINE,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Champion Rank 2 breakthrough.',
+    description: 'Требуется для прорыва ранга чемпиона 2.',
     basePrice: 100000
   },
   {
     id: 'con-death-potion',
-    name: 'Reverse Death Potion',
+    name: 'Зелье обратной смерти',
     type: ItemType.CONSUMABLE,
     category: ConsumableCategory.POTION,
     rarity: Rarity.DIVINE,
     weight: 1,
     stackSize: 1,
     isUnique: false,
-    description: 'Required for Champion Rank 3 breakthrough.',
+    description: 'Требуется для прорыва ранга чемпиона 3.',
     basePrice: 250000
   },
 
   // --- BAGS ---
   {
     id: 'bag-linen-worn',
-    name: 'Worn Linen Bag',
+    name: 'Потрёпанная льняная сумка',
     type: ItemType.BAG,
     rarity: Rarity.COMMON,
     weight: 2,
