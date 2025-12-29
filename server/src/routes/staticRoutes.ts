@@ -7,3 +7,4 @@ router.get('/bundle', getStaticBundle);
 
 export default router;
 
+
