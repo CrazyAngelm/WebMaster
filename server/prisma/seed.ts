@@ -974,9 +974,9 @@ async function main() {
       value: JSON.stringify({
         rankId: 'rank-1',
         stats: {
-          essence: { current: 50, max: 100 },
+          essence: { current: 100, max: 100 },
           energy: { current: 100, max: 100 },
-          protection: { current: 20, max: 20 },
+          protection: { current: 100, max: 100 },
           speedId: 'speed-ordinary'
         },
         bonuses: {
@@ -1001,7 +1001,7 @@ async function main() {
       value: JSON.stringify({
         essenceGainRoll: 20,
         energyCost: 20,
-        cooldownHours: 12
+        cooldownHours: 24
       })
     },
     {

@@ -14,7 +14,7 @@ export const CharacterSheet: React.FC = () => {
   const building = character.location?.buildingId ? StaticDataService.getBuilding(character.location.buildingId) : null;
   const canRestHere = building?.canRest || false;
   
-  const TRAIN_COOLDOWN = 12;
+  const TRAIN_COOLDOWN = 24;
   const timeSinceLastTrain = character.lastTrainTime !== undefined ? worldTime - character.lastTrainTime : 999;
   const trainCooldownRemaining = Math.max(0, TRAIN_COOLDOWN - timeSinceLastTrain);
 

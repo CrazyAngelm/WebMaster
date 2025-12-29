@@ -67,6 +67,8 @@ export const QuestService = {
     if (quest.rewards.essence) {
       updatedCharacter.stats.essence.max += quest.rewards.essence;
       updatedCharacter.stats.essence.current += quest.rewards.essence;
+      updatedCharacter.stats.protection.max += quest.rewards.essence;
+      updatedCharacter.stats.protection.current += quest.rewards.essence;
     }
 
     // Reward items logic (simplified)

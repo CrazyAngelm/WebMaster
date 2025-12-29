@@ -64,6 +64,7 @@ export const forceRest = async (req: Request, res: Response) => {
     const stats = JSON.parse(character.stats);
     const updatedStats = {
       ...stats,
+      essence: { ...stats.essence, current: stats.essence.max },
       energy: { ...stats.energy, current: stats.energy.max },
       protection: { ...stats.protection, current: stats.protection.max }
     };

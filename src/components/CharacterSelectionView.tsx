@@ -3,18 +3,32 @@
 // 🔗 Key dependencies: React, useGameStore, src/data/races
 // 💡 Usage: Shown after auth if no character is selected
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { Plus, Trash2, Shield, User, Zap } from 'lucide-react';
 
 export const CharacterSelectionView: React.FC = () => {
-  const { userCharacters, selectCharacter, createCharacter, deleteCharacter, logout } = useGameStore();
+  const { userCharacters, selectCharacter, createCharacter, deleteCharacter, logout, initializeData, isLoading } = useGameStore();
   const races = StaticDataService.getAllRaces();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [selectedRace, setSelectedRace] = useState(races[0]?.id || '');
   const [error, setError] = useState('');
+
+  // * Ensure static data is loaded when component mounts
+  useEffect(() => {
+    if (races.length === 0 && !isLoading) {
+      initializeData().catch(err => console.error('Failed to initialize data:', err));
+    }
+  }, [races.length, isLoading, initializeData]);
+
+  // * Update selected race when races are loaded
+  useEffect(() => {
+    if (races.length > 0 && !selectedRace) {
+      setSelectedRace(races[0].id);
+    }
+  }, [races, selectedRace]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +54,7 @@ export const CharacterSelectionView: React.FC = () => {
   };
 
   if (showCreate) {
-    if (races.length === 0) {
+    if (races.length === 0 || isLoading) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh]">
           <div className="fantasy-panel p-8 w-full max-w-xl text-center">

@@ -40,6 +40,10 @@ export const EventService = {
           updatedCharacter.stats.essence.max, 
           updatedCharacter.stats.essence.current + 5
         );
+        updatedCharacter.stats.protection.current = Math.min(
+          updatedCharacter.stats.protection.max,
+          updatedCharacter.stats.protection.current + 5
+        );
         message = "The fruit tastes like pure essence. You feel refreshed!";
       } else {
         message = "You don't have enough coins. The traveler sighs and leaves.";
@@ -54,6 +58,10 @@ export const EventService = {
         updatedCharacter.stats.essence.current = Math.min(
           updatedCharacter.stats.essence.max,
           updatedCharacter.stats.essence.current + gain
+        );
+        updatedCharacter.stats.protection.current = Math.min(
+          updatedCharacter.stats.protection.max,
+          updatedCharacter.stats.protection.current + gain
         );
         message = "You meditate and feel your inner essence stabilize. (Essence +10, Energy -30)";
       } else {

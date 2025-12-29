@@ -122,6 +122,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     localStorage.setItem('token', data.token);
     set({ user: data.user, token: data.token, authStatus: 'authenticated' });
+    await get().initializeData();
     await get().fetchCharacters();
   },
 
@@ -136,6 +137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     localStorage.setItem('token', data.token);
     set({ user: data.user, token: data.token, authStatus: 'authenticated' });
+    await get().initializeData();
     set({ userCharacters: [] });
   },
 
@@ -165,6 +167,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const data = await res.json();
       if (res.ok) {
         set({ user: data.user, authStatus: 'authenticated' });
+        await get().initializeData();
         await get().fetchCharacters();
       } else {
         get().logout();
@@ -308,6 +311,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     // Fully restore locally
     const stats = { ...character.stats };
+    stats.essence.current = stats.essence.max;
     stats.energy.current = stats.energy.max;
     stats.protection.current = stats.protection.max;
     set({ character: { ...character, stats } });
@@ -393,6 +397,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       money: character.money - REST_COST,
       stats: { ...character.stats, energy: { ...character.stats.energy }, protection: { ...character.stats.protection } }
     };
+    updatedCharacter.stats.essence.current = updatedCharacter.stats.essence.max;
     updatedCharacter.stats.energy.current = updatedCharacter.stats.energy.max;
     updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
     const nextWorldTime = worldTime + (config?.hoursDuration || 8);

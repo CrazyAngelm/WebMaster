@@ -98,6 +98,8 @@ export class CharacterService {
     const gain = DiceEngine.roll(config?.essenceGainRoll || 20);
     character.stats.essence.max += gain;
     character.stats.essence.current += gain;
+    character.stats.protection.max += gain;
+    character.stats.protection.current += gain;
     character.stats.energy.current -= ENERGY_COST;
     
     return { gain, energyCost: ENERGY_COST };
