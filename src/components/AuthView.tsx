@@ -19,13 +19,26 @@ export const AuthView: React.FC = () => {
     e.preventDefault();
     setError('');
     
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:18',message:'handleSubmit called',data:{isLogin,loginLength:login.length,passwordLength:password.length,isAdmin},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     try {
       if (isLogin) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:24',message:'Calling loginAction',data:{login},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         await loginAction(login, password);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:27',message:'loginAction completed successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
       } else {
         await registerAction(login, password, isAdmin ? 'ADMIN' : 'USER');
       }
     } catch (err: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:29',message:'Auth error caught',data:{errorMessage:err?.message,errorType:err?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       setError(err.message || 'Произошла ошибка');
     }
   };

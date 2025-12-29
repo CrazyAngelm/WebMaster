@@ -11,8 +11,9 @@ export const EventService = {
    * * Roll for a random event during travel
    */
   rollForTravelEvent(): GameEvent | null {
+    const config = StaticDataService.getConfig<{ travelEventChance: number }>('EVENT_CONFIG');
     const chance = Math.random();
-    if (chance < 0.2) { // 20% chance of an event
+    if (chance < (config?.travelEventChance || 0.2)) { // 20% chance of an event
       const allEvents = StaticDataService.getAllEvents();
       const randomIndex = Math.floor(Math.random() * allEvents.length);
       return allEvents[randomIndex];

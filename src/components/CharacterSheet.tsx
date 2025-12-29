@@ -11,7 +11,7 @@ export const CharacterSheet: React.FC = () => {
   if (!character) return null;
   
   const rank = ranks.find(r => r.id === character.rankId);
-  const building = character.location.buildingId ? StaticDataService.getBuilding(character.location.buildingId) : null;
+  const building = character.location?.buildingId ? StaticDataService.getBuilding(character.location.buildingId) : null;
   const canRestHere = building?.canRest || false;
   
   const TRAIN_COOLDOWN = 12;
@@ -147,7 +147,7 @@ export const CharacterSheet: React.FC = () => {
                   <div 
                     className="h-full bg-fantasy-accent opacity-50 transition-all duration-500"
                     style={{ 
-                      width: `${Math.min(100, (prof.exp / (ProfessionService.RANK_THRESHOLDS.find(t => t.rank === prof.rank)?.minExp || 100)) * 100)}%` 
+                      width: `${Math.min(100, (prof.exp / (StaticDataService.getProfessionThresholds().find(t => t.rank === prof.rank)?.minExp || 100)) * 100)}%` 
                     }}
                   />
                 </div>
@@ -162,7 +162,7 @@ export const CharacterSheet: React.FC = () => {
         <div className="flex items-center gap-1 not-italic text-xs font-bold uppercase text-gray-500 mb-1">
           <Info size={12} /> Биография
         </div>
-        {character.bio}
+        {character.bio || 'Биография пока не написана...'}
       </div>
     </div>
   );

@@ -17,8 +17,9 @@ export const WorldService = {
       return { allowed: false, reason: "You are already there." };
     }
 
-    const ENERGY_COST = 10;
-    const TIME_COST = 1; // 1 hour per movement
+    const config = StaticDataService.getConfig<{ energyCostPerMove: number; hoursPerMove: number }>('MOVEMENT_CONFIG');
+    const ENERGY_COST = config?.energyCostPerMove || 10;
+    const TIME_COST = config?.hoursPerMove || 1; // 1 hour per movement
 
     if (character.stats.energy.current < ENERGY_COST) {
       return { allowed: false, reason: "You are too tired to travel. Rest first." };

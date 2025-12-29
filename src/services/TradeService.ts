@@ -19,7 +19,9 @@ export const TradeService = {
    * * Calculates the selling price for an item (usually 50% of buy price)
    */
   getSellPrice(template: ItemTemplate): number {
-    return Math.floor((template.basePrice || 0) * 0.5);
+    const config = StaticDataService.getConfig<{ sellMultiplier: number }>('TRADE_CONFIG');
+    const multiplier = config?.sellMultiplier || 0.5;
+    return Math.floor((template.basePrice || 0) * multiplier);
   },
 
   /**
@@ -40,16 +42,20 @@ export const TradeService = {
       return { success: false, reason: "Not enough money." };
     }
 
-    // * Check inventory weight before purchase
+    // * Check inventory slots before purchase
     if (itemTemplates) {
-      const currentWeight = InventoryService.calculateTotalWeight(inventory, itemTemplates);
-      const itemWeight = template.weight * quantity;
-      const newTotalWeight = currentWeight + itemWeight;
+      const currentUsedSlots = InventoryService.getUsedSlots(inventory);
+      const maxSlots = InventoryService.getMaxSlots(inventory, inventory.items, itemTemplates);
 
-      if (newTotalWeight > inventory.maxWeight) {
+      const existingItem = inventory.items.find(
+        i => i.templateId === templateId && i.quantity < template.stackSize
+      );
+      const needsNewSlot = !existingItem || (existingItem.quantity + quantity > template.stackSize);
+
+      if (needsNewSlot && currentUsedSlots + 1 > maxSlots) {
         return { 
           success: false, 
-          reason: `Инвентарь переполнен. Текущий вес: ${currentWeight}kg, лимит: ${inventory.maxWeight}kg. Покупка добавит ${itemWeight}kg.` 
+          reason: `Инвентарь переполнен. Слоты: ${currentUsedSlots} / ${maxSlots}.` 
         };
       }
     }

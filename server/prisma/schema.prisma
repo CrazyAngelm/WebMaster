@@ -51,8 +51,136 @@ model Inventory {
   id          String    @id @default(uuid())
   characterId String    @unique
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  maxWeight   Float
+  baseSlots   Int       @default(10)
   items       String    // ExistingItem[] (JSON string)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Race {
+  id             String @id
+  name           String
+  description    String
+  baseSpeedId    String
+  innateSkills   String // UUID[] (JSON string)
+  passiveEffects String // UUID[] (JSON string)
+}
+
+model Rank {
+  id                     String @id
+  order                  Int
+  name                   String
+  maxEssence             Int
+  minEssenceRoll         Int?
+  maxArtifacts           Int
+  maxSkills              Int
+  breakthroughConditions String // string[] (JSON string)
+}
+
+model ItemTemplate {
+  id                String  @id
+  name              String
+  type              String
+  category          String?
+  rarity            String
+  stackSize         Int
+  isUnique          Boolean
+  baseEssence       Int?
+  maxEssence        Int?
+  penetration       String?
+  distance          String?
+  baseDurability    Int?
+  ignoreDamage      Int?
+  hitPenalty        Int?
+  evasionPenalty    Int?
+  speedPenalty      Int?
+  slotCount         Int?
+  effects           String? // UUID[] (JSON string)
+  description       String?
+  basePrice         Int?
+}
+
+model Recipe {
+  id               String  @id
+  resultTemplateId String
+  profession       String
+  rankRequired     Int
+  ingredients      String  // { templateId, quantity }[] (JSON string)
+  stationRequired  String?
+}
+
+model MonsterTemplate {
+  id           String  @id
+  name         String
+  rankOrder    Int
+  baseEssence  Int
+  description  String?
+  skills       String  // UUID[] (JSON string)
+  lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
+}
+
+model Quest {
+  id           String @id
+  title        String
+  description  String
+  objectives   String // QuestObjective[] (JSON string)
+  rewards      String // { money?, essence?, items? } (JSON string)
+  status       String
+  rankRequired Int
+}
+
+model Location {
+  id          String @id
+  name        String
+  description String
+  zoneType    String
+  buildings   String // UUID[] (JSON string)
+}
+
+model Building {
+  id            String  @id
+  locationId    String
+  name          String
+  description   String
+  hasShop       Boolean
+  canRest       Boolean @default(false)
+  shopInventory String? // UUID
+  workstations  String  // string[] (JSON string)
+}
+
+model LocationConnection {
+  id             String @id
+  fromLocationId String
+  toLocationId   String
+}
+
+model ProfessionRankThreshold {
+  id     String @id @default(uuid())
+  rank   Int
+  minExp Int
+  maxExp Float  // Using Float because maxExp can be Infinity
+  name   String
+}
+
+model Speed {
+  id                String @id
+  name              String
+  category          String
+  distancePerAction Int
+}
+
+model GameEvent {
+  id                  String  @id
+  title               String
+  description         String
+  rarity              String
+  image               String?
+  choices             String? // GameEventChoice[] (JSON string)
+  autoTriggerNextId   String?
+  triggerCondition    String?
+}
+
+model GameConfig {
+  key   String @id
+  value String // JSON string for flexibility
 }

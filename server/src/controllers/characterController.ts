@@ -61,35 +61,48 @@ export const createCharacter = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Character name already taken' });
     }
 
-    // Default stats (template from mockData)
+    // Fetch defaults from configuration
+    const config = await prisma.gameConfig.findUnique({ where: { key: 'CHARACTER_CREATION_DEFAULTS' } });
+    const defaults = config ? JSON.parse(config.value) : {
+      rankId: 'rank-1',
+      stats: {
+        essence: { current: 50, max: 100 },
+        energy: { current: 100, max: 100 },
+        protection: { current: 20, max: 20 },
+        speedId: 'speed-ordinary'
+      },
+      bonuses: {
+        evasion: 0,
+        accuracy: 0,
+        damageResistance: 0,
+        initiative: 0
+      },
+      professions: [],
+      location: {
+        locationId: 'loc-outskirts',
+        position: 'Центр'
+      },
+      money: 100,
+      inventory: {
+        baseSlots: 10
+      }
+    };
+
     // * Serialize JSON objects to strings for SQLite
     const newCharacter = await prisma.character.create({
       data: {
         userId,
         name,
         raceId: raceId || 'race-human',
-        rankId: 'rank-1',
-        stats: JSON.stringify({
-          essence: { current: 50, max: 100 },
-          energy: { current: 100, max: 100 },
-          protection: { current: 20, max: 20 },
-          speedId: 'speed-ordinary'
-        }),
-        bonuses: JSON.stringify({
-          evasion: 0,
-          accuracy: 0,
-          damageResistance: 0,
-          initiative: 0
-        }),
-        professions: JSON.stringify([]),
-        location: JSON.stringify({
-          locationId: 'loc-outskirts',
-          position: 'Центр'
-        }),
-        money: 100,
+        rankId: defaults.rankId,
+        stats: JSON.stringify(defaults.stats),
+        bonuses: JSON.stringify(defaults.bonuses),
+        professions: JSON.stringify(defaults.professions),
+        location: JSON.stringify(defaults.location),
+        money: defaults.money,
         inventory: {
           create: {
-            maxWeight: 30,
+            baseSlots: defaults.inventory.baseSlots,
             items: JSON.stringify([]) // Start with empty inventory
           }
         }
@@ -231,7 +244,7 @@ export const updateInventory = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { items, maxWeight } = req.body;
+    const { items, baseSlots } = req.body;
 
     // * Check ownership
     const character = await prisma.character.findUnique({ 
@@ -263,10 +276,10 @@ export const updateInventory = async (req: Request, res: Response) => {
       }
     }
 
-    // * Validate maxWeight if provided
-    if (maxWeight !== undefined) {
-      if (typeof maxWeight !== 'number' || maxWeight < 0) {
-        return res.status(400).json({ error: 'Invalid maxWeight' });
+    // * Validate baseSlots if provided
+    if (baseSlots !== undefined) {
+      if (typeof baseSlots !== 'number' || baseSlots < 0) {
+        return res.status(400).json({ error: 'Invalid baseSlots' });
       }
     }
 
@@ -274,8 +287,8 @@ export const updateInventory = async (req: Request, res: Response) => {
     const inventoryData: any = {
       items: JSON.stringify(items)
     };
-    if (maxWeight !== undefined) {
-      inventoryData.maxWeight = maxWeight;
+    if (baseSlots !== undefined) {
+      inventoryData.baseSlots = baseSlots;
     }
 
     let updatedInventory;
@@ -288,7 +301,7 @@ export const updateInventory = async (req: Request, res: Response) => {
       updatedInventory = await prisma.inventory.create({
         data: {
           characterId: id,
-          maxWeight: maxWeight || 30,
+          baseSlots: baseSlots || 10,
           items: JSON.stringify(items)
         }
       });

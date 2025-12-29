@@ -7,14 +7,20 @@ import { InventoryService } from '../services/InventoryService';
 
 export const Inventory: React.FC = () => {
   const { inventory, itemTemplates, equipItem, unequipItem, repairItem, discardItem } = useGameStore();
-  const [selectedItem, setSelectedItem] = useState<{ item: ExistingItem; template: ItemTemplate } | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [discardQuantity, setDiscardQuantity] = useState<Record<string, number>>({});
 
   if (!inventory) return null;
 
-  // Fill up to 10 slots for the grid view
+  const usedSlots = InventoryService.getUsedSlots(inventory);
+  const maxSlots = InventoryService.getMaxSlots(inventory, inventory.items, itemTemplates);
+
+  const selectedItem = selectedItemId ? inventory.items.find(i => i.id === selectedItemId) : null;
+  const selectedTemplate = selectedItem ? itemTemplates.get(selectedItem.templateId) : null;
+
+  // Fill up to maxSlots for the grid view
   const slots = [...inventory.items];
-  while (slots.length < 10) {
+  while (slots.length < maxSlots) {
     slots.push(null as any);
   }
 
@@ -34,7 +40,9 @@ export const Inventory: React.FC = () => {
     switch (type) {
       case ItemType.WEAPON: return <Sword size={20} className="text-gray-400" />;
       case ItemType.ARMOR: return <Shield size={20} className="text-gray-400" />;
-      case ItemType.ARTIFACT: return <Anchor size={20} className="text-gray-400" />;
+      case ItemType.SHIELD: return <Shield size={20} className="text-blue-400" />;
+      case ItemType.ARTIFACT: return <Anchor size={20} className="text-purple-400" />;
+      case ItemType.BAG: return <Package size={20} className="text-orange-400" />;
       default: return <Package size={20} className="text-gray-400" />;
     }
   };
@@ -65,7 +73,7 @@ export const Inventory: React.FC = () => {
   };
 
   const isEquippable = (type: ItemType): boolean => {
-    return [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT].includes(type);
+    return [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT, ItemType.BAG].includes(type);
   };
 
   return (
@@ -75,7 +83,7 @@ export const Inventory: React.FC = () => {
           <Package size={24} /> Инвентарь
         </h2>
         <div className="text-xs text-gray-500 uppercase font-bold tracking-tighter">
-          Вес: {InventoryService.calculateTotalWeight(inventory, itemTemplates)} / {inventory.maxWeight}
+          Слоты: {usedSlots} / {maxSlots}
         </div>
       </div>
 
@@ -94,7 +102,7 @@ export const Inventory: React.FC = () => {
 
           const canEquip = isEquippable(template.type);
 
-          const isSelected = selectedItem?.item.id === item.id;
+          const isSelected = selectedItemId === item.id;
 
           return (
             <div 
@@ -105,7 +113,7 @@ export const Inventory: React.FC = () => {
                 item.isEquipped && "ring-2 ring-fantasy-accent ring-offset-2 ring-offset-fantasy-dark",
                 isSelected && "ring-2 ring-fantasy-accent ring-offset-2 ring-offset-fantasy-dark"
               )}
-              onClick={() => setSelectedItem({ item, template })}
+              onClick={() => setSelectedItemId(item.id)}
             >
               <div className="w-full h-full flex items-center justify-center">
                 {getItemIcon(template.type)}
@@ -126,19 +134,16 @@ export const Inventory: React.FC = () => {
       </div>
 
       {/* Item Details Panel */}
-      {selectedItem && (
+      {selectedItem && selectedTemplate && (
         <div className="p-4 bg-fantasy-surface border border-fantasy-accent/30 rounded shadow-2xl">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h3 className="text-fantasy-accent font-serif text-lg leading-tight uppercase tracking-wider">{selectedItem.template.name}</h3>
-              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{translateRarity(selectedItem.template.rarity)} {translateItemType(selectedItem.template.type)}</div>
+              <h3 className="text-fantasy-accent font-serif text-lg leading-tight uppercase tracking-wider">{selectedTemplate.name}</h3>
+              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{translateRarity(selectedTemplate.rarity)} {translateItemType(selectedTemplate.type)}</div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-xs bg-black/30 px-2 py-1 rounded border border-fantasy-border text-gray-400">
-                {selectedItem.template.weight}kg
-              </div>
               <button
-                onClick={() => setSelectedItem(null)}
+                onClick={() => setSelectedItemId(null)}
                 className="text-gray-500 hover:text-gray-300 transition-colors"
                 title="Закрыть"
               >
@@ -148,46 +153,52 @@ export const Inventory: React.FC = () => {
           </div>
           
           <div className="space-y-2 text-sm text-gray-300 mb-4">
-            {selectedItem.template.baseEssence && (
+            {selectedTemplate.type === ItemType.BAG && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
-                <span className="text-gray-500">Сущность оружия:</span>
-                <span className="text-fantasy-essence font-bold">{selectedItem.item.currentEssence} / {selectedItem.template.maxEssence}</span>
+                <span className="text-gray-500">Доп. слоты:</span>
+                <span className="text-fantasy-accent font-bold">+{selectedTemplate.slotCount}</span>
               </div>
             )}
-            {selectedItem.template.ignoreDamage && (
+            {selectedTemplate.baseEssence && selectedTemplate.type !== ItemType.BAG && (
+              <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
+                <span className="text-gray-500">Сущность оружия:</span>
+                <span className="text-fantasy-essence font-bold">{selectedItem.currentEssence} / {selectedTemplate.maxEssence}</span>
+              </div>
+            )}
+            {selectedTemplate.ignoreDamage && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
                 <span className="text-gray-500">Снижение урона:</span>
-                <span className="text-fantasy-protection font-bold">{selectedItem.template.ignoreDamage}</span>
+                <span className="text-fantasy-protection font-bold">{selectedTemplate.ignoreDamage}</span>
               </div>
             )}
             <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
               <span className="text-gray-500">Прочность:</span>
-              <span>{selectedItem.item.currentDurability} / {selectedItem.template.baseDurability || '∞'}</span>
+              <span>{selectedItem.currentDurability} / {selectedTemplate.baseDurability || '∞'}</span>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-3 border-t border-fantasy-border/30">
             {/* Equip/Unequip button */}
-            {isEquippable(selectedItem.template.type) && (
+            {isEquippable(selectedTemplate.type) && (
               <button
                 onClick={() => {
-                  if (selectedItem.item.isEquipped) {
-                    unequipItem(selectedItem.item.id);
+                  if (selectedItem.isEquipped) {
+                    unequipItem(selectedItem.id);
                   } else {
-                    equipItem(selectedItem.item.id);
+                    equipItem(selectedItem.id);
                   }
                 }}
                 className="w-full py-2 bg-fantasy-accent/20 border border-fantasy-accent/50 rounded text-xs uppercase font-bold text-fantasy-accent hover:bg-fantasy-accent/30 flex items-center justify-center gap-2"
               >
-                {selectedItem.item.isEquipped ? 'Снять' : 'Экипировать'}
+                {selectedItem.isEquipped ? 'Снять' : 'Экипировать'}
               </button>
             )}
 
             {/* Repair button */}
-            {(selectedItem.template.type === ItemType.ARMOR || selectedItem.template.type === ItemType.SHIELD || selectedItem.template.type === ItemType.WEAPON) && (
+            {(selectedTemplate.type === ItemType.ARMOR || selectedTemplate.type === ItemType.SHIELD || selectedTemplate.type === ItemType.WEAPON) && (
               <button
-                onClick={() => repairItem(selectedItem.item.id)}
+                onClick={() => repairItem(selectedItem.id)}
                 className="w-full py-2 bg-fantasy-accent/20 border border-fantasy-accent/50 rounded text-xs uppercase font-bold text-fantasy-accent hover:bg-fantasy-accent/30 flex items-center justify-center gap-2"
               >
                 <Hammer size={14} /> Починить (10 монет)
@@ -202,16 +213,16 @@ export const Inventory: React.FC = () => {
               <input
                 type="number"
                 min="1"
-                max={selectedItem.item.quantity}
-                value={discardQuantity[selectedItem.item.id] || ''}
+                max={selectedItem.quantity}
+                value={discardQuantity[selectedItem.id] || ''}
                 onChange={(e) => {
                   const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val) && val >= 1 && val <= selectedItem.item.quantity) {
-                    setDiscardQuantity(prev => ({ ...prev, [selectedItem.item.id]: val }));
+                  if (!isNaN(val) && val >= 1 && val <= selectedItem.quantity) {
+                    setDiscardQuantity(prev => ({ ...prev, [selectedItem.id]: val }));
                   } else if (e.target.value === '') {
                     setDiscardQuantity(prev => {
                       const next = { ...prev };
-                      delete next[selectedItem.item.id];
+                      delete next[selectedItem.id!];
                       return next;
                     });
                   }
@@ -221,7 +232,7 @@ export const Inventory: React.FC = () => {
                   if (isNaN(val) || val < 1) {
                     setDiscardQuantity(prev => {
                       const next = { ...prev };
-                      delete next[selectedItem.item.id];
+                      delete next[selectedItem.id!];
                       return next;
                     });
                   }
@@ -234,19 +245,19 @@ export const Inventory: React.FC = () => {
               />
               <button
                 onClick={() => {
-                  const qty = discardQuantity[selectedItem.item.id] || 1;
-                  discardItem(selectedItem.item.id, qty);
+                  const qty = discardQuantity[selectedItem.id] || 1;
+                  discardItem(selectedItem.id, qty);
                   setDiscardQuantity(prev => {
                     const next = { ...prev };
-                    delete next[selectedItem.item.id];
+                    delete next[selectedItem.id];
                     return next;
                   });
                   // * If all items discarded, close the panel
-                  if (qty >= selectedItem.item.quantity) {
-                    setSelectedItem(null);
+                  if (qty >= selectedItem.quantity) {
+                    setSelectedItemId(null);
                   }
                 }}
-                disabled={!discardQuantity[selectedItem.item.id] || discardQuantity[selectedItem.item.id] < 1 || discardQuantity[selectedItem.item.id] > selectedItem.item.quantity}
+                disabled={!discardQuantity[selectedItem.id] || discardQuantity[selectedItem.id] < 1 || discardQuantity[selectedItem.id] > selectedItem.quantity}
                 className="px-3 py-1 bg-red-900/20 border border-red-900/50 rounded text-[10px] uppercase font-bold text-red-400 hover:bg-red-900/40 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-1"
               >
                 <Trash2 size={12} /> Выбросить

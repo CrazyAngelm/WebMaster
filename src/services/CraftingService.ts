@@ -18,9 +18,7 @@ import {
 import { ProfessionService } from './ProfessionService';
 import { DiceEngine } from '../engine/DiceEngine';
 import { InventoryService } from './InventoryService';
-
-// * StaticDataService is currently not used here, but may be needed later for extended logic.
-// import { StaticDataService } from './StaticDataService';
+import { StaticDataService } from './StaticDataService';
 
 export interface CraftingResult {
   success: boolean;
@@ -31,57 +29,6 @@ export interface CraftingResult {
 }
 
 export class CraftingService {
-
-  /**
-   * * Essence ranges for weapon quality variance
-   * * Based on docs/Боевая система.md
-   */
-  private static readonly WEAPON_ESSENCE_RANGES: Record<Rarity, { min1H: number; max1H: number; min2H: number; max2H: number }> = {
-    [Rarity.COMMON]: { min1H: 0, max1H: 60, min2H: 0, max2H: 100 },
-    [Rarity.RARE]: { min1H: 60, max1H: 150, min2H: 100, max2H: 250 },
-    [Rarity.EPIC]: { min1H: 150, max1H: 300, min2H: 250, max2H: 500 },
-    [Rarity.MYTHIC]: { min1H: 300, max1H: 450, min2H: 500, max2H: 800 },
-    [Rarity.LEGENDARY]: { min1H: 450, max1H: 650, min2H: 800, max2H: 1200 },
-    [Rarity.DIVINE]: { min1H: 650, max1H: 850, min2H: 1200, max2H: 1500 },
-  };
-
-  /**
-   * * Durability ranges for armor
-   */
-  private static readonly ARMOR_DURABILITY: Record<Rarity, number> = {
-    [Rarity.COMMON]: 2,
-    [Rarity.RARE]: 3,
-    [Rarity.EPIC]: 4,
-    [Rarity.MYTHIC]: 5,
-    [Rarity.LEGENDARY]: 6,
-    [Rarity.DIVINE]: 7,
-  };
-
-  /**
-   * * Essence ranges for potions based on rarity.
-   * * Docs/Боевая система.md -> Зелья.
-   */
-  private static readonly POTION_ESSENCE_MIN: Record<Rarity, number> = {
-    [Rarity.COMMON]: 0,
-    [Rarity.RARE]: 400,
-    [Rarity.EPIC]: 800,
-    [Rarity.MYTHIC]: 1200,
-    [Rarity.LEGENDARY]: 1600,
-    [Rarity.DIVINE]: 2000,
-  };
-
-  /**
-   * * Essence ranges for scrolls based on rarity.
-   * * Docs/Боевая система.md -> Свитки.
-   */
-  private static readonly SCROLL_ESSENCE_MIN: Record<Rarity, number> = {
-    [Rarity.COMMON]: 0,
-    [Rarity.RARE]: 300,
-    [Rarity.EPIC]: 600,
-    [Rarity.MYTHIC]: 900,
-    [Rarity.LEGENDARY]: 1200,
-    [Rarity.DIVINE]: 1600,
-  };
 
   /**
    * * Performs crafting logic
@@ -158,23 +105,25 @@ export class CraftingService {
 
     const itemRarityRank = rarityOrder[resultTemplate.rarity];
 
+    const config = StaticDataService.getConfig<any>('CRAFTING_CONFIG');
+
     if (resultTemplate.type === ItemType.WEAPON) {
-      const ranges = this.WEAPON_ESSENCE_RANGES[resultTemplate.rarity];
+      const ranges = config?.weaponEssenceRanges?.[resultTemplate.rarity];
       const is2H = resultTemplate.category === WeaponCategory.TWO_HANDED;
-      const min = is2H ? ranges.min2H : ranges.min1H;
+      const min = is2H ? (ranges?.min2H || 0) : (ranges?.min1H || 0);
       // * New weapon starts at minimal essence for its rarity.
       essence = min;
       durability = 10; // Default durability for weapons if any
     } else if (resultTemplate.type === ItemType.ARMOR || resultTemplate.type === ItemType.SHIELD) {
-      const maxDur = this.ARMOR_DURABILITY[resultTemplate.rarity];
+      const maxDur = config?.armorDurability?.[resultTemplate.rarity] || 2;
       durability = maxDur; // Durability usually fixed for rarity but could have variance
       essence = 0;
     } else if (resultTemplate.type === ItemType.CONSUMABLE) {
       // * Determine minimal essence based on consumable subtype.
       if (resultTemplate.category === ConsumableCategory.POTION) {
-        essence = this.POTION_ESSENCE_MIN[resultTemplate.rarity];
+        essence = config?.potionEssenceMin?.[resultTemplate.rarity] || 0;
       } else if (resultTemplate.category === ConsumableCategory.SCROLL) {
-        essence = this.SCROLL_ESSENCE_MIN[resultTemplate.rarity];
+        essence = config?.scrollEssenceMin?.[resultTemplate.rarity] || 0;
       } else {
         // * For other consumables (food, etc.), use baseEssence or default to 0
         essence = resultTemplate.baseEssence || 0;
@@ -196,18 +145,14 @@ export class CraftingService {
       buffs: []
     };
 
-    // 7. Check inventory weight before adding the item
-    const currentWeight = InventoryService.calculateTotalWeight(
-      { ...inventory, items: updatedItems },
-      templates
-    );
-    const templateWeight = resultTemplate.weight;
-    const newTotalWeight = currentWeight + templateWeight;
+    // 7. Check inventory slots before adding the item
+    const currentUsedSlots = InventoryService.getUsedSlots({ ...inventory, items: updatedItems });
+    const maxSlots = InventoryService.getMaxSlots(inventory, updatedItems, templates);
 
-    if (newTotalWeight > inventory.maxWeight) {
+    if (currentUsedSlots + 1 > maxSlots) {
       return {
         success: false,
-        message: `Инвентарь переполнен. Текущий вес: ${currentWeight}kg, лимит: ${inventory.maxWeight}kg. Новый предмет добавит ${templateWeight}kg.`,
+        message: `Инвентарь переполнен. Слоты: ${currentUsedSlots} / ${maxSlots}.`,
       };
     }
 
@@ -244,16 +189,18 @@ export class CraftingService {
     const template = templates.get(item.templateId);
     if (!template) return { success: false, message: "Шаблон не найден." };
 
+    const config = StaticDataService.getConfig<any>('CRAFTING_CONFIG');
+
     const maxDur = (template.type === ItemType.ARMOR || template.type === ItemType.SHIELD) 
-      ? this.ARMOR_DURABILITY[template.rarity] 
+      ? (config?.armorDurability?.[template.rarity] || 2) 
       : 10;
 
     if (item.currentDurability >= maxDur) {
       return { success: false, message: "Предмет не нуждается в ремонте." };
     }
 
-    // Simple repair cost: 10 coins
-    const REPAIR_COST = 10;
+    // Simple repair cost from config
+    const REPAIR_COST = config?.repairCost || 10;
     if (character.money < REPAIR_COST) {
       return { success: false, message: "Недостаточно денег для ремонта." };
     }

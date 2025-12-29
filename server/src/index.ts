@@ -9,6 +9,7 @@ import * as dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import characterRoutes from './routes/characterRoutes';
 import adminRoutes from './routes/adminRoutes';
+import staticRoutes from './routes/staticRoutes';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/characters', characterRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/static', staticRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

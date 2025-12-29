@@ -14,7 +14,8 @@ import {
   GameEvent,
   QuestStatus,
   UUID,
-  Recipe
+  Recipe,
+  ItemType
 } from '../types/game';
 import { CharacterService } from '../services/CharacterService';
 import { InventoryService } from '../services/InventoryService';
@@ -65,16 +66,17 @@ interface GameState {
   fetchCharacters: () => Promise<void>;
   createCharacter: (name: string, raceId: string) => Promise<void>;
   deleteCharacter: (id: string) => Promise<void>;
-  selectCharacter: (character: Character) => void;
+  selectCharacter: (character: Character) => Promise<void>;
 
   // Game Logic Actions
-  initializeData: () => void;
+  initializeData: () => Promise<void>;
   loadGame: () => Promise<void>;
   saveGame: () => Promise<void>;
   trainCharacter: () => void;
   rest: () => void;
   equipItem: (itemId: UUID) => void;
   unequipItem: (itemId: UUID) => void;
+  discardItem: (itemId: UUID, quantity?: number) => void;
   craftItem: (recipeId: UUID) => void;
   repairItem: (itemId: UUID) => void;
   moveToLocation: (locationId: UUID) => void;
@@ -168,7 +170,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         get().logout();
       }
     } catch (e) {
-      set({ authStatus: 'unauthenticated' });
+      console.error('Auth check failed:', e);
+      set({ authStatus: 'unauthenticated', isLoading: false });
     } finally {
       set({ isLoading: false });
     }
@@ -183,12 +186,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       const res = await fetch(`${API_BASE}/characters`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (res.ok) {
-        set({ userCharacters: data });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Failed to fetch characters:', errorData);
+        set({ userCharacters: [] });
+        return;
       }
+      const data = await res.json();
+      set({ userCharacters: data || [] });
     } catch (e) {
-      console.error('Failed to fetch characters');
+      console.error('Failed to fetch characters:', e);
+      set({ userCharacters: [] });
     }
   },
 
@@ -229,14 +237,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
-  selectCharacter: (character) => {
-    set({ 
-      character, 
-      inventory: (character as any).inventory,
-      isLoading: false 
-    });
-    // Initialize game data if needed
-    get().initializeData();
+  selectCharacter: async (character) => {
+    try {
+      set({ 
+        character, 
+        inventory: (character as any).inventory,
+        isLoading: true 
+      });
+      // Initialize game data if needed
+      await get().initializeData();
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('Failed to select character:', error);
+      set({ isLoading: false });
+      throw error;
+    }
   },
 
   // --- Admin Actions ---
@@ -299,16 +314,28 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   // --- Existing Game Actions (Adapted) ---
-  initializeData: () => {
-    const templates = StaticDataService.getAllItemTemplates();
-    const itemMap = new Map<string, ItemTemplate>();
-    templates.forEach(t => itemMap.set(t.id, t));
-    
-    set({ 
-      itemTemplates: itemMap,
-      ranks: StaticDataService.getAllRanks(),
-      recipes: StaticDataService.getAllRecipes()
-    });
+  initializeData: async () => {
+    try {
+      await StaticDataService.init();
+
+      const templates = StaticDataService.getAllItemTemplates();
+      const itemMap = new Map<string, ItemTemplate>();
+      templates.forEach(t => itemMap.set(t.id, t));
+      
+      set({ 
+        itemTemplates: itemMap,
+        ranks: StaticDataService.getAllRanks(),
+        recipes: StaticDataService.getAllRecipes()
+      });
+    } catch (error) {
+      console.error('Failed to initialize data:', error);
+      // Set empty defaults to prevent crashes
+      set({ 
+        itemTemplates: new Map(),
+        ranks: [],
+        recipes: []
+      });
+    }
   },
 
   loadGame: async () => {
@@ -333,7 +360,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   trainCharacter: () => {
     const { character, worldTime } = get();
     if (!character) return;
-    const TRAIN_COOLDOWN = 12;
+    const config = StaticDataService.getConfig<{ cooldownHours: number }>('TRAINING_CONFIG');
+    const TRAIN_COOLDOWN = config?.cooldownHours || 12;
     if (character.lastTrainTime !== undefined && (worldTime - character.lastTrainTime) < TRAIN_COOLDOWN) return;
 
     const updatedCharacter = { 
@@ -355,7 +383,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!character.location.buildingId) return;
     const building = StaticDataService.getBuilding(character.location.buildingId);
     if (!building || !building.canRest) return;
-    const REST_COST = 10;
+    
+    const config = StaticDataService.getConfig<{ moneyCost: number; hoursDuration: number }>('REST_CONFIG');
+    const REST_COST = config?.moneyCost || 10;
     if (character.money < REST_COST) return;
 
     const updatedCharacter = { 
@@ -365,7 +395,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
     updatedCharacter.stats.energy.current = updatedCharacter.stats.energy.max;
     updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
-    const nextWorldTime = worldTime + 8;
+    const nextWorldTime = worldTime + (config?.hoursDuration || 8);
     set({ character: updatedCharacter, worldTime: nextWorldTime });
     get().saveGame();
   },
@@ -373,22 +403,104 @@ export const useGameStore = create<GameState>((set, get) => ({
   equipItem: (itemId) => {
     const { character, inventory, ranks, itemTemplates } = get();
     if (!character || !inventory) return;
-    const item = inventory.items.find(i => i.id === itemId);
-    const template = item ? itemTemplates.get(item.templateId) : null;
+    
+    const itemIndex = inventory.items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+
+    let item = inventory.items[itemIndex];
+    const template = itemTemplates.get(item.templateId);
     const rank = ranks.find(r => r.id === character.rankId);
-    if (!item || !template || !rank) return;
-    const check = InventoryService.canEquip(character, rank, item, template, inventory);
-    if (check.allowed) {
-      const updatedItems = inventory.items.map(i => i.id === itemId ? { ...i, isEquipped: true } : i);
-      set({ inventory: { ...inventory, items: updatedItems } });
-      get().saveGame();
+    
+    if (!template || !rank) return;
+    
+    const check = InventoryService.canEquip(character, rank, item, template, inventory, itemTemplates);
+    if (!check.allowed) return;
+
+    let updatedItems = [...inventory.items];
+    let finalEquipId = itemId;
+
+    // * If item is in a stack, split it first
+    if (item.quantity > 1) {
+      const newItem: ExistingItem = {
+        ...item,
+        id: crypto.randomUUID(),
+        quantity: 1,
+        isEquipped: false // Will be set to true in the map below
+      };
+      
+      // Reduce original stack
+      updatedItems[itemIndex] = { ...item, quantity: item.quantity - 1 };
+      updatedItems.push(newItem);
+      finalEquipId = newItem.id;
     }
+
+    updatedItems = updatedItems.map(i => {
+      const otherTemplate = itemTemplates.get(i.templateId);
+      if (!otherTemplate) return i;
+
+      // * If this is the item being equipped
+      if (i.id === finalEquipId) {
+        return { ...i, isEquipped: true };
+      }
+
+      // * Logic for mutually exclusive items
+      if (i.isEquipped) {
+        // * 1. Same type (Armor, Weapon, etc.)
+        if (otherTemplate.type === template.type) {
+          if ([ItemType.ARMOR, ItemType.WEAPON, ItemType.SHIELD].includes(template.type)) {
+            return { ...i, isEquipped: false };
+          }
+        }
+
+        // * 2. Two-handed weapon vs Shield conflict
+        if (template.type === ItemType.WEAPON && template.category === 'TWO_HANDED' && otherTemplate.type === ItemType.SHIELD) {
+          return { ...i, isEquipped: false };
+        }
+        if (template.type === ItemType.SHIELD && otherTemplate.type === ItemType.WEAPON && otherTemplate.category === 'TWO_HANDED') {
+          return { ...i, isEquipped: false };
+        }
+      }
+
+      return i;
+    });
+    
+    set({ inventory: { ...inventory, items: updatedItems } });
+    get().saveGame();
   },
 
   unequipItem: (itemId) => {
     const { inventory } = get();
     if (!inventory) return;
     const updatedItems = inventory.items.map(i => i.id === itemId ? { ...i, isEquipped: false } : i);
+    set({ inventory: { ...inventory, items: updatedItems } });
+    get().saveGame();
+  },
+
+  discardItem: (itemId, quantity = 1) => {
+    const { inventory } = get();
+    if (!inventory) return;
+    
+    const itemIndex = inventory.items.findIndex(i => i.id === itemId);
+    if (itemIndex === -1) return;
+    
+    const item = inventory.items[itemIndex];
+    const discardQty = Math.min(quantity, item.quantity);
+    
+    // * If discarding an equipped item, it will be automatically unequipped as it's removed from inventory
+    
+    const updatedItems = [...inventory.items];
+    
+    if (discardQty >= item.quantity) {
+      // * Remove item completely
+      updatedItems.splice(itemIndex, 1);
+    } else {
+      // * Reduce quantity
+      updatedItems[itemIndex] = {
+        ...item,
+        quantity: item.quantity - discardQty
+      };
+    }
+    
     set({ inventory: { ...inventory, items: updatedItems } });
     get().saveGame();
   },
@@ -450,9 +562,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   buyItem: (templateId, quantity = 1) => {
-    const { character, inventory, activeQuests } = get();
+    const { character, inventory, activeQuests, itemTemplates } = get();
     if (!character || !inventory) return;
-    const result = TradeService.buyItem(character, inventory, templateId, quantity);
+    const result = TradeService.buyItem(character, inventory, templateId, quantity, itemTemplates);
     if (result.success && result.character && result.inventory) {
       const { updatedQuests } = QuestService.updateProgress(activeQuests, 'COLLECT', templateId, quantity);
       set({ character: result.character, inventory: result.inventory, activeQuests: updatedQuests });

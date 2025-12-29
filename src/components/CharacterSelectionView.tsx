@@ -5,14 +5,15 @@
 
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { RACES } from '../data/races';
+import { StaticDataService } from '../services/StaticDataService';
 import { Plus, Trash2, Shield, User, Zap } from 'lucide-react';
 
 export const CharacterSelectionView: React.FC = () => {
   const { userCharacters, selectCharacter, createCharacter, deleteCharacter, logout } = useGameStore();
+  const races = StaticDataService.getAllRaces();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
-  const [selectedRace, setSelectedRace] = useState(RACES[0].id);
+  const [selectedRace, setSelectedRace] = useState(races[0]?.id || '');
   const [error, setError] = useState('');
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -39,6 +40,25 @@ export const CharacterSelectionView: React.FC = () => {
   };
 
   if (showCreate) {
+    if (races.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[80vh]">
+          <div className="fantasy-panel p-8 w-full max-w-xl text-center">
+            <h2 className="text-3xl font-serif text-fantasy-accent mb-4 uppercase tracking-widest">
+              Загрузка данных...
+            </h2>
+            <p className="text-gray-500">Пожалуйста, подождите, пока загрузятся данные о расах.</p>
+            <button
+              onClick={() => setShowCreate(false)}
+              className="fantasy-button mt-6"
+            >
+              Назад
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh]">
         <div className="fantasy-panel p-8 w-full max-w-xl">
@@ -62,7 +82,7 @@ export const CharacterSelectionView: React.FC = () => {
             <div>
               <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-3">Выберите расу</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {RACES.map(race => (
+                {races.map(race => (
                   <div
                     key={race.id}
                     onClick={() => setSelectedRace(race.id)}
@@ -137,7 +157,7 @@ export const CharacterSelectionView: React.FC = () => {
                     </h3>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-[10px] text-gray-500 uppercase tracking-widest bg-fantasy-dark px-2 py-0.5 rounded">
-                        {RACES.find(r => r.id === char.raceId)?.name || 'Неизвестно'}
+                        {races.find(r => r.id === char.raceId)?.name || 'Неизвестно'}
                       </span>
                       <span className="text-[10px] text-fantasy-accent uppercase tracking-widest">
                         Ранг: {char.rankId}

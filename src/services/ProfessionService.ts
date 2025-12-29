@@ -4,26 +4,15 @@
 // 💡 Usage: Used by CraftingService to grant XP and check requirements
 
 import { Character, ProfessionType, CharacterProfession } from '../types/game';
+import { StaticDataService } from './StaticDataService';
 
 export class ProfessionService {
-  /**
-   * * Experience thresholds for profession ranks
-   * * Docs: 1 rank: 0-20, 2 rank: 20-50, etc.
-   */
-  public static readonly RANK_THRESHOLDS = [
-    { rank: 1, minExp: 0, maxExp: 20, name: 'Ученик' },
-    { rank: 2, minExp: 20, maxExp: 50, name: 'Подмастерье' },
-    { rank: 3, minExp: 50, maxExp: 100, name: 'Умелец' },
-    { rank: 4, minExp: 100, maxExp: 200, name: 'Мастер' },
-    { rank: 5, minExp: 200, maxExp: 400, name: 'Великий мастер' },
-    { rank: 6, minExp: 400, maxExp: Infinity, name: 'Прославленный мастер' },
-  ];
-
   /**
    * * Gets the current rank based on experience
    */
   public static calculateRank(exp: number): number {
-    const threshold = this.RANK_THRESHOLDS.find(t => exp >= t.minExp && exp < t.maxExp);
+    const thresholds = StaticDataService.getProfessionThresholds();
+    const threshold = thresholds.find(t => exp >= t.minExp && exp < t.maxExp);
     return threshold ? threshold.rank : 1;
   }
 
@@ -31,7 +20,8 @@ export class ProfessionService {
    * * Gets the name of the rank
    */
   public static getRankName(rank: number): string {
-    const threshold = this.RANK_THRESHOLDS.find(t => t.rank === rank);
+    const thresholds = StaticDataService.getProfessionThresholds();
+    const threshold = thresholds.find(t => t.rank === rank);
     return threshold ? threshold.name : 'Ученик';
   }
 

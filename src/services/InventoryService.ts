@@ -1,5 +1,5 @@
 // 📁 src/services/InventoryService.ts - Inventory management
-// 🎯 Core function: Handles weight, equipment limits, and item state
+// 🎯 Core function: Handles slots, equipment limits, and item state
 // 🔗 Key dependencies: src/types/game.ts
 // 💡 Usage: Used by game engine and UI for item operations
 
@@ -10,18 +10,39 @@ import {
   Character, 
   Rank,
   ItemType,
-  WeaponCategory
+  MAX_EQUIPPED_BAGS
 } from '../types/game';
+import { StaticDataService } from './StaticDataService';
 
 export class InventoryService {
   /**
-   * * Calculates total weight of all items in inventory.
+   * * Calculates used slots in inventory.
+   * * Each entry in items array (stack) occupies 1 slot.
    */
-  public static calculateTotalWeight(inventory: Inventory, templates: Map<string, ItemTemplate>): number {
-    return inventory.items.reduce((total, item) => {
+  public static getUsedSlots(inventory: Inventory): number {
+    return inventory.items.length;
+  }
+
+  /**
+   * * Calculates total max slots of inventory including equipped bags.
+   */
+  public static getMaxSlots(
+    inventory: Inventory, 
+    items: ExistingItem[], 
+    templates: Map<string, ItemTemplate>
+  ): number {
+    const equippedBags = items.filter(item => {
+      if (!item.isEquipped) return false;
       const template = templates.get(item.templateId);
-      return total + (template ? template.weight * item.quantity : 0);
+      return template?.type === ItemType.BAG;
+    });
+
+    const bagsSlots = equippedBags.reduce((total, item) => {
+      const template = templates.get(item.templateId);
+      return total + (template?.slotCount || 0);
     }, 0);
+
+    return inventory.baseSlots + bagsSlots;
   }
 
   /**
@@ -32,33 +53,40 @@ export class InventoryService {
     rank: Rank, 
     item: ExistingItem, 
     template: ItemTemplate,
-    currentInventory: Inventory
+    currentInventory: Inventory,
+    itemTemplates: Map<string, ItemTemplate>
   ): { allowed: boolean; reason?: string } {
     // * Check if item type is equippable
-    const equippableTypes = [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT];
+    const equippableTypes = [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT, ItemType.BAG];
     if (!equippableTypes.includes(template.type)) {
       return { allowed: false, reason: 'Этот предмет нельзя экипировать.' };
     }
 
-    // * Check weight limit
-    // (Weight calculation would normally happen here or before calling this)
-
     // * Check Rank limits for Artifacts
     if (template.type === ItemType.ARTIFACT) {
       const equippedArtifacts = currentInventory.items.filter(i => {
-        const t = i.isEquipped;
-        if (!t) return false;
-        // In real app, we'd need to check template type here too
-        return true; // Simplified for this example
+        if (!i.isEquipped) return false;
+        const t = itemTemplates.get(i.templateId);
+        return t?.type === ItemType.ARTIFACT;
       }).length;
 
       if (equippedArtifacts >= rank.maxArtifacts) {
-        return { allowed: false, reason: `Rank ${rank.name} limits you to ${rank.maxArtifacts} artifact(s).` };
+        return { allowed: false, reason: `Ранг ${rank.name} позволяет носить не более ${rank.maxArtifacts} артефактов.` };
       }
     }
 
-    // * Check Rank limits for Skills (if skills were items)
-    // ... logic for skills ...
+    // * Check limit for Bags
+    if (template.type === ItemType.BAG) {
+      const equippedBags = currentInventory.items.filter(i => {
+        if (!i.isEquipped) return false;
+        const t = itemTemplates.get(i.templateId);
+        return t?.type === ItemType.BAG;
+      }).length;
+
+      if (equippedBags >= MAX_EQUIPPED_BAGS) {
+        return { allowed: false, reason: `Вы не можете носить более ${MAX_EQUIPPED_BAGS} сумок одновременно.` };
+      }
+    }
 
     return { allowed: true };
   }
@@ -72,7 +100,9 @@ export class InventoryService {
     
     if (item.currentEssence >= template.maxEssence) return 0;
 
-    const gain = Math.floor(Math.random() * 5) + 1; // Simplified gain
+    const config = StaticDataService.getConfig<{ weaponTrainingGainRoll: number }>('CRAFTING_CONFIG');
+    const maxGain = config?.weaponTrainingGainRoll || 5;
+    const gain = Math.floor(Math.random() * maxGain) + 1; // Simplified gain
     item.currentEssence = Math.min(template.maxEssence, item.currentEssence + gain);
     return gain;
   }
@@ -87,8 +117,3 @@ export class InventoryService {
     return item;
   }
 }
-
-
-
-
-

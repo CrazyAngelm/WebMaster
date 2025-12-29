@@ -18,17 +18,6 @@ import { StaticDataService } from './StaticDataService';
 
 export class CharacterService {
   /**
-   * * Default speed values as per docs/Боевая система.md
-   */
-  public static readonly SPEED_MAP: Record<SpeedCategory, number> = {
-    [SpeedCategory.VERY_SLOW]: 5,
-    [SpeedCategory.SLOW]: 10,
-    [SpeedCategory.ORDINARY]: 15,
-    [SpeedCategory.FAST]: 20,
-    [SpeedCategory.VERY_FAST]: 30,
-  };
-
-  /**
    * * Calculates the current movement distance per action.
    * * Takes armor penalties into account.
    */
@@ -99,13 +88,14 @@ export class CharacterService {
    * * Docs: Training increases essence by 1-20, costs energy.
    */
   public static trainEssence(character: Character): { gain: number; energyCost: number } | null {
-    const ENERGY_COST = 20;
+    const config = StaticDataService.getConfig<{ essenceGainRoll: number; energyCost: number }>('TRAINING_CONFIG');
+    const ENERGY_COST = config?.energyCost || 20;
     
     if (character.stats.energy.current < ENERGY_COST) {
       return null;
     }
 
-    const gain = DiceEngine.roll(20);
+    const gain = DiceEngine.roll(config?.essenceGainRoll || 20);
     character.stats.essence.max += gain;
     character.stats.essence.current += gain;
     character.stats.energy.current -= ENERGY_COST;

@@ -83,12 +83,18 @@ export const ShopView: React.FC = () => {
     return Math.floor(character.money / price);
   };
 
-  // * Checks if adding items would exceed weight limit
-  const wouldExceedWeight = (item: ItemTemplate, quantity: number): boolean => {
+  // * Checks if adding items would exceed slots limit
+  const wouldExceedSlots = (item: ItemTemplate, quantity: number): boolean => {
     if (!inventory || !itemTemplates) return false;
-    const currentWeight = InventoryService.calculateTotalWeight(inventory, itemTemplates);
-    const addedWeight = item.weight * quantity;
-    return (currentWeight + addedWeight) > inventory.maxWeight;
+    const currentUsedSlots = InventoryService.getUsedSlots(inventory);
+    const maxSlots = InventoryService.getMaxSlots(inventory, inventory.items, itemTemplates);
+
+    const existingItem = inventory.items.find(
+      i => i.templateId === item.id && i.quantity < item.stackSize
+    );
+    const needsNewSlot = !existingItem || (existingItem.quantity + quantity > item.stackSize);
+
+    return needsNewSlot && (currentUsedSlots + 1 > maxSlots);
   };
 
   if (!building || !building.hasShop) {
@@ -112,8 +118,8 @@ export const ShopView: React.FC = () => {
               const maxAffordable = getMaxAffordable(item);
               const canAfford = (character?.money ?? 0) >= totalPrice;
               const maxStack = item.stackSize || 1;
-              const exceedsWeight = wouldExceedWeight(item, quantity);
-              const canBuy = canAfford && quantity >= 1 && !exceedsWeight;
+              const exceedsSlots = wouldExceedSlots(item, quantity);
+              const canBuy = canAfford && quantity >= 1 && !exceedsSlots;
               
               return (
                 <div key={item.id} className="flex flex-col p-2 border-b border-fantasy-border/30 hover:bg-white/5 transition-colors group">
@@ -164,9 +170,9 @@ export const ShopView: React.FC = () => {
                       Недостаточно денег (нужно {totalPrice}, есть {character?.money ?? 0})
                     </div>
                   )}
-                  {exceedsWeight && (
+                  {exceedsSlots && (
                     <div className="text-[10px] text-red-500 mt-1">
-                      Инвентарь переполнен. Покупка добавит {item.weight * quantity}kg, превысив лимит {inventory?.maxWeight}kg
+                      Инвентарь переполнен. Освободите место.
                     </div>
                   )}
                 </div>

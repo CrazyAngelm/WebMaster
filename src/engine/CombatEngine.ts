@@ -30,9 +30,11 @@ export class CombatEngine {
     // * Sort by initiative descending
     const sortedOrder = [...participants].sort((a, b) => b.initiative - a.initiative);
 
+    const config = StaticDataService.getConfig<{ defaultCombatLocationId: string }>('COMBAT_CONFIG');
+
     return {
       id: crypto.randomUUID(),
-      locationId: 'combat-zone', // Placeholder
+      locationId: config?.defaultCombatLocationId || 'combat-zone',
       status: BattleStatus.ACTIVE,
       turnOrder: sortedOrder,
       currentTurnIndex: 0,
@@ -91,7 +93,8 @@ export class CombatEngine {
     }
 
     // * 2. Damage & Penetration
-    const damage = weaponEssence || 5; // Default fist damage if no weapon
+    const config = StaticDataService.getConfig<{ defaultUnarmedDamage: number }>('COMBAT_CONFIG');
+    const damage = weaponEssence || (config?.defaultUnarmedDamage || 5);
     let finalDamage = 0;
     let logMessage = '';
 

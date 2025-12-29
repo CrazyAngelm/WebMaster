@@ -1,16 +1,8 @@
 // 📁 src/services/StaticDataService.ts - Centralized data access
 // 🎯 Core function: Provides access to all game templates and static data
-// 🔗 Key dependencies: src/data/*, src/types/game.ts
+// 🔗 Key dependencies: src/types/game.ts
 // 💡 Usage: Used by gameStore and engines to look up templates
 
-import { ITEM_TEMPLATES, RECIPES } from '../data/items';
-import { MONSTER_TEMPLATES } from '../data/monsters';
-import { RANKS } from '../data/ranks';
-import { RACES } from '../data/races';
-import { SPEEDS } from '../data/speeds';
-import { LOCATIONS, BUILDINGS, CONNECTIONS } from '../data/locations';
-import { QUESTS } from '../data/quests';
-import { EVENTS } from '../data/events';
 import { 
   ItemTemplate, 
   MonsterTemplate, 
@@ -22,87 +14,143 @@ import {
   LocationConnection,
   Quest,
   GameEvent,
-  UUID 
+  UUID,
+  Recipe
 } from '../types/game';
 
+interface StaticDataBundle {
+  races: Race[];
+  ranks: Rank[];
+  itemTemplates: ItemTemplate[];
+  recipes: Recipe[];
+  monsterTemplates: MonsterTemplate[];
+  quests: Quest[];
+  locations: Location[];
+  buildings: Building[];
+  connections: LocationConnection[];
+  professionThresholds: { rank: number; minExp: number; maxExp: number; name: string }[];
+  speeds: Speed[];
+  events: GameEvent[];
+  configs: Record<string, any>;
+}
+
+let data: StaticDataBundle = {
+  races: [],
+  ranks: [],
+  itemTemplates: [],
+  recipes: [],
+  monsterTemplates: [],
+  quests: [],
+  locations: [],
+  buildings: [],
+  connections: [],
+  professionThresholds: [],
+  speeds: [],
+  events: [],
+  configs: {}
+};
+
+const API_BASE = 'http://localhost:5000/api';
+
 export const StaticDataService = {
+  async init(): Promise<void> {
+    try {
+      const res = await fetch(`${API_BASE}/static/bundle`);
+      if (!res.ok) throw new Error('Failed to fetch static data');
+      data = await res.json();
+      console.log('Static data initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize static data:', error);
+      throw error;
+    }
+  },
+
   // World Data
   getAllLocations(): Location[] {
-    return LOCATIONS;
+    return data.locations;
   },
   getLocation(id: UUID): Location | undefined {
-    return LOCATIONS.find(l => l.id === id);
+    return data.locations.find(l => l.id === id);
   },
   getAllBuildings(): Building[] {
-    return BUILDINGS;
+    return data.buildings;
   },
   getBuilding(id: UUID): Building | undefined {
-    return BUILDINGS.find(b => b.id === id);
+    return data.buildings.find(b => b.id === id);
   },
   getConnections(fromId: UUID): LocationConnection[] {
-    return CONNECTIONS.filter(c => c.fromLocationId === fromId);
+    return data.connections.filter(c => c.fromLocationId === fromId);
   },
 
   // Quests & Events
   getAllQuests(): Quest[] {
-    return QUESTS;
+    return data.quests;
   },
   getQuest(id: UUID): Quest | undefined {
-    return QUESTS.find(q => q.id === id);
+    return data.quests.find(q => q.id === id);
   },
   getAllEvents(): GameEvent[] {
-    return EVENTS;
+    return data.events;
   },
   getEvent(id: UUID): GameEvent | undefined {
-    return EVENTS.find(e => e.id === id);
+    return data.events.find(e => e.id === id);
   },
 
   // Items
   getAllItemTemplates(): ItemTemplate[] {
-    return ITEM_TEMPLATES;
+    return data.itemTemplates;
   },
   getItemTemplate(id: UUID): ItemTemplate | undefined {
-    return ITEM_TEMPLATES.find(t => t.id === id);
+    return data.itemTemplates.find(t => t.id === id);
   },
 
   // Monsters
   getAllMonsterTemplates(): MonsterTemplate[] {
-    return MONSTER_TEMPLATES;
+    return data.monsterTemplates;
   },
   getMonsterTemplate(id: UUID): MonsterTemplate | undefined {
-    return MONSTER_TEMPLATES.find(t => t.id === id);
+    return data.monsterTemplates.find(t => t.id === id);
   },
 
   // Ranks
   getAllRanks(): Rank[] {
-    return RANKS;
+    return data.ranks;
   },
   getRank(id: UUID): Rank | undefined {
-    return RANKS.find(r => r.id === id);
+    return data.ranks.find(r => r.id === id);
   },
   getRankByOrder(order: number): Rank | undefined {
-    return RANKS.find(r => r.order === order);
+    return data.ranks.find(r => r.order === order);
   },
 
   // Races
   getAllRaces(): Race[] {
-    return RACES;
+    return data.races;
   },
   getRace(id: UUID): Race | undefined {
-    return RACES.find(r => r.id === id);
+    return data.races.find(r => r.id === id);
   },
 
   // Speeds
   getAllSpeeds(): Speed[] {
-    return SPEEDS;
+    return data.speeds;
   },
   getSpeed(id: UUID): Speed | undefined {
-    return SPEEDS.find(s => s.id === id);
+    return data.speeds.find(s => s.id === id);
   },
 
   // Recipes
-  getAllRecipes() {
-    return RECIPES;
+  getAllRecipes(): Recipe[] {
+    return data.recipes;
+  },
+
+  // Profession Thresholds
+  getProfessionThresholds() {
+    return data.professionThresholds;
+  },
+
+  // Game Config
+  getConfig<T>(key: string): T | undefined {
+    return data.configs[key] as T;
   }
 };
-

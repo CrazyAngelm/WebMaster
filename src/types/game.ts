@@ -223,10 +223,12 @@ export interface Race {
   passiveEffects: UUID[];
 }
 
+export const MAX_EQUIPPED_BAGS = 4;
+
 export interface Inventory {
   id: UUID;
   characterId: UUID;
-  maxWeight: number;
+  baseSlots: number;
   items: ExistingItem[];
 }
 
@@ -236,7 +238,6 @@ export interface ItemTemplate {
   type: ItemType;
   category?: WeaponCategory | ArmorCategory | ShieldCategory | ConsumableCategory;
   rarity: Rarity;
-  weight: number;
   stackSize: number;
   isUnique: boolean;
   
