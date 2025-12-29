@@ -11,7 +11,8 @@ import {
   ArmorCategory, 
   PenetrationType, 
   DistanceType,
-  ConsumableCategory 
+  ConsumableCategory,
+  ProfessionType 
 } from '../types/game';
 
 export const ITEM_TEMPLATES: ItemTemplate[] = [
@@ -87,6 +88,67 @@ export const ITEM_TEMPLATES: ItemTemplate[] = [
     stackSize: 30,
     isUnique: false,
     basePrice: 150
+  },
+  {
+    id: 'mat-coal',
+    name: 'Уголь',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.COMMON,
+    weight: 2,
+    stackSize: 50,
+    isUnique: false,
+    description: 'Топливо для кузницы.',
+    basePrice: 5
+  },
+  {
+    id: 'mat-leather-scraps',
+    name: 'Обрывки кожи',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.COMMON,
+    weight: 1,
+    stackSize: 40,
+    isUnique: false,
+    basePrice: 8
+  },
+  {
+    id: 'mat-herbs-common',
+    name: 'Обычные травы',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.COMMON,
+    weight: 1,
+    stackSize: 50,
+    isUnique: false,
+    basePrice: 5
+  },
+  {
+    id: 'mat-meat',
+    name: 'Мясо',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.COMMON,
+    weight: 2,
+    stackSize: 20,
+    isUnique: false,
+    basePrice: 15
+  },
+  {
+    id: 'mat-water',
+    name: 'Вода',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.COMMON,
+    weight: 1,
+    stackSize: 50,
+    isUnique: false,
+    basePrice: 2
+  },
+  {
+    id: 'mat-magic-dust',
+    name: 'Магическая пыль',
+    type: ItemType.MATERIAL,
+    rarity: Rarity.RARE,
+    weight: 1,
+    stackSize: 100,
+    isUnique: false,
+    basePrice: 50
   },
 
   // --- WEAPONS ---
@@ -346,11 +408,43 @@ export const RECIPES = [
   {
     id: 'rec-simple-stew',
     resultTemplateId: 'con-simple-stew',
-    profession: 'Cook',
+    profession: ProfessionType.COOK,
     rankRequired: 1,
     ingredients: [
       { templateId: 'mat-meat', quantity: 1 },
       { templateId: 'mat-water', quantity: 1 }
     ]
+  },
+  {
+    id: 'rec-copper-dagger',
+    resultTemplateId: 'wpn-thief-dagger',
+    profession: ProfessionType.BLACKSMITH,
+    rankRequired: 1,
+    ingredients: [
+      { templateId: 'mat-copper-ore', quantity: 2 },
+      { templateId: 'mat-coal', quantity: 1 }
+    ],
+    stationRequired: 'Forge'
+  },
+  {
+    id: 'rec-leather-armor-light',
+    resultTemplateId: 'arm-light-leather',
+    profession: ProfessionType.TAILOR,
+    rankRequired: 1,
+    ingredients: [
+      { templateId: 'mat-leather-scraps', quantity: 3 },
+      { templateId: 'mat-linen-fabric', quantity: 1 }
+    ]
+  },
+  {
+    id: 'rec-healing-potion-small',
+    resultTemplateId: 'con-healing-potion-small',
+    profession: ProfessionType.POTION_MAKER,
+    rankRequired: 1,
+    ingredients: [
+      { templateId: 'mat-herbs-common', quantity: 2 },
+      { templateId: 'mat-water', quantity: 1 }
+    ],
+    stationRequired: 'Alchemy Table'
   }
 ];

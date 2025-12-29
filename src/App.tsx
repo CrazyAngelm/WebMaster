@@ -1,3 +1,8 @@
+// 📁 src/App.tsx - Main application entry point
+// 🎯 Core function: Routing and authentication flow management
+// 🔗 Key dependencies: React, useGameStore, components/*
+// 💡 Usage: Root component of the application
+
 import React, { useEffect, useState } from 'react';
 import { Layout } from './components/Layout';
 import { useGameStore } from './store/gameStore';
@@ -6,27 +11,29 @@ import { CombatScreen } from './components/CombatScreen';
 import { WorldNavigation } from './components/WorldNavigation';
 import { QuestLog } from './components/QuestLog';
 import { EventOverlay } from './components/EventOverlay';
-import { 
-  MOCK_CHARACTER, 
-  MOCK_INVENTORY
-} from './data/mockData';
+import { CraftingView } from './components/CraftingView';
+import { AuthView } from './components/AuthView';
+import { CharacterSelectionView } from './components/CharacterSelectionView';
 
 function App() {
   const { 
     character, 
-    loadGame, 
-    setCharacter, 
-    setInventory, 
+    authStatus,
+    checkAuth,
     trainCharacter,
     isLoading 
   } = useGameStore();
-  const [view, setView] = useState<'hub' | 'inventory' | 'explore' | 'combat'>('hub');
   
+  const [view, setView] = useState<'hub' | 'inventory' | 'explore' | 'combat' | 'crafting'>('hub');
+  
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   // * Map header navigation to internal view state
-  const handleHeaderNavigate = (navView: 'character' | 'inventory' | 'world' | 'combat') => {
+  const handleHeaderNavigate = (navView: 'character' | 'inventory' | 'world' | 'combat' | 'crafting') => {
     switch (navView) {
       case 'character':
-        // * Character sheet is always visible in sidebar, so just show hub
         setView('hub');
         break;
       case 'inventory':
@@ -38,11 +45,14 @@ function App() {
       case 'combat':
         setView('combat');
         break;
+      case 'crafting':
+        setView('crafting');
+        break;
     }
   };
   
   // * Determine active header view based on current view state
-  const getActiveHeaderView = (): 'character' | 'inventory' | 'world' | 'combat' | undefined => {
+  const getActiveHeaderView = (): 'character' | 'inventory' | 'world' | 'combat' | 'crafting' | undefined => {
     switch (view) {
       case 'hub':
         return 'character';
@@ -52,35 +62,40 @@ function App() {
         return 'world';
       case 'combat':
         return 'combat';
+      case 'crafting':
+        return 'crafting';
       default:
         return undefined;
     }
   };
 
-  useEffect(() => {
-    const init = async () => {
-      await loadGame();
-    };
-    init();
-  }, [loadGame]);
-
-  // * Default character creation if none exists
-  useEffect(() => {
-    if (!isLoading && !character) {
-      console.log('No character found, initializing with mock data...');
-      setCharacter(MOCK_CHARACTER);
-      setInventory(MOCK_INVENTORY);
-    }
-  }, [isLoading, character, setCharacter, setInventory]);
-
-  if (isLoading) {
+  if (isLoading || authStatus === 'idle') {
     return (
       <div className="h-screen w-screen bg-fantasy-dark flex items-center justify-center text-fantasy-accent font-serif tracking-widest animate-pulse">
-ЗАГРУЗКА ДАННЫХ...
+        ЗАГРУЗКА ДАННЫХ...
       </div>
     );
   }
 
+  // 1. Not Authenticated -> Show Auth Screen
+  if (authStatus === 'unauthenticated') {
+    return (
+      <div className="h-screen w-screen bg-fantasy-dark overflow-y-auto">
+        <AuthView />
+      </div>
+    );
+  }
+
+  // 2. Authenticated but no character selected -> Show Character Selection
+  if (!character) {
+    return (
+      <div className="h-screen w-screen bg-fantasy-dark overflow-y-auto">
+        <CharacterSelectionView />
+      </div>
+    );
+  }
+
+  // 3. Authenticated and character selected -> Show Main Game
   return (
     <Layout 
       onNavigate={handleHeaderNavigate}
@@ -93,25 +108,31 @@ function App() {
           onClick={() => setView('hub')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'hub' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-Обзор
+          Обзор
         </button>
         <button 
           onClick={() => setView('explore')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'explore' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-Исследовать
+          Исследовать
         </button>
         <button 
           onClick={() => setView('inventory')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'inventory' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-Инвентарь
+          Инвентарь
         </button>
         <button 
           onClick={() => setView('combat')}
           className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'combat' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
         >
-Бой
+          Бой
+        </button>
+        <button 
+          onClick={() => setView('crafting')}
+          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'crafting' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          Ремесло
         </button>
       </div>
 
@@ -150,6 +171,7 @@ function App() {
           {view === 'explore' && <WorldNavigation />}
           {view === 'inventory' && <Inventory />}
           {view === 'combat' && <CombatScreen />}
+          {view === 'crafting' && <CraftingView />}
         </div>
 
         {/* Sidebar for Quests and Info */}

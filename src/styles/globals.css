@@ -16,7 +16,26 @@
   .fantasy-button {
     @apply px-4 py-2 bg-fantasy-surface border border-fantasy-accent/30 text-fantasy-accent hover:bg-fantasy-accent hover:text-fantasy-dark transition-all duration-200 uppercase tracking-wider text-sm font-bold;
   }
+
+  /* * Ensures input text is always visible */
+  .quantity-input {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+  }
+  
+  .quantity-input::placeholder {
+    color: #6b7280 !important;
+  }
+  
+  .quantity-input:-webkit-autofill,
+  .quantity-input:-webkit-autofill:hover,
+  .quantity-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff !important;
+    -webkit-box-shadow: 0 0 0px 1000px #1a1b1e inset !important;
+    box-shadow: 0 0 0px 1000px #1a1b1e inset !important;
+  }
 }
+
 
 
 

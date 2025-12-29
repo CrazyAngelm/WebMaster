@@ -109,6 +109,15 @@ export enum SpeedCategory {
   VERY_FAST = 'VERY_FAST',
 }
 
+export enum ProfessionType {
+  BLACKSMITH = 'BLACKSMITH',
+  TAILOR = 'TAILOR',
+  POTION_MAKER = 'POTION_MAKER',
+  ALCHEMIST = 'ALCHEMIST',
+  SCRIBE = 'SCRIBE',
+  COOK = 'COOK',
+}
+
 /**
  * * Entities
  */
@@ -125,6 +134,12 @@ export interface Speed {
   name: string;
   category: SpeedCategory;
   distancePerAction: number;
+}
+
+export interface CharacterProfession {
+  type: ProfessionType;
+  exp: number;
+  rank: number;
 }
 
 export interface CharacterStats {
@@ -159,6 +174,7 @@ export interface Character {
   isDead: boolean;
   money: number;
   bonuses: CharacterBonuses;
+  professions: CharacterProfession[];
   lastTrainTime?: number; // * Added to track training cooldown (in worldTime)
 }
 
@@ -178,6 +194,7 @@ export interface Building {
   hasShop: boolean;
   canRest?: boolean; // * Added for rest restrictions
   shopInventory?: UUID; // Optional shop reference
+  workstations?: string[];
 }
 
 export interface LocationConnection {
@@ -373,7 +390,7 @@ export interface Effect {
 export interface Recipe {
   id: UUID;
   resultTemplateId: UUID;
-  profession: string;
+  profession: ProfessionType;
   rankRequired: number;
   ingredients: {
     templateId: UUID;

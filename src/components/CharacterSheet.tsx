@@ -1,7 +1,8 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Shield, Zap, TrendingUp, Info, Battery, Moon, Lock } from 'lucide-react';
+import { Shield, Zap, TrendingUp, Info, Battery, Moon, Lock, Hammer } from 'lucide-react';
 import { StaticDataService } from '../services/StaticDataService';
+import { ProfessionService } from '../services/ProfessionService';
 import { clsx } from 'clsx';
 
 export const CharacterSheet: React.FC = () => {
@@ -128,6 +129,33 @@ export const CharacterSheet: React.FC = () => {
         <StatBox label="Сопротивление" value={character.bonuses.damageResistance} color="text-gray-400" />
         <StatBox label="Инициатива" value={character.bonuses.initiative} color="text-gray-400" />
       </div>
+
+      {/* Professions */}
+      {character.professions && character.professions.length > 0 && (
+        <div className="space-y-3 pt-2 border-t border-fantasy-border/50">
+          <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest flex items-center gap-2">
+            <Hammer size={12} /> Профессии
+          </div>
+          <div className="space-y-2">
+            {character.professions.map((prof) => (
+              <div key={prof.type} className="space-y-1">
+                <div className="flex justify-between text-[10px] uppercase font-bold">
+                  <span className="text-gray-400">{prof.type}</span>
+                  <span className="text-fantasy-accent">{ProfessionService.getRankName(prof.rank)} ({prof.exp} XP)</span>
+                </div>
+                <div className="h-1 bg-black/50 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-fantasy-accent opacity-50 transition-all duration-500"
+                    style={{ 
+                      width: `${Math.min(100, (prof.exp / (ProfessionService.RANK_THRESHOLDS.find(t => t.rank === prof.rank)?.minExp || 100)) * 100)}%` 
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bio / Description */}
       <div className="p-3 bg-black/30 border border-fantasy-border rounded text-sm text-gray-400 italic leading-relaxed">

@@ -73,7 +73,8 @@ export const MOCK_CHARACTER: Character = {
     accuracy: 0,
     damageResistance: 0,
     initiative: 0
-  }
+  },
+  professions: []
   // * lastTrainTime is undefined for new characters (allows first training)
 };
 

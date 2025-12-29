@@ -25,7 +25,7 @@ export const LOCATIONS: Location[] = [
     name: 'Торговый район',
     description: 'Сердце коммерции. Прилавки и магазины выстроились вдоль улиц, продавая всё от экзотических специй до обычной стали.',
     zoneType: ZoneType.GREEN,
-    buildings: ['build-district-market']
+    buildings: ['build-district-market', 'build-blacksmith-shop', 'build-alchemy-lab']
   },
   {
     id: 'loc-forsaken-woods',
@@ -43,7 +43,26 @@ export const BUILDINGS: Building[] = [
     name: 'Таверна "Ржавый якорь"',
     description: 'Тускло освещённая таверна, пахнущая дешёвым элем и отчаянными мечтами.',
     hasShop: true,
-    canRest: true
+    canRest: true,
+    workstations: ['Cooking Pot']
+  },
+  {
+    id: 'build-blacksmith-shop',
+    locationId: 'loc-merchant-district',
+    name: 'Кузница "Стальной молот"',
+    description: 'Здесь всегда жарко и шумно. Лучшее место для ковки оружия.',
+    hasShop: true,
+    canRest: false,
+    workstations: ['Forge']
+  },
+  {
+    id: 'build-alchemy-lab',
+    locationId: 'loc-merchant-district',
+    name: 'Алхимическая лаборатория',
+    description: 'Тихое место, наполненное странными запахами и булькающими колбами.',
+    hasShop: true,
+    canRest: false,
+    workstations: ['Alchemy Table']
   },
   {
     id: 'build-guard-post',

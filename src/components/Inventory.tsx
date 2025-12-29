@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ExistingItem, ItemTemplate, Rarity, ItemType } from '../types/game';
-import { Package, Shield, Sword, Anchor, Info } from 'lucide-react';
+import { Package, Shield, Sword, Anchor, Info, Hammer, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { InventoryService } from '../services/InventoryService';
 
 export const Inventory: React.FC = () => {
-  const { inventory, itemTemplates, equipItem, unequipItem } = useGameStore();
-  const [hoveredItem, setHoveredItem] = useState<{ item: ExistingItem; template: ItemTemplate } | null>(null);
+  const { inventory, itemTemplates, equipItem, unequipItem, repairItem, discardItem } = useGameStore();
+  const [selectedItem, setSelectedItem] = useState<{ item: ExistingItem; template: ItemTemplate } | null>(null);
+  const [discardQuantity, setDiscardQuantity] = useState<Record<string, number>>({});
 
   if (!inventory) return null;
 
@@ -62,6 +64,10 @@ export const Inventory: React.FC = () => {
     }
   };
 
+  const isEquippable = (type: ItemType): boolean => {
+    return [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT].includes(type);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -69,7 +75,7 @@ export const Inventory: React.FC = () => {
           <Package size={24} /> Инвентарь
         </h2>
         <div className="text-xs text-gray-500 uppercase font-bold tracking-tighter">
-          Вес: {slots.filter(s => s).reduce((acc, s) => acc + (itemTemplates.get(s.templateId)?.weight || 0), 0)} / {inventory.maxWeight}
+          Вес: {InventoryService.calculateTotalWeight(inventory, itemTemplates)} / {inventory.maxWeight}
         </div>
       </div>
 
@@ -86,17 +92,20 @@ export const Inventory: React.FC = () => {
           const template = itemTemplates.get(item.templateId);
           if (!template) return null;
 
+          const canEquip = isEquippable(template.type);
+
+          const isSelected = selectedItem?.item.id === item.id;
+
           return (
             <div 
               key={item.id}
               className={clsx(
-                "aspect-square border-2 rounded relative cursor-pointer transition-all hover:scale-105 group",
+                "aspect-square border-2 rounded relative transition-all cursor-pointer hover:scale-105",
                 getRarityColor(template.rarity),
-                item.isEquipped && "ring-2 ring-fantasy-accent ring-offset-2 ring-offset-fantasy-dark"
+                item.isEquipped && "ring-2 ring-fantasy-accent ring-offset-2 ring-offset-fantasy-dark",
+                isSelected && "ring-2 ring-fantasy-accent ring-offset-2 ring-offset-fantasy-dark"
               )}
-              onMouseEnter={() => setHoveredItem({ item, template })}
-              onMouseLeave={() => setHoveredItem(null)}
-              onClick={() => item.isEquipped ? unequipItem(item.id) : equipItem(item.id)}
+              onClick={() => setSelectedItem({ item, template })}
             >
               <div className="w-full h-full flex items-center justify-center">
                 {getItemIcon(template.type)}
@@ -116,41 +125,133 @@ export const Inventory: React.FC = () => {
         })}
       </div>
 
-      {/* Tooltip (Simplified Inline for now) */}
-      {hoveredItem && (
-        <div className="p-4 bg-fantasy-surface border border-fantasy-accent/30 rounded shadow-2xl animate-in fade-in zoom-in duration-200">
+      {/* Item Details Panel */}
+      {selectedItem && (
+        <div className="p-4 bg-fantasy-surface border border-fantasy-accent/30 rounded shadow-2xl">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h3 className="text-fantasy-accent font-serif text-lg leading-tight uppercase tracking-wider">{hoveredItem.template.name}</h3>
-              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{translateRarity(hoveredItem.template.rarity)} {translateItemType(hoveredItem.template.type)}</div>
+              <h3 className="text-fantasy-accent font-serif text-lg leading-tight uppercase tracking-wider">{selectedItem.template.name}</h3>
+              <div className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">{translateRarity(selectedItem.template.rarity)} {translateItemType(selectedItem.template.type)}</div>
             </div>
-            <div className="text-xs bg-black/30 px-2 py-1 rounded border border-fantasy-border text-gray-400">
-              {hoveredItem.template.weight}kg
+            <div className="flex items-center gap-2">
+              <div className="text-xs bg-black/30 px-2 py-1 rounded border border-fantasy-border text-gray-400">
+                {selectedItem.template.weight}kg
+              </div>
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="text-gray-500 hover:text-gray-300 transition-colors"
+                title="Закрыть"
+              >
+                ×
+              </button>
             </div>
           </div>
           
-          <div className="space-y-2 text-sm text-gray-300">
-            {hoveredItem.template.baseEssence && (
+          <div className="space-y-2 text-sm text-gray-300 mb-4">
+            {selectedItem.template.baseEssence && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
                 <span className="text-gray-500">Сущность оружия:</span>
-                <span className="text-fantasy-essence font-bold">{hoveredItem.item.currentEssence} / {hoveredItem.template.maxEssence}</span>
+                <span className="text-fantasy-essence font-bold">{selectedItem.item.currentEssence} / {selectedItem.template.maxEssence}</span>
               </div>
             )}
-            {hoveredItem.template.ignoreDamage && (
+            {selectedItem.template.ignoreDamage && (
               <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
                 <span className="text-gray-500">Снижение урона:</span>
-                <span className="text-fantasy-protection font-bold">{hoveredItem.template.ignoreDamage}</span>
+                <span className="text-fantasy-protection font-bold">{selectedItem.template.ignoreDamage}</span>
               </div>
             )}
             <div className="flex justify-between border-b border-fantasy-border/30 pb-1">
               <span className="text-gray-500">Прочность:</span>
-              <span>{hoveredItem.item.currentDurability} / {hoveredItem.template.baseDurability || '∞'}</span>
+              <span>{selectedItem.item.currentDurability} / {selectedItem.template.baseDurability || '∞'}</span>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 text-[10px] text-gray-500 italic">
-            <Info size={12} />
-            Нажмите, чтобы {hoveredItem.item.isEquipped ? 'снять' : 'экипировать'}
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-3 border-t border-fantasy-border/30">
+            {/* Equip/Unequip button */}
+            {isEquippable(selectedItem.template.type) && (
+              <button
+                onClick={() => {
+                  if (selectedItem.item.isEquipped) {
+                    unequipItem(selectedItem.item.id);
+                  } else {
+                    equipItem(selectedItem.item.id);
+                  }
+                }}
+                className="w-full py-2 bg-fantasy-accent/20 border border-fantasy-accent/50 rounded text-xs uppercase font-bold text-fantasy-accent hover:bg-fantasy-accent/30 flex items-center justify-center gap-2"
+              >
+                {selectedItem.item.isEquipped ? 'Снять' : 'Экипировать'}
+              </button>
+            )}
+
+            {/* Repair button */}
+            {(selectedItem.template.type === ItemType.ARMOR || selectedItem.template.type === ItemType.SHIELD || selectedItem.template.type === ItemType.WEAPON) && (
+              <button
+                onClick={() => repairItem(selectedItem.item.id)}
+                className="w-full py-2 bg-fantasy-accent/20 border border-fantasy-accent/50 rounded text-xs uppercase font-bold text-fantasy-accent hover:bg-fantasy-accent/30 flex items-center justify-center gap-2"
+              >
+                <Hammer size={14} /> Починить (10 монет)
+              </button>
+            )}
+
+            {/* Discard section */}
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                Выбросить:
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={selectedItem.item.quantity}
+                value={discardQuantity[selectedItem.item.id] || ''}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= selectedItem.item.quantity) {
+                    setDiscardQuantity(prev => ({ ...prev, [selectedItem.item.id]: val }));
+                  } else if (e.target.value === '') {
+                    setDiscardQuantity(prev => {
+                      const next = { ...prev };
+                      delete next[selectedItem.item.id];
+                      return next;
+                    });
+                  }
+                }}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (isNaN(val) || val < 1) {
+                    setDiscardQuantity(prev => {
+                      const next = { ...prev };
+                      delete next[selectedItem.item.id];
+                      return next;
+                    });
+                  }
+                }}
+                className="flex-1 px-2 py-1 text-xs bg-fantasy-surface border border-fantasy-border rounded placeholder:text-gray-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
+                placeholder="1"
+                style={{ 
+                  caretColor: '#ffffff'
+                }}
+              />
+              <button
+                onClick={() => {
+                  const qty = discardQuantity[selectedItem.item.id] || 1;
+                  discardItem(selectedItem.item.id, qty);
+                  setDiscardQuantity(prev => {
+                    const next = { ...prev };
+                    delete next[selectedItem.item.id];
+                    return next;
+                  });
+                  // * If all items discarded, close the panel
+                  if (qty >= selectedItem.item.quantity) {
+                    setSelectedItem(null);
+                  }
+                }}
+                disabled={!discardQuantity[selectedItem.item.id] || discardQuantity[selectedItem.item.id] < 1 || discardQuantity[selectedItem.item.id] > selectedItem.item.quantity}
+                className="px-3 py-1 bg-red-900/20 border border-red-900/50 rounded text-[10px] uppercase font-bold text-red-400 hover:bg-red-900/40 disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-1"
+              >
+                <Trash2 size={12} /> Выбросить
+              </button>
+            </div>
           </div>
         </div>
       )}

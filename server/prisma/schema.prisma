@@ -1,0 +1,58 @@
+// 📁 server/prisma/schema.prisma - Database schema
+// 🎯 Core function: Defines models for User, Character, and Inventory
+// 🔗 Key dependencies: Prisma
+// 💡 Usage: Used by Prisma to generate client and migrate database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(uuid())
+  login        String      @unique
+  passwordHash String
+  role         String      @default("USER")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  characters   Character[]
+}
+
+model Character {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  name          String    @unique
+  raceId        String
+  rankId        String
+  description   String    @default("")
+  bio           String    @default("")
+  
+  // Stats and complex objects stored as String (JSON) for flexibility
+  stats         String    // CharacterStats (JSON string)
+  bonuses       String    // CharacterBonuses (JSON string)
+  professions   String    // CharacterProfession[] (JSON string)
+  location      String    // { locationId, buildingId, position } (JSON string)
+  
+  isDead        Boolean   @default(false)
+  money         Int       @default(0)
+  lastTrainTime Int?
+  
+  inventory     Inventory?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Inventory {
+  id          String    @id @default(uuid())
+  characterId String    @unique
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  maxWeight   Float
+  items       String    // ExistingItem[] (JSON string)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

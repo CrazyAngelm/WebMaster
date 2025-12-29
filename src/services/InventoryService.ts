@@ -34,6 +34,12 @@ export class InventoryService {
     template: ItemTemplate,
     currentInventory: Inventory
   ): { allowed: boolean; reason?: string } {
+    // * Check if item type is equippable
+    const equippableTypes = [ItemType.WEAPON, ItemType.ARMOR, ItemType.SHIELD, ItemType.ARTIFACT];
+    if (!equippableTypes.includes(template.type)) {
+      return { allowed: false, reason: 'Этот предмет нельзя экипировать.' };
+    }
+
     // * Check weight limit
     // (Weight calculation would normally happen here or before calling this)
 
@@ -72,16 +78,16 @@ export class InventoryService {
   }
 
   /**
-   * * Reduces durability of an item.
+   * * Reduces durability of an item and returns the updated item.
    */
-  public static reduceDurability(item: ExistingItem): boolean {
-    if (item.currentDurability > 0) {
-      item.currentDurability -= 1;
-      return true;
+  public static reduceDurability(item: ExistingItem): ExistingItem {
+    if (item.currentDurability !== undefined && item.currentDurability > 0) {
+      return { ...item, currentDurability: item.currentDurability - 1 };
     }
-    return false; // Item broken
+    return item;
   }
 }
+
 
 
 

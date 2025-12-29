@@ -1,20 +1,28 @@
-import React, { ReactNode } from 'react';
-import { Shield, User, Package, Map as MapIcon, Sword, Clock } from 'lucide-react';
+// 📁 src/components/Layout.tsx - Main layout wrapper
+// 🎯 Core function: Shared UI elements (header, sidebars) and admin access
+// 🔗 Key dependencies: React, lucide-react, useGameStore, components/*
+// 💡 Usage: Wraps main game content
+
+import React, { ReactNode, useState } from 'react';
+import { Shield, User, Package, Map as MapIcon, Sword, Clock, Hammer, Settings } from 'lucide-react';
 import { CharacterSheet } from './CharacterSheet';
 import { SaveManager } from './SaveManager';
+import { AdminPanel } from './AdminPanel';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
 import { clsx } from 'clsx';
+import { Notification } from './Notification';
 
 interface LayoutProps {
   children: ReactNode;
-  onNavigate?: (view: 'character' | 'inventory' | 'world' | 'combat') => void;
-  activeView?: 'character' | 'inventory' | 'world' | 'combat';
+  onNavigate?: (view: 'character' | 'inventory' | 'world' | 'combat' | 'crafting') => void;
+  activeView?: 'character' | 'inventory' | 'world' | 'combat' | 'crafting';
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView }) => {
   const { battle } = useCombatStore();
-  const { worldTime } = useGameStore();
+  const { worldTime, user } = useGameStore();
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
 
   const formatTime = (totalHours: number) => {
     const days = Math.floor(totalHours / 24) + 1;
@@ -24,6 +32,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
+      {/* * Global notification overlay */}
+      <Notification />
+      
       {/* Top Header */}
       <header className="h-14 bg-fantasy-surface border-b border-fantasy-border flex items-center justify-between px-6 z-10">
         <div className="flex items-center gap-6">
@@ -38,6 +50,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {user?.role === 'ADMIN' && (
+            <button 
+              onClick={() => setShowAdminPanel(true)}
+              className="p-2 text-yellow-500 hover:text-yellow-400 transition-colors"
+              title="Админ-панель"
+            >
+              <Settings size={20} />
+            </button>
+          )}
           <SaveManager />
           <nav className="flex gap-6">
             <button 
@@ -84,6 +105,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               <Sword size={18} />
               <span className="text-xs uppercase font-bold tracking-tighter">Бой</span>
             </button>
+            <button 
+              onClick={() => onNavigate?.('crafting')}
+              className={`flex items-center gap-2 transition-colors ${
+                activeView === 'crafting' 
+                  ? 'text-fantasy-accent' 
+                  : 'text-gray-400 hover:text-fantasy-accent'
+              }`}
+            >
+              <Hammer size={18} />
+              <span className="text-xs uppercase font-bold tracking-tighter">Ремесло</span>
+            </button>
           </nav>
         </div>
       </header>
@@ -127,4 +159,3 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
     </div>
   );
 };
-

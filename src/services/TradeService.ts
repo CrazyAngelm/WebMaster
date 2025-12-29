@@ -5,6 +5,7 @@
 
 import { Character, Inventory, ExistingItem, ItemTemplate, UUID } from '../types/game';
 import { StaticDataService } from './StaticDataService';
+import { InventoryService } from './InventoryService';
 
 export const TradeService = {
   /**
@@ -28,14 +29,29 @@ export const TradeService = {
     character: Character, 
     inventory: Inventory, 
     templateId: UUID, 
-    quantity: number = 1
-  ): { success: boolean; character?: Character; inventory?: Inventory; reason?: string } {
+    quantity: number = 1,
+    itemTemplates?: Map<string, ItemTemplate>
+  ): { success: boolean; character?: Character; inventory?: Inventory; message?: string; reason?: string } {
     const template = StaticDataService.getItemTemplate(templateId);
     if (!template) return { success: false, reason: "Item not found." };
 
     const totalPrice = this.getBuyPrice(template) * quantity;
     if (character.money < totalPrice) {
       return { success: false, reason: "Not enough money." };
+    }
+
+    // * Check inventory weight before purchase
+    if (itemTemplates) {
+      const currentWeight = InventoryService.calculateTotalWeight(inventory, itemTemplates);
+      const itemWeight = template.weight * quantity;
+      const newTotalWeight = currentWeight + itemWeight;
+
+      if (newTotalWeight > inventory.maxWeight) {
+        return { 
+          success: false, 
+          reason: `Инвентарь переполнен. Текущий вес: ${currentWeight}kg, лимит: ${inventory.maxWeight}kg. Покупка добавит ${itemWeight}kg.` 
+        };
+      }
     }
 
     // * Update character money
@@ -69,7 +85,7 @@ export const TradeService = {
       updatedInventory.items.push(this.createNewItem(templateId, quantity));
     }
 
-    return { success: true, character: updatedCharacter, inventory: updatedInventory };
+    return { success: true, character: updatedCharacter, inventory: updatedInventory, message: `Куплено: ${template.name} x${quantity}` };
   },
 
   /**
@@ -80,16 +96,16 @@ export const TradeService = {
     inventory: Inventory, 
     itemId: UUID, 
     quantity: number = 1
-  ): { success: boolean; character?: Character; inventory?: Inventory; reason?: string } {
+  ): { success: boolean; character?: Character; inventory?: Inventory; message?: string; reason?: string } {
     const itemIndex = inventory.items.findIndex(i => i.id === itemId);
-    if (itemIndex === -1) return { success: false, reason: "Item not found in inventory." };
+    if (itemIndex === -1) return { success: false, reason: "Item not found in inventory.", message: "Item not found in inventory." };
 
     const item = inventory.items[itemIndex];
     const template = StaticDataService.getItemTemplate(item.templateId);
-    if (!template) return { success: false, reason: "Item template not found." };
+    if (!template) return { success: false, reason: "Item template not found.", message: "Item template not found." };
 
     if (item.quantity < quantity) {
-      return { success: false, reason: "Not enough items to sell." };
+      return { success: false, reason: "Not enough items to sell.", message: "Not enough items to sell." };
     }
 
     const totalGain = this.getSellPrice(template) * quantity;
@@ -111,7 +127,7 @@ export const TradeService = {
       };
     }
 
-    return { success: true, character: updatedCharacter, inventory: updatedInventory };
+    return { success: true, character: updatedCharacter, inventory: updatedInventory, message: `Продано: ${template.name} x${quantity}` };
   },
 
   /**

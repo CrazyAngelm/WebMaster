@@ -24,6 +24,18 @@ export const WorldNavigation: React.FC = () => {
     ? StaticDataService.getBuilding(character.location.buildingId)
     : null;
 
+  // * Safety check: if location not found, show error message
+  if (!currentLoc) {
+    return (
+      <div className="fantasy-panel p-8 text-center">
+        <div className="text-red-500 text-lg font-bold mb-2">Ошибка локации</div>
+        <div className="text-gray-400 text-sm">
+          Локация с ID "{character.location.locationId}" не найдена.
+        </div>
+      </div>
+    );
+  }
+
   if (currentBuilding) {
     return (
       <div className="h-full flex flex-col">
