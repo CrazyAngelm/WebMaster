@@ -19,6 +19,20 @@ vite.config.*.timestamp-*
 .env.test.local
 .env.production.local
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+*.db3
+
+# Prisma
+# Note: migrations should be committed, but dev databases should not
+# Uncomment if you want to ignore Prisma client generation (not recommended)
+# node_modules/.prisma/
+
 # Logs
 logs
 *.log

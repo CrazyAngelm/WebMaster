@@ -38,7 +38,7 @@ export class CombatEngine {
       status: BattleStatus.ACTIVE,
       turnOrder: sortedOrder,
       currentTurnIndex: 0,
-      log: ['Battle started!']
+      log: ['Бой начался!']
     };
   }
 
@@ -51,7 +51,7 @@ export class CombatEngine {
     
     // * Reset actions for the new turn
     active.currentActions = { main: 1, bonus: 1 };
-    battle.log.push(`It's now turn for participant ${active.id}`);
+    // ! Log message for turn change is handled in combatStore where character names are available
   }
 
   /**
@@ -89,7 +89,7 @@ export class CombatEngine {
 
     // * Tie-breaker: If results are equal, defender wins (counts as miss)
     if (hitRoll <= evasionRoll) {
-      return { hit: false, damageDealt: 0, log: 'Attack missed (Evasion)!' };
+      return { hit: false, damageDealt: 0, log: 'Промах (уворот)!' };
     }
 
     // * 2. Damage & Penetration
@@ -114,11 +114,11 @@ export class CombatEngine {
         defenderArmor.currentDurability = Math.max(0, defenderArmor.currentDurability - 1);
       }
       
-      logMessage = `Hit! Dealt ${finalDamage} damage.`;
+      logMessage = `Попадание! Нанесено ${finalDamage} урона.`;
     } else {
       // * Does not penetrate: Only reduce armor durability
       defenderArmor.currentDurability = Math.max(0, defenderArmor.currentDurability - 1);
-      logMessage = 'Hit! But armor absorbed the damage (durability reduced).';
+      logMessage = 'Попадание! Броня поглотила урон (прочность снижена).';
     }
 
     return { hit: true, damageDealt: finalDamage, log: logMessage };

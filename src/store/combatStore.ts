@@ -41,11 +41,18 @@ export const useCombatStore = create<CombatState>((set, get) => ({
   },
 
   nextTurn: () => {
-    const { battle } = get();
+    const { battle, player, enemy } = get();
     if (!battle) return;
 
     const updatedBattle = { ...battle };
     CombatEngine.nextTurn(updatedBattle);
+    
+    // * Add turn change message with character name
+    const currentParticipant = updatedBattle.turnOrder[updatedBattle.currentTurnIndex];
+    const isPlayerTurn = currentParticipant.characterId === player?.id;
+    const characterName = isPlayerTurn ? (player?.name || 'Вы') : (enemy?.name || 'Противник');
+    updatedBattle.log.push(`Ход: ${characterName}`);
+    
     set({ battle: updatedBattle });
   },
 
@@ -63,12 +70,12 @@ export const useCombatStore = create<CombatState>((set, get) => ({
 
     const updatedBattle = { 
       ...battle, 
-      log: [...battle.log, `Player: ${result.log}`] 
+      log: [...battle.log, `${player.name}: ${result.log}`] 
     };
 
     if (enemy.isDead) {
       updatedBattle.status = BattleStatus.FINISHED;
-      updatedBattle.log.push(`${enemy.name} has been defeated!`);
+      updatedBattle.log.push(`${enemy.name} повержен!`);
     }
 
     set({ battle: updatedBattle, enemy: { ...enemy } });
@@ -88,12 +95,12 @@ export const useCombatStore = create<CombatState>((set, get) => ({
 
     const updatedBattle = { 
       ...battle, 
-      log: [...battle.log, `Enemy: ${result.log}`] 
+      log: [...battle.log, `${enemy.name}: ${result.log}`] 
     };
 
     if (player.isDead) {
       updatedBattle.status = BattleStatus.FINISHED;
-      updatedBattle.log.push(`${player.name} has fallen in battle...`);
+      updatedBattle.log.push(`${player.name} пал в бою...`);
     }
 
     set({ battle: updatedBattle, player: { ...player } });
