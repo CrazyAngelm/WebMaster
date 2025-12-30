@@ -61,7 +61,10 @@ export class CharacterService {
     const probReq = nextRank.breakthroughConditions.find(c => c.includes('1d100 >'));
     if (probReq) {
       const threshold = parseInt(probReq.split('>')[1].trim());
-      const roll = DiceEngine.d100();
+      // * Use sync roll for check logic, but we could also make this async
+      // * However, canBreakthrough is called synchronously in many places.
+      // * Let's keep it sync but trigger a non-blocking animation.
+      const roll = DiceEngine.roll(100, 'Прорыв: 1d100');
       if (roll <= threshold) {
         return { success: false, reason: `Breakthrough failed! Roll: ${roll} (Needed > ${threshold}).` };
       }
@@ -95,7 +98,7 @@ export class CharacterService {
       return null;
     }
 
-    const gain = DiceEngine.roll(config?.essenceGainRoll || 20);
+    const gain = DiceEngine.roll(config?.essenceGainRoll || 20, 'Медитация: Прирост');
     character.stats.essence.max += gain;
     character.stats.essence.current += gain;
     character.stats.protection.max += gain;

@@ -14,6 +14,9 @@ import { EventOverlay } from './components/EventOverlay';
 import { CraftingView } from './components/CraftingView';
 import { AuthView } from './components/AuthView';
 import { CharacterSelectionView } from './components/CharacterSelectionView';
+import { DiceOverlay } from './components/DiceOverlay';
+import { useDiceStore } from './store/diceStore';
+import { DiceEngine } from './engine/DiceEngine';
 
 function App() {
   const { 
@@ -24,11 +27,26 @@ function App() {
     isLoading 
   } = useGameStore();
   
+  const triggerRoll = useDiceStore(state => state.triggerRoll);
+  
   const [view, setView] = useState<'hub' | 'inventory' | 'explore' | 'combat' | 'crafting'>('hub');
   
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // * Initialize Dice Engine Listeners
+  useEffect(() => {
+    // Non-blocking listener for standard rolls
+    DiceEngine.setListener((sides, result, label) => {
+      triggerRoll(sides, result, label);
+    });
+
+    // Blocking listener for combat/important rolls
+    DiceEngine.setAnimatedListener(async (sides, result, label) => {
+      await triggerRoll(sides, result, label);
+    });
+  }, [triggerRoll]);
 
   // * Map header navigation to internal view state
   const handleHeaderNavigate = (navView: 'character' | 'inventory' | 'world' | 'combat' | 'crafting') => {
@@ -101,6 +119,7 @@ function App() {
       onNavigate={handleHeaderNavigate}
       activeView={getActiveHeaderView()}
     >
+      <DiceOverlay />
       <EventOverlay />
       
       <div className="mb-6 flex flex-wrap gap-2 sm:gap-4 border-b border-fantasy-border">

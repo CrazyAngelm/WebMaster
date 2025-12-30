@@ -26,9 +26,9 @@ export const CombatScreen: React.FC = () => {
 
       if (!isPlayerTurn) {
         // * Enemy AI Turn
-        const timer = setTimeout(() => {
+        const timer = setTimeout(async () => {
           // Simple AI: always attack
-          executeEnemyAttack(null, null, null);
+          await executeEnemyAttack(null, null, null);
           nextTurn();
         }, 1500); // 1.5s delay for readability
         return () => clearTimeout(timer);
@@ -73,12 +73,12 @@ export const CombatScreen: React.FC = () => {
     initiateBattle(participants, character, mockEnemy);
   };
 
-  const handleAttack = () => {
+  const handleAttack = async () => {
     if (!battle || !player || !enemy) return;
     
     const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON') || null;
     // We'd also need the defender's armor template, but for now we simplify
-    executePlayerAttack(equippedWeapon, null, null);
+    await executePlayerAttack(equippedWeapon, null, null);
     nextTurn();
   };
 

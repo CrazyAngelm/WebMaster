@@ -21,10 +21,21 @@ export class CombatEngine {
   /**
    * * Initializes a new battle, rolling initiative for all participants.
    */
-  public static startBattle(participants: Participant[]): Battle {
+  public static startBattle(participants: Participant[], characterNames?: Map<string, string>): Battle {
+    const log: string[] = ['Бой начался!'];
+    
     // * Roll initiative: 1d100 + bonus
     participants.forEach(p => {
-      p.initiative = DICE.d100() + (p.initiative || 0);
+      const baseRoll = DICE.roll(100, 'Инициатива');
+      const bonus = p.initiative || 0;
+      p.initiative = baseRoll + bonus;
+      
+      const name = characterNames?.get(p.characterId) || `Участник ${p.id}`;
+      if (bonus > 0) {
+        log.push(`${name}: Инициатива 1d100 + ${bonus} = ${p.initiative} (${baseRoll} + ${bonus})`);
+      } else {
+        log.push(`${name}: Инициатива 1d100 = ${p.initiative}`);
+      }
     });
 
     // * Sort by initiative descending
@@ -38,7 +49,7 @@ export class CombatEngine {
       status: BattleStatus.ACTIVE,
       turnOrder: sortedOrder,
       currentTurnIndex: 0,
-      log: ['Бой начался!']
+      log
     };
   }
 
@@ -57,39 +68,48 @@ export class CombatEngine {
   /**
    * * Resolves an attack between two characters.
    */
-  public static resolveAttack(
+  public static async resolveAttack(
     attacker: Character,
     attackerWeapon: ExistingItem | null,
     defender: Character,
     defenderArmor: ExistingItem | null,
     armorTemplate: ItemTemplate | null
-  ): { hit: boolean; damageDealt: number; log: string } {
+  ): Promise<{ hit: boolean; damageDealt: number; log: string; diceLogs: string[] }> {
     
     // * 1. Hit Check
-    // * Hit Roll: 1d(Essence + Weapon Essence - Armor Hit Penalty)
     const armorHitPenalty = armorTemplate?.hitPenalty || 0;
     const weaponEssence = attackerWeapon?.currentEssence || 0;
     const hitSides = Math.max(1, attacker.stats.essence.current + weaponEssence - armorHitPenalty);
     
-    // * Handle Champion Rank minimum roll
+    // * Roll for Hit (Animated)
     const attackerRank = StaticDataService.getRank(attacker.rankId);
-    const hitRoll = attackerRank?.minEssenceRoll 
-      ? DICE.rollWithMin(hitSides, attackerRank.minEssenceRoll)
-      : DICE.roll(hitSides);
+    const hitRoll = await DICE.rollAnimated(
+      hitSides, 
+      `${attacker.name}: Точность`, 
+      attackerRank?.minEssenceRoll || 1
+    );
 
     // * Evasion Roll: 1d(Essence - Armor Evasion Penalty)
     const armorEvasionPenalty = armorTemplate?.evasionPenalty || 0;
     const evasionSides = Math.max(1, defender.stats.essence.current - armorEvasionPenalty);
     
-    // * Handle Champion Rank minimum roll for defender
+    // * Roll for Evasion (Animated)
     const defenderRank = StaticDataService.getRank(defender.rankId);
-    const evasionRoll = defenderRank?.minEssenceRoll
-      ? DICE.rollWithMin(evasionSides, defenderRank.minEssenceRoll)
-      : DICE.roll(evasionSides);
+    const evasionRoll = await DICE.rollAnimated(
+      evasionSides, 
+      `${defender.name}: Уклонение`,
+      defenderRank?.minEssenceRoll || 1
+    );
+
+    // * Build dice logs
+    const diceLogs: string[] = [
+      `${attacker.name}: Точность 1d${hitSides} = ${hitRoll}`,
+      `${defender.name}: Уклонение 1d${evasionSides} = ${evasionRoll}`
+    ];
 
     // * Tie-breaker: If results are equal, defender wins (counts as miss)
     if (hitRoll <= evasionRoll) {
-      return { hit: false, damageDealt: 0, log: 'Промах (уворот)!' };
+      return { hit: false, damageDealt: 0, log: 'Промах (уворот)!', diceLogs };
     }
 
     // * 2. Damage & Penetration
@@ -121,7 +141,7 @@ export class CombatEngine {
       logMessage = 'Попадание! Броня поглотила урон (прочность снижена).';
     }
 
-    return { hit: true, damageDealt: finalDamage, log: logMessage };
+    return { hit: true, damageDealt: finalDamage, log: logMessage, diceLogs };
   }
 
   /**

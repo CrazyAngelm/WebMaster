@@ -21,12 +21,12 @@ interface CombatState {
     weapon: ExistingItem | null,
     defenderArmor: ExistingItem | null,
     armorTemplate: ItemTemplate | null
-  ) => void;
+  ) => Promise<void>;
   executeEnemyAttack: (
     weapon: ExistingItem | null,
     defenderArmor: ExistingItem | null,
     armorTemplate: ItemTemplate | null
-  ) => void;
+  ) => Promise<void>;
   endBattle: () => void;
 }
 
@@ -36,7 +36,12 @@ export const useCombatStore = create<CombatState>((set, get) => ({
   enemy: null,
 
   initiateBattle: (participants, player, enemy) => {
-    const battle = CombatEngine.startBattle(participants);
+    // * Create a map of character IDs to names for initiative logging
+    const characterNames = new Map<string, string>();
+    characterNames.set(player.id, player.name);
+    characterNames.set(enemy.id, enemy.name);
+    
+    const battle = CombatEngine.startBattle(participants, characterNames);
     set({ battle, player, enemy });
   },
 
@@ -56,11 +61,11 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     set({ battle: updatedBattle });
   },
 
-  executePlayerAttack: (weapon, defenderArmor, armorTemplate) => {
+  executePlayerAttack: async (weapon, defenderArmor, armorTemplate) => {
     const { battle, player, enemy } = get();
     if (!battle || !player || !enemy) return;
 
-    const result = CombatEngine.resolveAttack(
+    const result = await CombatEngine.resolveAttack(
       player,
       weapon,
       enemy,
@@ -68,9 +73,10 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       armorTemplate
     );
 
+    // * Add dice rolls to log first, then the result
     const updatedBattle = { 
       ...battle, 
-      log: [...battle.log, `${player.name}: ${result.log}`] 
+      log: [...battle.log, ...result.diceLogs, `${player.name}: ${result.log}`] 
     };
 
     if (enemy.isDead) {
@@ -81,11 +87,11 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     set({ battle: updatedBattle, enemy: { ...enemy } });
   },
 
-  executeEnemyAttack: (weapon, defenderArmor, armorTemplate) => {
+  executeEnemyAttack: async (weapon, defenderArmor, armorTemplate) => {
     const { battle, player, enemy } = get();
     if (!battle || !player || !enemy) return;
 
-    const result = CombatEngine.resolveAttack(
+    const result = await CombatEngine.resolveAttack(
       enemy,
       weapon,
       player,
@@ -93,9 +99,10 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       armorTemplate
     );
 
+    // * Add dice rolls to log first, then the result
     const updatedBattle = { 
       ...battle, 
-      log: [...battle.log, `${enemy.name}: ${result.log}`] 
+      log: [...battle.log, ...result.diceLogs, `${enemy.name}: ${result.log}`] 
     };
 
     if (player.isDead) {
