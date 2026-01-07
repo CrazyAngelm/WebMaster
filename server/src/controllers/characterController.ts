@@ -220,7 +220,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
       if (typeof money !== 'number' || money < 0) {
         return res.status(400).json({ error: 'Money cannot be negative' });
       }
-      // * Allow higher cap to avoid false positives when крупные суммы легальны
+      // * Allow higher cap to avoid false positives when large legitimate sums are processed
       const MONEY_CAP = 1000000000; // 1000M hard cap
       if (money > MONEY_CAP) {
         return res.status(400).json({ error: 'Money value too high' });
