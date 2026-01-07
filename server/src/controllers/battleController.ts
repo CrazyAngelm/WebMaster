@@ -7,13 +7,62 @@ import { Request, Response } from 'express';
 import prisma from '../db';
 import { CombatEngine } from '../utils/combatEngine';
 import { DiceEngine as DICE } from '../utils/diceEngine';
-import { BattleStatus, ArmorCategory, PenetrationType } from '../types/game';
+import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats } from '../types/game';
+
+const syncParticipantToCharacter = async (participant: any) => {
+  if (!participant.characterId) return;
+
+  const character = await prisma.character.findUnique({
+    where: { id: participant.characterId }
+  });
+
+  if (!character) return;
+
+  const stats: CharacterStats = JSON.parse(character.stats);
+  stats.essence.current = participant.currentHp;
+  stats.protection.current = participant.currentProtection;
+
+  await prisma.character.update({
+    where: { id: participant.characterId },
+    data: {
+      stats: JSON.stringify(stats)
+    }
+  });
+};
 
 export const startBattle = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
     const userId = req.userId;
     const { playerCharacterId, enemyId, isMonster } = req.body;
+
+    // * Check if an active battle already exists for this character
+    const existingBattle = await prisma.battle.findFirst({
+      where: {
+        status: BattleStatus.ACTIVE,
+        participants: {
+          some: { characterId: playerCharacterId }
+        }
+      },
+      include: { participants: true }
+    });
+
+    if (existingBattle) {
+      // * Check if this battle should actually be finished
+      const hasDeadParticipant = existingBattle.participants.some(p => p.currentHp <= 0);
+      if (hasDeadParticipant) {
+        await prisma.battle.update({
+          where: { id: existingBattle.id },
+          data: { status: BattleStatus.FINISHED }
+        });
+      } else {
+        return res.json({
+          ...existingBattle,
+          log: JSON.parse(existingBattle.log),
+          message: 'Active battle resumed'
+        });
+      }
+    }
 
     const playerChar = await prisma.character.findUnique({
       where: { id: playerCharacterId, userId },
@@ -206,13 +255,21 @@ export const resolveAttack = async (req: Request, res: Response) => {
     );
 
     // * Update target state with NEW values after damage application
-    await prisma.battleParticipant.update({
+    const updatedTarget = await prisma.battleParticipant.update({
       where: { id: target.id },
       data: {
-        currentHp: targetCopy.currentHp,
-        currentProtection: targetCopy.currentProtection
+        currentHp: Math.max(0, targetCopy.currentHp),
+        currentProtection: Math.max(0, targetCopy.currentProtection)
       }
     });
+
+    // * Sync target state back to character if applicable
+    await syncParticipantToCharacter(updatedTarget);
+
+    // * If attacker is a player, sync their state (just in case)
+    if (attacker.isPlayer) {
+      await syncParticipantToCharacter(attacker);
+    }
 
     // * Update attacker actions (use current value from database, not from copy)
     const updatedMainActions = Math.max(0, attacker.mainActions - 1);
@@ -223,13 +280,21 @@ export const resolveAttack = async (req: Request, res: Response) => {
       }
     });
 
+    // * Final sync for attacker to save reduced actions if needed (though character doesn't track battle actions)
+    if (attacker.isPlayer) {
+        await syncParticipantToCharacter(attacker);
+    }
+
     // * Update log
     const currentLog = JSON.parse(battle.log);
     const updatedLog = [...currentLog, ...result.diceLogs, `${attacker.name}: ${result.log}`];
 
     const isTargetDead = targetCopy.currentHp <= 0;
+    
     if (isTargetDead) {
       updatedLog.push(`${targetCopy.name} повержен!`);
+      
+      // * Mark battle as finished
       await prisma.battle.update({
         where: { id: battle.id },
         data: {
@@ -237,6 +302,14 @@ export const resolveAttack = async (req: Request, res: Response) => {
           log: JSON.stringify(updatedLog)
         }
       });
+      
+      // * Sync ALL player participants one last time to ensure everything is saved
+      for (const participant of battle.participants) {
+        if (participant.isPlayer) {
+          const p = await prisma.battleParticipant.findUnique({ where: { id: participant.id } });
+          if (p) await syncParticipantToCharacter(p);
+        }
+      }
       
       // * If target was a character, mark as dead in characters table
       if (targetCopy.characterId) {
@@ -340,6 +413,48 @@ export const getBattle = async (req: Request, res: Response) => {
     }
 };
 
+export const endBattle = async (req: Request, res: Response) => {
+    try {
+        // @ts-ignore
+        const userId = req.userId;
+        const { id } = req.params;
+        
+        const battle = await prisma.battle.findUnique({
+            where: { id },
+            include: { participants: true }
+        });
+
+        if (!battle) return res.status(404).json({ error: 'Battle not found' });
+
+        // * Verify user owns one of the participants
+        const playerParticipant = battle.participants.find(p => p.characterId && p.isPlayer);
+        if (playerParticipant && playerParticipant.characterId) {
+            const char = await prisma.character.findUnique({ where: { id: playerParticipant.characterId } });
+            if (!char || char.userId !== userId) {
+                return res.status(403).json({ error: 'Not authorized' });
+            }
+        }
+
+        // * Mark battle as finished
+        await prisma.battle.update({
+            where: { id },
+            data: { status: BattleStatus.FINISHED }
+        });
+
+        // * Sync all player participants back to characters
+        for (const participant of battle.participants) {
+            if (participant.isPlayer) {
+                await syncParticipantToCharacter(participant);
+            }
+        }
+
+        res.json({ message: 'Battle ended' });
+    } catch (error) {
+        console.error('End battle error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
 export const getActiveBattle = async (req: Request, res: Response) => {
   try {
     const { characterId } = req.params;
@@ -354,6 +469,17 @@ export const getActiveBattle = async (req: Request, res: Response) => {
     });
 
     if (!battle) return res.status(404).json({ error: 'No active battle' });
+
+    // * Additional check: ensure no participant is dead (battle should be finished)
+    const hasDeadParticipant = battle.participants.some(p => p.currentHp <= 0);
+    if (hasDeadParticipant) {
+      // * Mark battle as finished if someone is dead
+      await prisma.battle.update({
+        where: { id: battle.id },
+        data: { status: BattleStatus.FINISHED }
+      });
+      return res.status(404).json({ error: 'Battle already finished' });
+    }
 
     res.json({
       ...battle,

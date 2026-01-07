@@ -198,7 +198,7 @@ export const CombatScreen: React.FC = () => {
             <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">
               {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вы проиграли' : 'Победа!'}
             </h4>
-            <button onClick={endBattle} className="fantasy-button">
+            <button onClick={() => endBattle(battle.id)} className="fantasy-button">
               {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вернуться в город' : 'Завершить бой'}
             </button>
           </div>

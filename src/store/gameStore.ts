@@ -78,6 +78,7 @@ interface GameState {
   deleteCharacter: (id: string) => Promise<void>;
   selectCharacter: (character: Character) => Promise<void>;
   setCharacter: (character: Character) => void;
+  refreshCharacter: () => Promise<void>;
 
   // Game Logic Actions
   initializeData: () => Promise<void>;
@@ -296,6 +297,31 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   setCharacter: (character) => set({ character }),
+
+  refreshCharacter: async () => {
+    const { token, character } = get();
+    if (!token || !character) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/characters`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updatedChar = data.find((c: any) => c.id === character.id);
+        if (updatedChar) {
+          set({ 
+            character: updatedChar,
+            inventory: updatedChar.inventory,
+            userCharacters: data
+          });
+        }
+      }
+    } catch (e) {
+      console.error('Failed to refresh character:', e);
+    }
+  },
 
   // --- Admin Actions ---
   adminAddGold: async (amount) => {

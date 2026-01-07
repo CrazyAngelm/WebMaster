@@ -25,7 +25,7 @@ interface CombatState {
     targetId: string,
     weaponId: string | null
   ) => Promise<void>;
-  endBattle: () => void;
+  endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
   checkActiveBattle: (characterId: string) => Promise<boolean>;
 }
@@ -108,6 +108,22 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       if (!res.ok) throw new Error(updatedBattle.error);
       
       set({ battle: updatedBattle });
+      
+      // * Sync local character stats even on turn change (passive effects might apply)
+      const playerPart = updatedBattle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+      if (playerPart) {
+        const char = useGameStore.getState().character;
+        if (char) {
+          useGameStore.getState().setCharacter({
+            ...char,
+            stats: {
+              ...char.stats,
+              essence: { ...char.stats.essence, current: playerPart.currentHp },
+              protection: { ...char.stats.protection, current: playerPart.currentProtection }
+            }
+          });
+        }
+      }
     } catch (error) {
       console.error('Failed to advance turn:', error);
     }
@@ -136,6 +152,24 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       const result = await res.json();
       if (!res.ok) throw new Error(result.error);
       
+      // * Update local character stats immediately after attack to prevent race with saveGame
+      if (result.battle) {
+        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+        if (playerPart) {
+          const char = useGameStore.getState().character;
+          if (char) {
+            useGameStore.getState().setCharacter({
+              ...char,
+              stats: {
+                ...char.stats,
+                essence: { ...char.stats.essence, current: playerPart.currentHp },
+                protection: { ...char.stats.protection, current: playerPart.currentProtection }
+              }
+            });
+          }
+        }
+      }
+
       // * Trigger visual dice rolls if any
       if (result.rolls && Array.isArray(result.rolls)) {
         const { triggerRoll } = useDiceStore.getState();
@@ -172,8 +206,26 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
   },
 
-  endBattle: () => {
+  endBattle: async (battleId?: string) => {
+    const { battle, token } = get();
+    const battleIdToEnd = battleId || battle?.id;
+    
+    // * Mark battle as finished on server if ID provided
+    if (battleIdToEnd && token) {
+      try {
+        await fetch(`${API_BASE}/battle/end/${battleIdToEnd}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (error) {
+        console.error('Failed to end battle on server:', error);
+      }
+    }
+    
     set({ battle: null, player: null, enemy: null });
+    
+    // * Refresh character stats after battle
+    await useGameStore.getState().refreshCharacter();
   }
 }));
 
