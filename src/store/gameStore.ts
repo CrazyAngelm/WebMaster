@@ -60,6 +60,10 @@ interface GameState {
     baseRealTime: number;
     baseServerTime: number;
   } | null;
+  timeSyncIntervals: {
+    interpolation: number | null;
+    sync: number | null;
+  };
   
   // Auth Actions
   login: (login: string, password: string) => Promise<void>;
@@ -119,6 +123,10 @@ export const useGameStore = create<GameState>((set, get) => ({
   isSaving: false,
   serverTime: 0,
   serverTimeData: null,
+  timeSyncIntervals: {
+    interpolation: null,
+    sync: null
+  },
 
   // --- Auth Actions ---
   login: async (login, password) => {
@@ -152,6 +160,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   logout: () => {
+    // * Clear time sync intervals on logout
+    const { timeSyncIntervals } = get();
+    if (timeSyncIntervals.interpolation) {
+      clearInterval(timeSyncIntervals.interpolation);
+    }
+    if (timeSyncIntervals.sync) {
+      clearInterval(timeSyncIntervals.sync);
+    }
+
     localStorage.removeItem('token');
     set({ 
       user: null, 
@@ -159,7 +176,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       authStatus: 'unauthenticated', 
       character: null, 
       inventory: null,
-      userCharacters: []
+      userCharacters: [],
+      timeSyncIntervals: {
+        interpolation: null,
+        sync: null
+      }
     });
   },
 
@@ -397,8 +418,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   syncServerTime: () => {
+    // * Clear existing intervals to prevent accumulation
+    const { timeSyncIntervals } = get();
+    if (timeSyncIntervals.interpolation) {
+      clearInterval(timeSyncIntervals.interpolation);
+    }
+    if (timeSyncIntervals.sync) {
+      clearInterval(timeSyncIntervals.sync);
+    }
+
     // 1. Interpolation interval (every second)
-    setInterval(() => {
+    const interpolationId = setInterval(() => {
       const { serverTimeData } = get();
       if (!serverTimeData) return;
 
@@ -411,9 +441,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     }, 1000);
 
     // 2. Sync interval (every minute)
-    setInterval(() => {
+    const syncId = setInterval(() => {
       get().fetchServerTime();
     }, 60000);
+
+    // * Store interval IDs for cleanup
+    set({ 
+      timeSyncIntervals: {
+        interpolation: interpolationId,
+        sync: syncId
+      }
+    });
   },
 
   loadGame: async () => {
@@ -447,6 +485,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           bonuses: character.bonuses,
           activeQuests,
           lastTrainTime: typeof character.lastTrainTime === 'number' ? character.lastTrainTime : null,
+          lastRestTime: typeof character.lastRestTime === 'number' ? character.lastRestTime : null,
           inventory: inventory ? {
             items: inventory.items,
             baseSlots: inventory.baseSlots
@@ -499,7 +538,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   rest: async () => {
-    const { character } = get();
+    const { character, serverTime } = get();
     if (!character) return;
     if (!character.location.buildingId) return;
     const building = StaticDataService.getBuilding(character.location.buildingId);
@@ -507,11 +546,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     const config = StaticDataService.getConfig<{ moneyCost: number; hoursDuration: number }>('REST_CONFIG');
     const REST_COST = config?.moneyCost || 10;
+    const REST_COOLDOWN = config?.hoursDuration || 8;
+    
     if (character.money < REST_COST) return;
+    
+    // * Check cooldown
+    if (character.lastRestTime !== undefined && (serverTime - character.lastRestTime) < REST_COOLDOWN) {
+      return; // Rest on cooldown
+    }
 
+    // * Instant restore stats, deduct money, record time
     const updatedCharacter = { 
       ...character,
       money: character.money - REST_COST,
+      lastRestTime: serverTime,
       stats: { ...character.stats, energy: { ...character.stats.energy }, protection: { ...character.stats.protection } }
     };
     updatedCharacter.stats.essence.current = updatedCharacter.stats.essence.max;

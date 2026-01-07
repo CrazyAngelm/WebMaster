@@ -42,6 +42,7 @@ model Character {
   money         Int       @default(0)
   activeQuests  String    @default("[]") // Quest[] (JSON string)
   lastTrainTime Int?
+  lastRestTime  Int?      // * Track last rest time (in server time hours)
   
   inventory     Inventory?
   createdAt     DateTime  @default(now())

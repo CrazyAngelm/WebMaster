@@ -18,6 +18,12 @@ export const CharacterSheet: React.FC = () => {
   const timeSinceLastTrain = character.lastTrainTime !== undefined ? serverTime - character.lastTrainTime : 999;
   const trainCooldownRemaining = Math.max(0, TRAIN_COOLDOWN - timeSinceLastTrain);
 
+  const restConfig = StaticDataService.getConfig<{ moneyCost: number; hoursDuration: number }>('REST_CONFIG');
+  const REST_COOLDOWN = restConfig?.hoursDuration || 8;
+  const REST_COST = restConfig?.moneyCost || 10;
+  const timeSinceLastRest = character.lastRestTime !== undefined ? serverTime - character.lastRestTime : 999;
+  const restCooldownRemaining = Math.max(0, REST_COOLDOWN - timeSinceLastRest);
+
   const formatCooldown = (hours: number) => {
     const h = Math.floor(hours);
     const m = Math.floor((hours * 60) % 60);
@@ -104,16 +110,21 @@ export const CharacterSheet: React.FC = () => {
       {/* Rest Button with Restrictions */}
       <div className="space-y-2">
         <button 
-          disabled={!canRestHere || character.money < 10}
+          disabled={!canRestHere || character.money < REST_COST || restCooldownRemaining > 0}
           onClick={rest}
           className={clsx(
             "w-full fantasy-button py-2 flex items-center justify-center gap-2 text-xs",
-            (!canRestHere || character.money < 10) && "opacity-50 cursor-not-allowed grayscale"
+            (!canRestHere || character.money < REST_COST || restCooldownRemaining > 0) && "opacity-50 cursor-not-allowed grayscale"
           )}
         >
           {canRestHere ? <Moon size={14} /> : <Lock size={14} />}
-          Отдохнуть (10 монет, 8ч)
+          {restCooldownRemaining > 0 ? `Отдохнуть (на кулдауне)` : `Отдохнуть (${REST_COST} монет, ${REST_COOLDOWN}ч)`}
         </button>
+        {restCooldownRemaining > 0 && (
+          <p className="text-[10px] text-center text-amber-500 italic">
+            Следующий отдых доступен через {formatCooldown(restCooldownRemaining)}
+          </p>
+        )}
         {!canRestHere && (
           <div className="space-y-1">
             <p className="text-[10px] text-center text-fantasy-blood italic">
@@ -124,9 +135,9 @@ export const CharacterSheet: React.FC = () => {
             </p>
           </div>
         )}
-        {canRestHere && character.money < 10 && (
+        {canRestHere && restCooldownRemaining === 0 && character.money < REST_COST && (
           <p className="text-[10px] text-center text-fantasy-blood italic">
-            * Недостаточно монет для отдыха (нужно 10)
+            * Недостаточно монет для отдыха (нужно {REST_COST})
           </p>
         )}
       </div>

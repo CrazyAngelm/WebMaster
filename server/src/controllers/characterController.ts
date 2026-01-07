@@ -157,7 +157,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, inventory } = req.body;
+    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, lastRestTime, inventory } = req.body;
 
     console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
@@ -180,6 +180,15 @@ export const updateCharacter = async (req: Request, res: Response) => {
       updateData.lastTrainTime = lastTrainTime;
     } else if (lastTrainTime === null) {
       updateData.lastTrainTime = null;
+    }
+
+    if (lastRestTime !== undefined && lastRestTime !== null) {
+      if (typeof lastRestTime !== 'number' || lastRestTime < 0) {
+        return res.status(400).json({ error: 'Invalid lastRestTime' });
+      }
+      updateData.lastRestTime = lastRestTime;
+    } else if (lastRestTime === null) {
+      updateData.lastRestTime = null;
     }
 
     if (activeQuests !== undefined) {

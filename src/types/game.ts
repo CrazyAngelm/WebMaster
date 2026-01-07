@@ -173,11 +173,11 @@ export interface Character {
   };
   isDead: boolean;
   money: number;
-  worldTime: number;
   activeQuests: Quest[];
   bonuses: CharacterBonuses;
   professions: CharacterProfession[];
-  lastTrainTime?: number; // * Added to track training cooldown (in worldTime)
+  lastTrainTime?: number; // * Added to track training cooldown (in server time hours)
+  lastRestTime?: number;  // * Added to track rest cooldown (in server time hours)
 }
 
 export interface Location {
