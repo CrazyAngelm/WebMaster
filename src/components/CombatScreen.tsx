@@ -10,8 +10,7 @@ export const CombatScreen: React.FC = () => {
     battle, 
     player, 
     enemy, 
-    executePlayerAttack, 
-    executeEnemyAttack, 
+    executeAttack, 
     nextTurn, 
     initiateBattle, 
     endBattle 
@@ -21,15 +20,18 @@ export const CombatScreen: React.FC = () => {
   // * Auto-handle enemy turns
   useEffect(() => {
     if (battle && battle.status === BattleStatus.ACTIVE) {
-      const currentParticipant = battle.turnOrder[battle.currentTurnIndex];
+      const currentParticipant = battle.participants[battle.currentTurnIndex];
       const isPlayerTurn = currentParticipant.characterId === character?.id;
 
       if (!isPlayerTurn) {
         // * Enemy AI Turn
         const timer = setTimeout(async () => {
           // Simple AI: always attack
-          await executeEnemyAttack(null, null, null);
-          nextTurn();
+          const target = battle.participants.find(p => p.isPlayer);
+          if (target) {
+            await executeAttack(currentParticipant.id, target.id, null);
+          }
+          await nextTurn();
         }, 1500); // 1.5s delay for readability
         return () => clearTimeout(timer);
       }
@@ -38,51 +40,46 @@ export const CombatScreen: React.FC = () => {
 
   // * Sync player health back to game store if changed
   useEffect(() => {
-    if (player && character && (player.stats.essence.current !== character.stats.essence.current || player.stats.protection.current !== character.stats.protection.current)) {
-      setCharacter(player);
+    if (battle && character) {
+      const playerParticipant = battle.participants.find(p => p.characterId === character.id);
+      if (playerParticipant && (playerParticipant.currentHp !== character.stats.essence.current || playerParticipant.currentProtection !== character.stats.protection.current)) {
+        setCharacter({
+          ...character,
+          stats: {
+            ...character.stats,
+            essence: { ...character.stats.essence, current: playerParticipant.currentHp },
+            protection: { ...character.stats.protection, current: playerParticipant.currentProtection }
+          },
+          isDead: playerParticipant.currentHp <= 0
+        });
+      }
     }
-  }, [player?.stats.essence.current, player?.stats.protection.current]);
+  }, [battle?.participants]);
 
   const handleStartBattle = () => {
     if (!character) return;
     
-    // Mocking an enemy for the battle
-    const mockEnemy: any = {
-      id: 'enemy-wolf',
-      name: 'Лесной волк',
-      isDead: false,
-      stats: {
-        essence: { current: 30, max: 30 },
-        energy: { current: 100, max: 100 },
-        protection: { current: 0, max: 0 },
-        speedId: 'speed-ordinary'
-      },
-      bonuses: {
-        evasion: 10,
-        accuracy: 10,
-        damageResistance: 0,
-        initiative: 5
-      }
-    };
-
-    const participants = [
-      { id: 'p1', characterId: character.id, teamId: 'player', initiative: 0, currentActions: { main: 1, bonus: 1 } },
-      { id: 'p2', characterId: 'enemy-wolf', teamId: 'enemy', initiative: 0, currentActions: { main: 1, bonus: 1 } }
-    ];
-
-    initiateBattle(participants, character, mockEnemy);
+    // For testing, we use a known monster template ID from seed.ts
+    initiateBattle('mon-wolf', true);
   };
 
   const handleAttack = async () => {
-    if (!battle || !player || !enemy) return;
+    if (!battle || !character) return;
     
+    const currentParticipant = battle.participants[battle.currentTurnIndex];
+    if (!currentParticipant) return; // Robustness check
+
+    const target = battle.participants.find(p => !p.isPlayer);
+    
+    if (!target) return;
+
     const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON') || null;
-    // We'd also need the defender's armor template, but for now we simplify
-    await executePlayerAttack(equippedWeapon, null, null);
-    nextTurn();
+    
+    await executeAttack(currentParticipant.id, target.id, equippedWeapon?.id || null);
+    await nextTurn();
   };
 
-  if (!battle) {
+  if (!battle || !battle.participants || battle.participants.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-fantasy-border rounded bg-black/10">
         <Sword size={48} className="text-fantasy-border mb-4" />
@@ -94,8 +91,13 @@ export const CombatScreen: React.FC = () => {
     );
   }
 
-  const currentParticipant = battle.turnOrder[battle.currentTurnIndex];
+  const currentParticipant = battle.participants[battle.currentTurnIndex];
+  if (!currentParticipant) return null; // Should not happen with above check
+
   const isPlayerTurn = currentParticipant.characterId === character?.id;
+
+  const playerParticipant = battle.participants.find(p => p.isPlayer);
+  const enemyParticipant = battle.participants.find(p => !p.isPlayer);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -103,7 +105,7 @@ export const CombatScreen: React.FC = () => {
       <div className="bg-fantasy-surface border border-fantasy-border rounded p-2 overflow-x-auto">
         <div className="flex items-center gap-4 min-w-max">
           <div className="text-[10px] uppercase font-bold text-gray-600 px-2 border-r border-fantasy-border">Инициатива</div>
-          {battle.turnOrder.map((p, i) => (
+          {battle.participants.map((p, i) => (
             <div 
               key={p.id}
               className={clsx(
@@ -113,8 +115,8 @@ export const CombatScreen: React.FC = () => {
                 : "bg-black/30 border-fantasy-border text-gray-500"
               )}
             >
-              {p.characterId === character?.id ? <UserIcon /> : <Skull size={14} />}
-              <span>{p.characterId === character?.id ? 'Вы' : 'Враг'}</span>
+              {p.isPlayer ? <UserIcon /> : <Skull size={14} />}
+              <span>{p.name}</span>
               <span className="opacity-50">#{p.initiative}</span>
             </div>
           ))}
@@ -136,8 +138,11 @@ export const CombatScreen: React.FC = () => {
             )}
           </div>
           <div className="text-center">
-            <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{player?.name}</div>
-            <StatSmall label="Сущность" current={player?.stats.essence.current || 0} max={player?.stats.essence.max || 1} color="bg-fantasy-essence" />
+            <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{playerParticipant?.name}</div>
+            <div className="flex flex-col gap-2 items-center mt-2">
+              <StatSmall label="Защита" current={playerParticipant?.currentProtection || 0} max={playerParticipant?.maxProtection || 1} color="bg-blue-500" />
+              <StatSmall label="Сущность" current={playerParticipant?.currentHp || 0} max={playerParticipant?.maxHp || 1} color="bg-fantasy-essence" />
+            </div>
           </div>
         </div>
 
@@ -154,8 +159,11 @@ export const CombatScreen: React.FC = () => {
             )}
           </div>
           <div className="text-center">
-            <div className="font-serif text-lg text-fantasy-blood uppercase tracking-wider">{enemy?.name}</div>
-            <StatSmall label="Сущность" current={enemy?.stats.essence.current || 0} max={enemy?.stats.essence.max || 1} color="bg-fantasy-blood" />
+            <div className="font-serif text-lg text-fantasy-blood uppercase tracking-wider">{enemyParticipant?.name}</div>
+            <div className="flex flex-col gap-2 items-center mt-2">
+              <StatSmall label="Защита" current={enemyParticipant?.currentProtection || 0} max={enemyParticipant?.maxProtection || 1} color="bg-blue-500" />
+              <StatSmall label="Сущность" current={enemyParticipant?.currentHp || 0} max={enemyParticipant?.maxHp || 1} color="bg-fantasy-blood" />
+            </div>
           </div>
         </div>
       </div>
@@ -188,10 +196,10 @@ export const CombatScreen: React.FC = () => {
         ) : (
           <div className="text-center">
             <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">
-              {player?.isDead ? 'Вы проиграли' : 'Победа!'}
+              {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вы проиграли' : 'Победа!'}
             </h4>
             <button onClick={endBattle} className="fantasy-button">
-              {player?.isDead ? 'Вернуться в город' : 'Завершить бой'}
+              {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вернуться в город' : 'Завершить бой'}
             </button>
           </div>
         )}

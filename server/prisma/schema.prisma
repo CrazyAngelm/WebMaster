@@ -186,3 +186,31 @@ model GameConfig {
   key   String @id
   value String // JSON string for flexibility
 }
+
+model Battle {
+  id               String              @id @default(uuid())
+  locationId       String
+  status           String              @default("ACTIVE")
+  currentTurnIndex Int                 @default(0)
+  log              String              @default("[]")
+  participants     BattleParticipant[]
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+}
+
+model BattleParticipant {
+  id                String    @id @default(uuid())
+  battleId          String
+  battle            Battle    @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  characterId       String?
+  monsterTemplateId String?
+  name              String
+  initiative        Int
+  currentHp         Int
+  currentProtection Int
+  maxHp             Int
+  maxProtection     Int
+  mainActions       Int       @default(1)
+  bonusActions      Int       @default(1)
+  isPlayer          Boolean   @default(false)
+}

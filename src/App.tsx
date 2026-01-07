@@ -16,6 +16,7 @@ import { AuthView } from './components/AuthView';
 import { CharacterSelectionView } from './components/CharacterSelectionView';
 import { DiceOverlay } from './components/DiceOverlay';
 import { useDiceStore } from './store/diceStore';
+import { useCombatStore } from './store/combatStore';
 import { DiceEngine } from './engine/DiceEngine';
 
 function App() {
@@ -28,12 +29,24 @@ function App() {
   } = useGameStore();
   
   const triggerRoll = useDiceStore(state => state.triggerRoll);
+  const checkActiveBattle = useCombatStore(state => state.checkActiveBattle);
   
   const [view, setView] = useState<'hub' | 'inventory' | 'explore' | 'combat' | 'crafting'>('hub');
   
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // * Auto-resume active battle on character selection
+  useEffect(() => {
+    if (character && checkActiveBattle) {
+      checkActiveBattle(character.id).then(isActive => {
+        if (isActive) setView('combat');
+      }).catch(err => {
+        console.error('Error checking active battle:', err);
+      });
+    }
+  }, [character?.id, checkActiveBattle]);
 
   // * Initialize Dice Engine Listeners
   useEffect(() => {

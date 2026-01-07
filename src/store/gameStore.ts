@@ -77,6 +77,7 @@ interface GameState {
   createCharacter: (name: string, raceId: string) => Promise<void>;
   deleteCharacter: (id: string) => Promise<void>;
   selectCharacter: (character: Character) => Promise<void>;
+  setCharacter: (character: Character) => void;
 
   // Game Logic Actions
   initializeData: () => Promise<void>;
@@ -293,6 +294,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       throw error;
     }
   },
+
+  setCharacter: (character) => set({ character }),
 
   // --- Admin Actions ---
   adminAddGold: async (amount) => {

@@ -363,20 +363,24 @@ export interface Battle {
   id: UUID;
   locationId: UUID;
   status: BattleStatus;
-  turnOrder: Participant[];
+  participants: BattleParticipant[]; // * Changed from turnOrder
   currentTurnIndex: number;
   log: string[];
 }
 
-export interface Participant {
+export interface BattleParticipant {
   id: UUID;
-  characterId: UUID;
-  teamId: UUID;
+  characterId?: UUID;
+  monsterTemplateId?: UUID;
+  name: string;
   initiative: number;
-  currentActions: {
-    main: number;
-    bonus: number;
-  };
+  currentHp: number;
+  currentProtection: number;
+  maxHp: number;
+  maxProtection: number;
+  mainActions: number;
+  bonusActions: number;
+  isPlayer: boolean;
 }
 
 export interface Effect {
