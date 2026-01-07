@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { TimeService } from '../utils/timeService';
 
 const prisma = new PrismaClient();
+
+export const getServerTime = async (req: Request, res: Response) => {
+  res.json(TimeService.getTimeMetadata());
+};
 
 export const getStaticBundle = async (req: Request, res: Response) => {
   try {

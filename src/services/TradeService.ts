@@ -125,16 +125,22 @@ export const TradeService = {
       money: character.money + totalGain
     };
 
-    // * Update inventory
-    const updatedInventory = { ...inventory };
+    // * Update inventory - create a new items array to maintain immutability
+    const updatedItems = [...inventory.items];
     if (item.quantity === quantity) {
-      updatedInventory.items.splice(itemIndex, 1);
+      // * Remove item completely
+      updatedItems.splice(itemIndex, 1);
     } else {
-      updatedInventory.items[itemIndex] = {
+      // * Reduce quantity
+      updatedItems[itemIndex] = {
         ...item,
         quantity: item.quantity - quantity
       };
     }
+    const updatedInventory = {
+      ...inventory,
+      items: updatedItems
+    };
 
     return { success: true, character: updatedCharacter, inventory: updatedInventory, message: `Продано: ${template.name} x${quantity}` };
   },

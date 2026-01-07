@@ -10,11 +10,17 @@ import authRoutes from './routes/authRoutes';
 import characterRoutes from './routes/characterRoutes';
 import adminRoutes from './routes/adminRoutes';
 import staticRoutes from './routes/staticRoutes';
+import { TimeService } from './utils/timeService';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// * Initialize Time Service
+TimeService.init().then(() => {
+  console.log('Server time system ready');
+});
 
 app.use(cors());
 app.use(express.json());

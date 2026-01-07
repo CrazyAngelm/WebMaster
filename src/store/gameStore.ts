@@ -54,7 +54,12 @@ interface GameState {
   recipes: Recipe[];
   isLoading: boolean;
   isSaving: boolean;
-  worldTime: number; 
+  serverTime: number; 
+  serverTimeData: {
+    multiplier: number;
+    baseRealTime: number;
+    baseServerTime: number;
+  } | null;
   
   // Auth Actions
   login: (login: string, password: string) => Promise<void>;
@@ -70,6 +75,8 @@ interface GameState {
 
   // Game Logic Actions
   initializeData: () => Promise<void>;
+  fetchServerTime: () => Promise<void>;
+  syncServerTime: () => void;
   loadGame: () => Promise<void>;
   saveGame: () => Promise<void>;
   trainCharacter: () => void;
@@ -92,6 +99,7 @@ interface GameState {
   // Admin Actions
   adminAddGold: (amount: number) => Promise<void>;
   adminSkipTime: (hours: number) => Promise<void>;
+  adminSetMultiplier: (multiplier: number) => Promise<void>;
   adminForceRest: () => Promise<void>;
 }
 
@@ -109,7 +117,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   recipes: [],
   isLoading: true,
   isSaving: false,
-  worldTime: 0,
+  serverTime: 0,
+  serverTimeData: null,
 
   // --- Auth Actions ---
   login: async (login, password) => {
@@ -248,7 +257,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         character, 
         inventory: (character as any).inventory,
         activeQuests: character.activeQuests || [],
-        worldTime: character.worldTime || 0,
         isLoading: true 
       });
       // Initialize game data if needed
@@ -294,9 +302,25 @@ export const useGameStore = create<GameState>((set, get) => ({
       const data = await res.json();
       throw new Error(data.error);
     }
-    const nextTime = get().worldTime + hours;
-    set({ worldTime: nextTime });
-    await get().saveGame();
+    await get().fetchServerTime();
+  },
+
+  adminSetMultiplier: async (multiplier) => {
+    const { token } = get();
+    if (!token) return;
+    const res = await fetch(`${API_BASE}/admin/set-multiplier`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ multiplier })
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+    await get().fetchServerTime();
   },
 
   adminForceRest: async () => {
@@ -328,6 +352,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   initializeData: async () => {
     try {
       await StaticDataService.init();
+      await get().fetchServerTime();
 
       const templates = StaticDataService.getAllItemTemplates();
       const itemMap = new Map<string, ItemTemplate>();
@@ -338,6 +363,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         ranks: StaticDataService.getAllRanks(),
         recipes: StaticDataService.getAllRecipes()
       });
+
+      // Start time sync/interpolation
+      get().syncServerTime();
     } catch (error) {
       console.error('Failed to initialize data:', error);
       // Set empty defaults to prevent crashes
@@ -349,13 +377,52 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
+  fetchServerTime: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/static/server-time`);
+      if (res.ok) {
+        const data = await res.json();
+        set({ 
+          serverTimeData: {
+            multiplier: data.multiplier,
+            baseRealTime: data.baseRealTime,
+            baseServerTime: data.baseServerTime
+          },
+          serverTime: data.currentTime
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch server time:', e);
+    }
+  },
+
+  syncServerTime: () => {
+    // 1. Interpolation interval (every second)
+    setInterval(() => {
+      const { serverTimeData } = get();
+      if (!serverTimeData) return;
+
+      const realElapsedMs = Date.now() - serverTimeData.baseRealTime;
+      const realElapsedHours = realElapsedMs / (1000 * 3600);
+      const serverElapsedHours = realElapsedHours * serverTimeData.multiplier;
+      const currentTime = serverTimeData.baseServerTime + serverElapsedHours;
+
+      set({ serverTime: currentTime });
+    }, 1000);
+
+    // 2. Sync interval (every minute)
+    setInterval(() => {
+      get().fetchServerTime();
+    }, 60000);
+  },
+
   loadGame: async () => {
     // This is now handled by checkAuth and selectCharacter
     await get().checkAuth();
   },
 
   saveGame: async () => {
-    const { character, inventory, worldTime, activeQuests, token } = get();
+    const { character, inventory, activeQuests, token } = get();
     if (!character || !token) return;
 
     set({ isSaving: true });
@@ -378,7 +445,6 @@ export const useGameStore = create<GameState>((set, get) => ({
           professions: character.professions,
           location: character.location,
           bonuses: character.bonuses,
-          worldTime,
           activeQuests,
           lastTrainTime: typeof character.lastTrainTime === 'number' ? character.lastTrainTime : null,
           inventory: inventory ? {
@@ -400,7 +466,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ 
         character: updatedData,
         inventory: updatedData.inventory,
-        worldTime: updatedData.worldTime,
         activeQuests: updatedData.activeQuests,
         isSaving: false
       });
@@ -414,11 +479,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   trainCharacter: async () => {
-    const { character, worldTime } = get();
+    const { character, serverTime } = get();
     if (!character) return;
     const config = StaticDataService.getConfig<{ cooldownHours: number }>('TRAINING_CONFIG');
     const TRAIN_COOLDOWN = config?.cooldownHours || 12;
-    if (character.lastTrainTime !== undefined && (worldTime - character.lastTrainTime) < TRAIN_COOLDOWN) return;
+    if (character.lastTrainTime !== undefined && (serverTime - character.lastTrainTime) < TRAIN_COOLDOWN) return;
 
     const updatedCharacter = { 
       ...character,
@@ -427,14 +492,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     const result = CharacterService.trainEssence(updatedCharacter);
     if (result) {
-      updatedCharacter.lastTrainTime = worldTime;
-      set({ character: updatedCharacter, worldTime: worldTime + 2 });
+      updatedCharacter.lastTrainTime = serverTime;
+      set({ character: updatedCharacter });
       await get().saveGame();
     }
   },
 
   rest: async () => {
-    const { character, worldTime } = get();
+    const { character } = get();
     if (!character) return;
     if (!character.location.buildingId) return;
     const building = StaticDataService.getBuilding(character.location.buildingId);
@@ -452,8 +517,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     updatedCharacter.stats.essence.current = updatedCharacter.stats.essence.max;
     updatedCharacter.stats.energy.current = updatedCharacter.stats.energy.max;
     updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
-    const nextWorldTime = worldTime + (config?.hoursDuration || 8);
-    set({ character: updatedCharacter, worldTime: nextWorldTime });
+    
+    set({ character: updatedCharacter });
     await get().saveGame();
   },
 
@@ -587,15 +652,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   moveToLocation: async (locationId) => {
-    const { character, activeQuests, worldTime } = get();
+    const { character, activeQuests } = get();
     if (!character) return;
     const moveResult = WorldService.canMoveTo(character, locationId);
     if (moveResult.allowed) {
       const updatedCharacter = WorldService.moveCharacter(character, locationId, moveResult.energyCost || 0);
-      const nextWorldTime = worldTime + (moveResult.timeCost || 0);
       const { updatedQuests } = QuestService.updateProgress(activeQuests, 'VISIT', locationId);
       const event = EventService.rollForTravelEvent();
-      set({ character: updatedCharacter, activeQuests: updatedQuests, activeEvent: event, worldTime: nextWorldTime });
+      set({ character: updatedCharacter, activeQuests: updatedQuests, activeEvent: event });
       await get().saveGame();
     }
   },

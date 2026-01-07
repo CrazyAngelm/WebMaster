@@ -6,7 +6,7 @@ import { ProfessionService } from '../services/ProfessionService';
 import { clsx } from 'clsx';
 
 export const CharacterSheet: React.FC = () => {
-  const { character, ranks, rest, worldTime } = useGameStore();
+  const { character, ranks, rest, serverTime } = useGameStore();
   
   if (!character) return null;
   
@@ -15,8 +15,17 @@ export const CharacterSheet: React.FC = () => {
   const canRestHere = building?.canRest || false;
   
   const TRAIN_COOLDOWN = 24;
-  const timeSinceLastTrain = character.lastTrainTime !== undefined ? worldTime - character.lastTrainTime : 999;
+  const timeSinceLastTrain = character.lastTrainTime !== undefined ? serverTime - character.lastTrainTime : 999;
   const trainCooldownRemaining = Math.max(0, TRAIN_COOLDOWN - timeSinceLastTrain);
+
+  const formatCooldown = (hours: number) => {
+    const h = Math.floor(hours);
+    const m = Math.floor((hours * 60) % 60);
+    const s = Math.floor((hours * 3600) % 60);
+    if (h > 0) return `${h}ч ${m}м`;
+    if (m > 0) return `${m}м ${s}с`;
+    return `${s}с`;
+  };
 
   return (
     <div className="space-y-6">
@@ -46,7 +55,7 @@ export const CharacterSheet: React.FC = () => {
               <span>{character.stats.essence.current} / {character.stats.essence.max}</span>
               {trainCooldownRemaining > 0 && (
                 <span className="text-[9px] text-amber-500 opacity-70">
-                  Откат культивации: {trainCooldownRemaining}ч
+                  Откат культивации: {formatCooldown(trainCooldownRemaining)}
                 </span>
               )}
             </div>

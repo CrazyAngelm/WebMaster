@@ -302,10 +302,11 @@ export const Inventory: React.FC = () => {
           <div className="flex gap-2 flex-wrap">
             {isInShop && (
               <button
-                onClick={() => {
-                  bulkSelectedItems.forEach(({ item }) => {
-                    sellItem(item.id, item.quantity);
-                  });
+                onClick={async () => {
+                  // * Await all sell operations sequentially to prevent race conditions
+                  for (const { item } of bulkSelectedItems) {
+                    await sellItem(item.id, item.quantity);
+                  }
                   clearBulk();
                 }}
                 className="px-3 py-1 text-[10px] uppercase font-bold bg-green-900/20 border border-green-700/50 rounded text-green-300 hover:bg-green-900/40"
@@ -314,10 +315,12 @@ export const Inventory: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => {
-                bulkSelectedItems
-                  .filter(({ item }) => item.isEquipped)
-                  .forEach(({ item }) => unequipItem(item.id));
+              onClick={async () => {
+                // * Await all unequip operations sequentially to prevent race conditions
+                const equippedItems = bulkSelectedItems.filter(({ item }) => item.isEquipped);
+                for (const { item } of equippedItems) {
+                  await unequipItem(item.id);
+                }
                 clearBulk();
               }}
               className="px-3 py-1 text-[10px] uppercase font-bold bg-blue-900/20 border border-blue-700/50 rounded text-blue-200 hover:bg-blue-900/40"
@@ -325,10 +328,11 @@ export const Inventory: React.FC = () => {
               Снять выбранное
             </button>
             <button
-              onClick={() => {
-                bulkSelectedItems.forEach(({ item }) => {
-                  discardItem(item.id, item.quantity);
-                });
+              onClick={async () => {
+                // * Await all discard operations sequentially to prevent race conditions
+                for (const { item } of bulkSelectedItems) {
+                  await discardItem(item.id, item.quantity);
+                }
                 clearBulk();
                 setSelectedItemId(null);
               }}

@@ -22,14 +22,15 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView }) => {
   const { battle } = useCombatStore();
-  const { worldTime, user, activeQuests } = useGameStore();
+  const { serverTime, user, activeQuests } = useGameStore();
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'log' | 'quests'>('log');
 
   const formatTime = (totalHours: number) => {
     const days = Math.floor(totalHours / 24) + 1;
-    const hours = totalHours % 24;
-    return `День ${days}, ${hours.toString().padStart(2, '0')}:00`;
+    const hours = Math.floor(totalHours % 24);
+    const minutes = Math.floor((totalHours * 60) % 60);
+    return `День ${days}, ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
   const completedQuestsCount = activeQuests.filter(q => q.status === 'COMPLETED').length;
@@ -52,7 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
           <div className="hidden lg:flex items-center gap-4">
             <div className="flex items-center gap-2 px-3 py-1 bg-black/40 border border-fantasy-border/50 rounded-full text-[10px] text-gray-400 font-mono tracking-wider">
               <Clock size={12} className="text-fantasy-accent" />
-              {formatTime(worldTime)}
+              {formatTime(serverTime)}
             </div>
             <CharacterQuickInfo />
           </div>

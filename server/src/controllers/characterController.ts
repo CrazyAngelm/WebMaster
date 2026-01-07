@@ -23,10 +23,10 @@ export const getCharacters = async (req: Request, res: Response) => {
       bonuses: JSON.parse(char.bonuses),
       professions: JSON.parse(char.professions),
       location: JSON.parse(char.location),
-      activeQuests: JSON.parse(char.activeQuests || '[]'),
-      inventory: char.inventory ? {
-        ...char.inventory,
-        items: JSON.parse(char.inventory.items)
+      activeQuests: JSON.parse((char as any).activeQuests || '[]'),
+      inventory: (char as any).inventory ? {
+        ...(char as any).inventory,
+        items: JSON.parse((char as any).inventory.items)
       } : null
     }));
     
@@ -101,7 +101,6 @@ export const createCharacter = async (req: Request, res: Response) => {
         professions: JSON.stringify(defaults.professions),
         location: JSON.stringify(defaults.location),
         money: defaults.money,
-        worldTime: 0,
         activeQuests: JSON.stringify([]),
         inventory: {
           create: {
@@ -109,7 +108,7 @@ export const createCharacter = async (req: Request, res: Response) => {
             items: JSON.stringify([]) // Start with empty inventory
           }
         }
-      },
+      } as any,
       include: { inventory: true }
     });
 
@@ -120,10 +119,10 @@ export const createCharacter = async (req: Request, res: Response) => {
       bonuses: JSON.parse(newCharacter.bonuses),
       professions: JSON.parse(newCharacter.professions),
       location: JSON.parse(newCharacter.location),
-      activeQuests: JSON.parse(newCharacter.activeQuests || '[]'),
-      inventory: newCharacter.inventory ? {
-        ...newCharacter.inventory,
-        items: JSON.parse(newCharacter.inventory.items)
+      activeQuests: JSON.parse((newCharacter as any).activeQuests || '[]'),
+      inventory: (newCharacter as any).inventory ? {
+        ...(newCharacter as any).inventory,
+        items: JSON.parse((newCharacter as any).inventory.items)
       } : null
     };
 
@@ -158,7 +157,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { stats, money, professions, location, bonuses, worldTime, activeQuests, lastTrainTime, inventory } = req.body;
+    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, inventory } = req.body;
 
     console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
@@ -173,13 +172,6 @@ export const updateCharacter = async (req: Request, res: Response) => {
 
     // * Validate and prepare update data
     const updateData: any = {};
-
-    if (worldTime !== undefined) {
-      if (typeof worldTime !== 'number' || worldTime < 0) {
-        return res.status(400).json({ error: 'Invalid worldTime' });
-      }
-      updateData.worldTime = worldTime;
-    }
 
     if (lastTrainTime !== undefined && lastTrainTime !== null) {
       if (typeof lastTrainTime !== 'number' || lastTrainTime < 0) {
@@ -296,10 +288,10 @@ export const updateCharacter = async (req: Request, res: Response) => {
       bonuses: JSON.parse(updatedCharacter.bonuses),
       professions: JSON.parse(updatedCharacter.professions),
       location: JSON.parse(updatedCharacter.location),
-      activeQuests: JSON.parse(updatedCharacter.activeQuests || '[]'),
-      inventory: updatedCharacter.inventory ? {
-        ...updatedCharacter.inventory,
-        items: JSON.parse(updatedCharacter.inventory.items)
+      activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
+      inventory: (updatedCharacter as any).inventory ? {
+        ...(updatedCharacter as any).inventory,
+        items: JSON.parse((updatedCharacter as any).inventory.items)
       } : null
     };
 

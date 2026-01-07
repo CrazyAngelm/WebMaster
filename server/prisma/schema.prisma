@@ -40,7 +40,6 @@ model Character {
   
   isDead        Boolean   @default(false)
   money         Int       @default(0)
-  worldTime     Int       @default(0)
   activeQuests  String    @default("[]") // Quest[] (JSON string)
   lastTrainTime Int?
   

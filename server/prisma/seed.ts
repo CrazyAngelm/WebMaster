@@ -997,6 +997,14 @@ async function main() {
       })
     },
     {
+      key: 'SERVER_TIME_DATA',
+      value: JSON.stringify({
+        baseServerTime: 0,
+        baseRealTime: Date.now(),
+        multiplier: 1.0
+      })
+    },
+    {
       key: 'TRAINING_CONFIG',
       value: JSON.stringify({
         essenceGainRoll: 20,

@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import prisma from '../db';
+import { TimeService } from '../utils/timeService';
 
 export const addGold = async (req: Request, res: Response) => {
   try {
@@ -32,18 +33,33 @@ export const skipTime = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Numeric hours are required' });
     }
 
-    // Since worldTime is stored in Character (as lastTrainTime) or in a global state, 
-    // we might need a GlobalState table. But for now, we'll update the active character's lastTrainTime 
-    // or just return success if we assume worldTime is client-side for now (though it should be server-side).
-    // In the current schema, worldTime isn't global yet. Let's assume we update character-specific time.
+    await TimeService.skipTime(hours);
     
-    // Actually, in the plan it says "Advance world time by specified hours".
-    // I'll add a simple response for now, as worldTime persistence needs to be decided.
-    // Let's assume we might need a separate table for global settings/time.
-    
-    res.json({ message: `World time advanced by ${hours} hours` });
+    res.json({ 
+      message: `World time advanced by ${hours} hours`,
+      timeData: TimeService.getTimeMetadata()
+    });
   } catch (error) {
     console.error('Skip time error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const setTimeMultiplier = async (req: Request, res: Response) => {
+  try {
+    const { multiplier } = req.body;
+    if (typeof multiplier !== 'number' || multiplier <= 0) {
+      return res.status(400).json({ error: 'Positive numeric multiplier is required' });
+    }
+
+    await TimeService.setMultiplier(multiplier);
+    
+    res.json({ 
+      message: `Time multiplier set to ${multiplier}`,
+      timeData: TimeService.getTimeMetadata()
+    });
+  } catch (error) {
+    console.error('Set multiplier error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

@@ -5,16 +5,17 @@
 
 import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { Coins, Clock, Heart, X } from 'lucide-react';
+import { Coins, Clock, Heart, X, Zap } from 'lucide-react';
 
 interface AdminPanelProps {
   onClose: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
-  const { adminAddGold, adminSkipTime, adminForceRest } = useGameStore();
+  const { adminAddGold, adminSkipTime, adminForceRest, adminSetMultiplier, serverTimeData } = useGameStore();
   const [goldAmount, setGoldAmount] = useState(1000);
   const [skipHours, setSkipHours] = useState(24);
+  const [multiplier, setMultiplier] = useState(serverTimeData?.multiplier || 1.0);
   const [message, setMessage] = useState('');
 
   const handleAction = async (action: () => Promise<void>) => {
@@ -85,6 +86,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   className="fantasy-button flex-1 py-2 text-xs"
                 >
                   Промотать
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Multiplier Action */}
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-fantasy-dark border border-fantasy-border flex items-center justify-center text-fantasy-essence">
+              <Zap size={24} />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Множитель времени (x5, x10...)</div>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  step="0.1"
+                  value={multiplier}
+                  onChange={(e) => setMultiplier(Number(e.target.value))}
+                  className="bg-fantasy-dark border border-fantasy-border p-2 text-white w-24 outline-none focus:border-fantasy-accent"
+                />
+                <button 
+                  onClick={() => handleAction(() => adminSetMultiplier(multiplier))}
+                  className="fantasy-button flex-1 py-2 text-xs"
+                >
+                  Установить
                 </button>
               </div>
             </div>

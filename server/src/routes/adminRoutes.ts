@@ -4,7 +4,7 @@
 // 💡 Usage: Integrated into main Express app
 
 import { Router } from 'express';
-import { addGold, skipTime, forceRest } from '../controllers/adminController';
+import { addGold, skipTime, forceRest, setTimeMultiplier } from '../controllers/adminController';
 import { authenticate, isAdmin } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -14,6 +14,7 @@ router.use(authenticate, isAdmin);
 
 router.post('/add-gold', addGold);
 router.post('/skip-time', skipTime);
+router.post('/set-multiplier', setTimeMultiplier);
 router.post('/force-rest', forceRest);
 
 export default router;
