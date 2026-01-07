@@ -285,6 +285,10 @@ async function main() {
       maxEssence: 300,
       penetration: 'MEDIUM',
       distance: 'CLOSE',
+      accuracyBonus: 0,
+      evasionBonus: 0,
+      initiativeBonus: 80,
+      resistanceBonus: 0,
       description: '+80 Инициатива',
       basePrice: 850
     },
@@ -300,6 +304,10 @@ async function main() {
       maxEssence: 800,
       penetration: 'HEAVY',
       distance: 'CLOSE',
+      accuracyBonus: 70,
+      evasionBonus: 0,
+      initiativeBonus: 30,
+      resistanceBonus: 0,
       description: '+70 Точность, +30 Инициатива, +100 Защита',
       basePrice: 2500
     },

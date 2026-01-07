@@ -207,7 +207,8 @@ export const useCombatStore = create<CombatState>((set, get) => ({
   },
 
   endBattle: async (battleId?: string) => {
-    const { battle, token } = get();
+    const { battle } = get();
+    const { token } = useGameStore.getState();
     const battleIdToEnd = battleId || battle?.id;
     
     // * Mark battle as finished on server if ID provided

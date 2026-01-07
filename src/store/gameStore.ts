@@ -697,15 +697,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       return i;
     });
     
-    set({ inventory: { ...inventory, items: updatedItems } });
+    const updatedInventory = { ...inventory, items: updatedItems };
+    const newBonuses = CharacterService.calculateEquipmentBonuses(updatedInventory, itemTemplates);
+    
+    set({ 
+      inventory: updatedInventory,
+      character: { ...character, bonuses: newBonuses }
+    });
     await get().saveGame();
   },
 
   unequipItem: async (itemId) => {
-    const { inventory } = get();
-    if (!inventory) return;
+    const { character, inventory, itemTemplates } = get();
+    if (!inventory || !character) return;
     const updatedItems = inventory.items.map(i => i.id === itemId ? { ...i, isEquipped: false } : i);
-    set({ inventory: { ...inventory, items: updatedItems } });
+    const updatedInventory = { ...inventory, items: updatedItems };
+    const newBonuses = CharacterService.calculateEquipmentBonuses(updatedInventory, itemTemplates);
+
+    set({ 
+      inventory: updatedInventory,
+      character: { ...character, bonuses: newBonuses }
+    });
     await get().saveGame();
   },
 
@@ -734,7 +746,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       };
     }
     
-    set({ inventory: { ...inventory, items: updatedItems } });
+    const updatedInventory = { ...inventory, items: updatedItems };
+    const { itemTemplates, character } = get();
+    const newBonuses = character && itemTemplates ? CharacterService.calculateEquipmentBonuses(updatedInventory, itemTemplates) : character?.bonuses;
+
+    set({ 
+      inventory: updatedInventory,
+      character: character ? { ...character, bonuses: newBonuses } : null
+    });
     await get().saveGame();
   },
 

@@ -99,6 +99,12 @@ export const CombatScreen: React.FC = () => {
   const playerParticipant = battle.participants.find(p => p.isPlayer);
   const enemyParticipant = battle.participants.find(p => !p.isPlayer);
 
+  const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON');
+  const weaponTemplate = equippedWeapon ? itemTemplates.get(equippedWeapon.templateId) : null;
+
+  const equippedArmor = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'ARMOR');
+  const armorTemplate = equippedArmor ? itemTemplates.get(equippedArmor.templateId) : null;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Initiative Timeline */}
@@ -137,8 +143,45 @@ export const CombatScreen: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="text-center">
+          <div className="text-center w-full max-w-[200px]">
             <div className="font-serif text-lg text-fantasy-accent uppercase tracking-wider">{playerParticipant?.name}</div>
+            
+            {/* Equipment Info */}
+            <div className="mt-2 p-2 bg-black/20 rounded border border-fantasy-border/30 text-[10px] text-left">
+              <div className="flex justify-between items-center text-gray-400 mb-1">
+                <span className="flex items-center gap-1"><Sword size={10} /> {weaponTemplate?.name || 'Кулаки'}</span>
+                <span className="text-fantasy-essence font-bold">{equippedWeapon?.currentEssence || 5}</span>
+              </div>
+              {armorTemplate && (
+                <div className="flex flex-col gap-0.5 border-t border-fantasy-border/10 pt-1 mt-1">
+                  <div className="flex justify-between text-gray-400">
+                    <span className="flex items-center gap-1"><Shield size={10} /> {armorTemplate.name}</span>
+                    <span>{equippedArmor?.currentDurability}/{armorTemplate.baseDurability}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px]">
+                    {((armorTemplate.accuracyBonus || 0) - (armorTemplate.hitPenalty || 0)) !== 0 && (
+                      <span className={((armorTemplate.accuracyBonus || 0) - (armorTemplate.hitPenalty || 0)) > 0 ? "text-green-400" : "text-red-400"}>
+                        Точность: {((armorTemplate.accuracyBonus || 0) - (armorTemplate.hitPenalty || 0)) > 0 ? '+' : ''}{((armorTemplate.accuracyBonus || 0) - (armorTemplate.hitPenalty || 0))}
+                      </span>
+                    )}
+                    {((armorTemplate.evasionBonus || 0) - (armorTemplate.evasionPenalty || 0)) !== 0 && (
+                      <span className={((armorTemplate.evasionBonus || 0) - (armorTemplate.evasionPenalty || 0)) > 0 ? "text-green-400" : "text-red-400"}>
+                        Уворот: {((armorTemplate.evasionBonus || 0) - (armorTemplate.evasionPenalty || 0)) > 0 ? '+' : ''}{((armorTemplate.evasionBonus || 0) - (armorTemplate.evasionPenalty || 0))}
+                      </span>
+                    )}
+                    {armorTemplate.initiativeBonus !== undefined && armorTemplate.initiativeBonus !== 0 && (
+                      <span className={armorTemplate.initiativeBonus > 0 ? "text-blue-400" : "text-red-400"}>
+                        Инициатива: {armorTemplate.initiativeBonus > 0 ? '+' : ''}{armorTemplate.initiativeBonus}
+                      </span>
+                    )}
+                    {armorTemplate.speedPenalty !== undefined && armorTemplate.speedPenalty !== 0 && (
+                      <span className="text-red-400">Скорость: -{armorTemplate.speedPenalty}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-col gap-2 items-center mt-2">
               <StatSmall label="Защита" current={playerParticipant?.currentProtection || 0} max={playerParticipant?.maxProtection || 1} color="bg-blue-500" />
               <StatSmall label="Сущность" current={playerParticipant?.currentHp || 0} max={playerParticipant?.maxHp || 1} color="bg-fantasy-essence" />

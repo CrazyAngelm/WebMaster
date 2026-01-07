@@ -9,6 +9,7 @@ import {
   BattleStatus, 
   ArmorCategory, 
   PenetrationType,
+  CharacterBonuses,
   UUID
 } from '../types/game';
 import { DiceEngine as DICE } from './diceEngine';
@@ -31,18 +32,21 @@ export class CombatEngine {
     defenderArmorIgnore: number,
     defenderArmorPenetration: ArmorCategory | undefined,
     defenderRankMinRoll: number = 1,
-    attackerRankMinRoll: number = 1
+    attackerRankMinRoll: number = 1,
+    attackerHitPenalty: number = 0,
+    defenderEvasionPenalty: number = 0
   ): { hit: boolean; damageDealt: number; log: string; diceLogs: string[]; rolls: RollResult[] } {
     
     // * 1. Hit Check
-    const armorHitPenalty = 0; // * Simplified for now
-    const hitSides = Math.max(1, attacker.currentHp + attackerWeaponEssence - armorHitPenalty);
+    const attackerBonusesParsed: CharacterBonuses = attacker.bonuses ? JSON.parse(attacker.bonuses) : { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
+    
+    const hitSides = Math.max(1, attacker.currentHp + attackerWeaponEssence + (attackerBonusesParsed.accuracy || 0) - attackerHitPenalty);
     
     const hitRoll = DICE.roll(hitSides, attackerRankMinRoll);
 
-    // * Evasion Roll: 1d(Essence - Armor Evasion Penalty)
-    const armorEvasionPenalty = 0; // * Simplified
-    const evasionSides = Math.max(1, defender.currentHp - armorEvasionPenalty);
+    // * Evasion Roll: 1d(Essence + Evasion Bonus - Armor Evasion Penalty)
+    const defenderBonusesParsed: CharacterBonuses = defender.bonuses ? JSON.parse(defender.bonuses) : { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
+    const evasionSides = Math.max(1, defender.currentHp + (defenderBonusesParsed.evasion || 0) - defenderEvasionPenalty);
     
     const evasionRoll = DICE.roll(evasionSides, defenderRankMinRoll);
 
@@ -73,7 +77,8 @@ export class CombatEngine {
 
     if (weaponPenLevel >= armorLevel || defender.currentHp <= 0) {
       // * Penetrates or no armor: Apply damage to Protection then Essence
-      finalDamage = Math.max(0, damage - defenderArmorIgnore);
+      // * Apply Damage Resistance bonus from defender
+      finalDamage = Math.max(0, damage - defenderArmorIgnore - (defenderBonusesParsed.damageResistance || 0));
       
       this.applyDamage(defender, finalDamage);
       

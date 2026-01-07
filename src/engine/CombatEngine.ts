@@ -79,7 +79,7 @@ export class CombatEngine {
     // * 1. Hit Check
     const armorHitPenalty = armorTemplate?.hitPenalty || 0;
     const weaponEssence = attackerWeapon?.currentEssence || 0;
-    const hitSides = Math.max(1, attacker.stats.essence.current + weaponEssence - armorHitPenalty);
+    const hitSides = Math.max(1, attacker.stats.essence.current + weaponEssence + (attacker.bonuses?.accuracy || 0) - armorHitPenalty);
     
     // * Roll for Hit (Animated)
     const attackerRank = StaticDataService.getRank(attacker.rankId);
@@ -89,9 +89,9 @@ export class CombatEngine {
       attackerRank?.minEssenceRoll || 1
     );
 
-    // * Evasion Roll: 1d(Essence - Armor Evasion Penalty)
+    // * Evasion Roll: 1d(Essence + Evasion Bonus - Armor Evasion Penalty)
     const armorEvasionPenalty = armorTemplate?.evasionPenalty || 0;
-    const evasionSides = Math.max(1, defender.stats.essence.current - armorEvasionPenalty);
+    const evasionSides = Math.max(1, defender.stats.essence.current + (defender.bonuses?.evasion || 0) - armorEvasionPenalty);
     
     // * Roll for Evasion (Animated)
     const defenderRank = StaticDataService.getRank(defender.rankId);
@@ -126,7 +126,8 @@ export class CombatEngine {
     if (weaponPen >= armorTypeLevel || !defenderArmor || defenderArmor.currentDurability <= 0) {
       // * Penetrates or no armor: Apply damage to Protection then Essence
       const ignore = armorTemplate?.ignoreDamage || 0;
-      finalDamage = Math.max(0, damage - ignore);
+      const resBonus = defender.bonuses?.damageResistance || 0;
+      finalDamage = Math.max(0, damage - ignore - resBonus);
       
       this.applyDamage(defender, finalDamage);
       

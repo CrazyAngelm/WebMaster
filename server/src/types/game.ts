@@ -95,6 +95,7 @@ export interface BattleParticipant {
   mainActions: number;
   bonusActions: number;
   isPlayer: boolean;
+  bonuses?: string;
 }
 
 export interface Battle {

@@ -96,6 +96,10 @@ model ItemTemplate {
   hitPenalty        Int?
   evasionPenalty    Int?
   speedPenalty      Int?
+  accuracyBonus     Int?    @default(0)
+  evasionBonus      Int?    @default(0)
+  initiativeBonus   Int?    @default(0)
+  resistanceBonus   Int?    @default(0)
   slotCount         Int?
   effects           String? // UUID[] (JSON string)
   description       String?
@@ -213,4 +217,5 @@ model BattleParticipant {
   mainActions       Int       @default(1)
   bonusActions      Int       @default(1)
   isPlayer          Boolean   @default(false)
+  bonuses           String?   // CharacterBonuses (JSON string)
 }

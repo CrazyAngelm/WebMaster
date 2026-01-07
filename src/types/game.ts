@@ -255,6 +255,12 @@ export interface ItemTemplate {
   hitPenalty?: number;
   evasionPenalty?: number;
   speedPenalty?: number;
+
+  // General bonuses
+  accuracyBonus?: number;
+  evasionBonus?: number;
+  initiativeBonus?: number;
+  resistanceBonus?: number;
   
   // Bag specific
   slotCount?: number;

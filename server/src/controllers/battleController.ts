@@ -122,7 +122,8 @@ export const startBattle = async (req: Request, res: Response) => {
         currentProtection: playerStats.protection.current,
         maxHp: playerStats.essence.max,
         maxProtection: playerStats.protection.max,
-        isPlayer: true
+        isPlayer: true,
+        bonuses: playerChar.bonuses // Store bonuses at start of combat
       },
       {
         characterId: enemyCharacterId,
@@ -133,7 +134,8 @@ export const startBattle = async (req: Request, res: Response) => {
         currentProtection: enemyProtection,
         maxHp: enemyHp,
         maxProtection: enemyProtection,
-        isPlayer: false
+        isPlayer: false,
+        bonuses: JSON.stringify({ accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 }) // Monsters currently have no bonuses
       }
     ].sort((a, b) => b.initiative - a.initiative);
 
@@ -146,14 +148,15 @@ export const startBattle = async (req: Request, res: Response) => {
         participants: {
           create: participants.map(p => ({
             characterId: p.characterId,
-            monsterTemplateId: p.monsterTemplateId,
+            monsterTemplateId: (p as any).monsterTemplateId,
             name: p.name,
             initiative: p.initiative,
             currentHp: p.currentHp,
             currentProtection: p.currentProtection,
             maxHp: p.maxHp,
             maxProtection: p.maxProtection,
-            isPlayer: p.isPlayer
+            isPlayer: p.isPlayer,
+            bonuses: p.bonuses
           }))
         }
       },
@@ -205,6 +208,8 @@ export const resolveAttack = async (req: Request, res: Response) => {
     // * Fetch weapon/armor info
     let weaponEssence = 5;
     let weaponPen: PenetrationType = PenetrationType.NONE;
+    let weaponTemplate: any = null;
+    let equippedWeapon: any = null;
 
     if (attacker.characterId) {
       const char = await prisma.character.findUnique({
@@ -213,17 +218,20 @@ export const resolveAttack = async (req: Request, res: Response) => {
       });
       if (char && char.inventory) {
         const items = JSON.parse(char.inventory.items);
-        const weapon = items.find((i: any) => i.isEquipped && i.id === weaponId);
-        if (weapon) {
-          weaponEssence = weapon.currentEssence;
-          const template = await prisma.itemTemplate.findUnique({ where: { id: weapon.templateId } });
-          weaponPen = (template?.penetration as PenetrationType) || PenetrationType.NONE;
+        equippedWeapon = items.find((i: any) => i.isEquipped && i.id === weaponId);
+        if (equippedWeapon) {
+          weaponEssence = equippedWeapon.currentEssence;
+          weaponTemplate = await prisma.itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
+          weaponPen = (weaponTemplate?.penetration as PenetrationType) || PenetrationType.NONE;
         }
       }
     }
 
     let armorIgnore = 0;
     let armorCat: ArmorCategory | undefined;
+    let equippedArmor: any = null;
+    let armorHitPenalty = 0;
+    let armorEvasionPenalty = 0;
 
     if (target.characterId) {
         const char = await prisma.character.findUnique({
@@ -232,11 +240,13 @@ export const resolveAttack = async (req: Request, res: Response) => {
         });
         if (char && char.inventory) {
             const items = JSON.parse(char.inventory.items);
-            const armor = items.find((i: any) => i.isEquipped && i.templateId.includes('armor')); // Simple check
-            if (armor) {
-                const template = await prisma.itemTemplate.findUnique({ where: { id: armor.templateId } });
+            equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.includes('armor')); // Simple check
+            if (equippedArmor) {
+                const template = await prisma.itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
                 armorIgnore = template?.ignoreDamage || 0;
                 armorCat = template?.category as ArmorCategory;
+                armorHitPenalty = template?.hitPenalty || 0;
+                armorEvasionPenalty = template?.evasionPenalty || 0;
             }
         }
     }
@@ -251,8 +261,68 @@ export const resolveAttack = async (req: Request, res: Response) => {
       weaponPen,
       targetCopy as any,
       armorIgnore,
-      armorCat
+      armorCat,
+      1, // defender min roll
+      1, // attacker min roll
+      armorHitPenalty,
+      armorEvasionPenalty
     );
+
+    // * Handle Item Progression and Durability
+    const itemUpdatesLog: string[] = [];
+    
+    // * 1. Weapon Mastery Growth (on successful hit)
+    if (result.hit && equippedWeapon && weaponTemplate && weaponTemplate.maxEssence) {
+      const currentMastery = equippedWeapon.currentEssence || 0;
+      const maxMastery = weaponTemplate.maxEssence;
+      
+      if (currentMastery < maxMastery) {
+        // 20% chance to gain 1-3 essence
+        if (Math.random() < 0.2) {
+          const gain = DICE.roll(3);
+          equippedWeapon.currentEssence = Math.min(maxMastery, currentMastery + gain);
+          itemUpdatesLog.push(`${attacker.name}: Мастерство владения ${weaponTemplate.name} повышено! (+${gain})`);
+          
+          // Persist weapon change
+          if (attacker.characterId) {
+            const inv = await prisma.inventory.findUnique({ where: { characterId: attacker.characterId } });
+            if (inv) {
+              const items = JSON.parse(inv.items);
+              const weaponInInv = items.find((i: any) => i.id === equippedWeapon.id);
+              if (weaponInInv) {
+                weaponInInv.currentEssence = equippedWeapon.currentEssence;
+                await prisma.inventory.update({
+                  where: { characterId: attacker.characterId },
+                  data: { items: JSON.stringify(items) }
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // * 2. Armor Durability Loss (on any hit)
+    if (result.hit && equippedArmor) {
+      equippedArmor.currentDurability = Math.max(0, (equippedArmor.currentDurability || 0) - 1);
+      itemUpdatesLog.push(`${target.name}: Броня получила повреждения! (Прочность: ${equippedArmor.currentDurability})`);
+      
+      // Persist armor change
+      if (target.characterId) {
+        const inv = await prisma.inventory.findUnique({ where: { characterId: target.characterId } });
+        if (inv) {
+          const items = JSON.parse(inv.items);
+          const armorInInv = items.find((i: any) => i.id === equippedArmor.id);
+          if (armorInInv) {
+            armorInInv.currentDurability = equippedArmor.currentDurability;
+            await prisma.inventory.update({
+              where: { characterId: target.characterId },
+              data: { items: JSON.stringify(items) }
+            });
+          }
+        }
+      }
+    }
 
     // * Update target state with NEW values after damage application
     const updatedTarget = await prisma.battleParticipant.update({
@@ -287,7 +357,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
 
     // * Update log
     const currentLog = JSON.parse(battle.log);
-    const updatedLog = [...currentLog, ...result.diceLogs, `${attacker.name}: ${result.log}`];
+    const updatedLog = [...currentLog, ...result.diceLogs, ...itemUpdatesLog, `${attacker.name}: ${result.log}`];
 
     const isTargetDead = targetCopy.currentHp <= 0;
     

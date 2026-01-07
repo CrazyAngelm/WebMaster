@@ -119,5 +119,34 @@ export class CharacterService {
       initiative: equipmentBonuses.initiative,
     };
   }
+
+  /**
+   * * Calculates total bonuses from all equipped items.
+   */
+  public static calculateEquipmentBonuses(
+    inventory: Inventory,
+    templates: Map<string, ItemTemplate>
+  ): CharacterBonuses {
+    const total: CharacterBonuses = {
+      evasion: 0,
+      accuracy: 0,
+      damageResistance: 0,
+      initiative: 0,
+    };
+
+    inventory.items.forEach(item => {
+      if (item.isEquipped) {
+        const template = templates.get(item.templateId);
+        if (template) {
+          total.evasion += (template.evasionBonus || 0) - (template.evasionPenalty || 0);
+          total.accuracy += (template.accuracyBonus || 0) - (template.hitPenalty || 0);
+          total.damageResistance += (template.resistanceBonus || 0) + (template.ignoreDamage || 0);
+          total.initiative += (template.initiativeBonus || 0);
+        }
+      }
+    });
+
+    return total;
+  }
 }
 

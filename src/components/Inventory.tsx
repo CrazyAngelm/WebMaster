@@ -450,14 +450,48 @@ export const Inventory: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
-            {selectedItem.template.type === ItemType.BAG && (
+            {selectedItem.template.type === ItemType.BAG && selectedItem.template.slotCount && (
               <InfoRow label="Доп. слоты" value={`+${selectedItem.template.slotCount}`} accent="text-fantasy-accent" />
             )}
             {selectedItem.template.baseEssence && selectedItem.template.type !== ItemType.BAG && (
               <InfoRow label="Сущность" value={`${selectedItem.item.currentEssence} / ${selectedItem.template.maxEssence}`} accent="text-fantasy-essence" />
             )}
-            {selectedItem.template.ignoreDamage && (
-              <InfoRow label="Снижение урона" value={`${selectedItem.template.ignoreDamage}`} accent="text-fantasy-protection" />
+            
+            {/* Бонусы и штрафы */}
+            {((selectedItem.template.accuracyBonus || 0) - (selectedItem.template.hitPenalty || 0)) !== 0 && (
+              <InfoRow 
+                label="Точность" 
+                value={`${(selectedItem.template.accuracyBonus || 0) - (selectedItem.template.hitPenalty || 0) > 0 ? '+' : ''}${(selectedItem.template.accuracyBonus || 0) - (selectedItem.template.hitPenalty || 0)}`} 
+                accent={(selectedItem.template.accuracyBonus || 0) - (selectedItem.template.hitPenalty || 0) >= 0 ? "text-green-400" : "text-red-400"} 
+              />
+            )}
+            {((selectedItem.template.evasionBonus || 0) - (selectedItem.template.evasionPenalty || 0)) !== 0 && (
+              <InfoRow 
+                label="Уклонение" 
+                value={`${(selectedItem.template.evasionBonus || 0) - (selectedItem.template.evasionPenalty || 0) > 0 ? '+' : ''}${(selectedItem.template.evasionBonus || 0) - (selectedItem.template.evasionPenalty || 0)}`} 
+                accent={(selectedItem.template.evasionBonus || 0) - (selectedItem.template.evasionPenalty || 0) >= 0 ? "text-green-400" : "text-red-400"} 
+              />
+            )}
+            {selectedItem.template.initiativeBonus !== undefined && selectedItem.template.initiativeBonus !== 0 && (
+              <InfoRow 
+                label="Инициатива" 
+                value={`${selectedItem.template.initiativeBonus > 0 ? '+' : ''}${selectedItem.template.initiativeBonus}`} 
+                accent={selectedItem.template.initiativeBonus > 0 ? "text-blue-400" : "text-red-400"} 
+              />
+            )}
+            {((selectedItem.template.resistanceBonus || 0) + (selectedItem.template.ignoreDamage || 0)) !== 0 && (
+              <InfoRow 
+                label="Снижение урона" 
+                value={`${(selectedItem.template.resistanceBonus || 0) + (selectedItem.template.ignoreDamage || 0) > 0 ? '+' : ''}${(selectedItem.template.resistanceBonus || 0) + (selectedItem.template.ignoreDamage || 0)}`} 
+                accent="text-fantasy-protection" 
+              />
+            )}
+            {selectedItem.template.speedPenalty !== undefined && selectedItem.template.speedPenalty !== 0 && (
+              <InfoRow 
+                label="Штраф к скорости" 
+                value={`-${selectedItem.template.speedPenalty}`} 
+                accent="text-red-400" 
+              />
             )}
             <InfoRow 
               label="Прочность" 
