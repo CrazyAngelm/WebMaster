@@ -32,7 +32,7 @@ export const register = async (req: Request, res: Response) => {
       data: {
         login,
         passwordHash,
-        role: (role === 'ADMIN' || role === 'OWNER') ? role : 'USER',
+        role: 'USER', // Always register as USER. Admin/Owner roles must be assigned manually.
       },
     });
 

@@ -61,6 +61,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const handleUpdateConfig = async (key: string) => {
     try {
       let value = editingConfigs[key];
+      
+      if (typeof value !== 'string') {
+        throw new Error('Значение конфигурации должно быть строкой');
+      }
+
       // Try to parse as JSON if it looks like it
       try {
         if (value.startsWith('{') || value.startsWith('[')) {

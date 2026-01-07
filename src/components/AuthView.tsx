@@ -10,7 +10,6 @@ export const AuthView: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'USER' | 'ADMIN' | 'OWNER'>('USER');
   const [error, setError] = useState('');
   
   const { login: loginAction, register: registerAction } = useGameStore();
@@ -19,26 +18,13 @@ export const AuthView: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:18',message:'handleSubmit called',data:{isLogin,loginLength:login.length,passwordLength:password.length,role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     try {
       if (isLogin) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:24',message:'Calling loginAction',data:{login},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
         await loginAction(login, password);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:27',message:'loginAction completed successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
       } else {
-        await registerAction(login, password, role);
+        await registerAction(login, password);
       }
     } catch (err: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:29',message:'Auth error caught',data:{errorMessage:err?.message,errorType:err?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
       setError(err.message || 'Произошла ошибка');
     }
   };
@@ -74,21 +60,6 @@ export const AuthView: React.FC = () => {
               required
             />
           </div>
-          
-          {!isLogin && (
-            <div>
-              <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Роль (тест)</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                className="w-full bg-fantasy-dark border border-fantasy-border p-2 text-white focus:border-fantasy-accent outline-none"
-              >
-                <option value="USER">Игрок</option>
-                <option value="ADMIN">Администратор</option>
-                <option value="OWNER">Владелец (Owner)</option>
-              </select>
-            </div>
-          )}
           
           {error && (
             <div className="text-red-500 text-xs italic text-center bg-red-950/20 py-2 rounded border border-red-900/30">
