@@ -4,12 +4,12 @@
 // 💡 Usage: Root component of the application
 
 import React, { useEffect, useState } from 'react';
+import { Zap, Map as MapIcon } from 'lucide-react';
 import { Layout } from './components/Layout';
 import { useGameStore } from './store/gameStore';
 import { Inventory } from './components/Inventory';
 import { CombatScreen } from './components/CombatScreen';
 import { WorldNavigation } from './components/WorldNavigation';
-import { QuestLog } from './components/QuestLog';
 import { EventOverlay } from './components/EventOverlay';
 import { CraftingView } from './components/CraftingView';
 import { AuthView } from './components/AuthView';
@@ -122,93 +122,52 @@ function App() {
       <DiceOverlay />
       <EventOverlay />
       
-      <div className="mb-6 flex flex-wrap gap-2 sm:gap-4 border-b border-fantasy-border">
-        <button 
-          onClick={() => setView('hub')}
-          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'hub' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          Обзор
-        </button>
-        <button 
-          onClick={() => setView('explore')}
-          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'explore' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          Исследовать
-        </button>
-        <button 
-          onClick={() => setView('inventory')}
-          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'inventory' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          Инвентарь
-        </button>
-        <button 
-          onClick={() => setView('combat')}
-          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'combat' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          Бой
-        </button>
-        <button 
-          onClick={() => setView('crafting')}
-          className={`pb-2 px-4 uppercase text-[10px] font-bold tracking-widest transition-all ${view === 'crafting' ? 'text-fantasy-accent border-b-2 border-fantasy-accent' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          Ремесло
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-full overflow-hidden">
-        {/* Main Content Area */}
-        <div className="lg:col-span-3 h-full overflow-y-auto custom-scrollbar">
-          {view === 'hub' && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-              <h1 className="text-5xl font-serif text-fantasy-accent mb-4 uppercase tracking-tighter">Hornygrad</h1>
-              <p className="text-gray-400 max-w-md italic mb-10">"Где сталь встречается с сущностью, а смертность — лишь порог."</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl w-full">
-                <div className="fantasy-panel p-6 flex flex-col items-center gap-3">
-                  <div className="text-fantasy-accent font-serif text-lg">Ежедневная медитация</div>
+      <div className="h-full">
+        {view === 'hub' && (
+          <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
+            <h1 className="text-6xl font-serif text-fantasy-accent mb-4 uppercase tracking-[0.2em] drop-shadow-[0_0_15px_rgba(197,160,89,0.2)]">Hornygrad</h1>
+            <p className="text-gray-400 max-w-md italic mb-12 text-sm leading-relaxed">"Где сталь встречается с сущностью, а смертность — лишь порог."</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-2xl w-full">
+              <div className="fantasy-panel p-8 flex flex-col items-center gap-4 bg-fantasy-surface/40 hover:bg-fantasy-surface/60 transition-all group">
+                <div className="w-12 h-12 rounded-full bg-fantasy-accent/10 border border-fantasy-accent/30 flex items-center justify-center group-hover:bg-fantasy-accent/20 transition-all">
+                  <Zap size={24} className="text-fantasy-accent" />
+                </div>
+                <div className="text-center">
+                  <div className="text-fantasy-accent font-serif text-xl mb-1">Ежедневная медитация</div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-widest">Соединись со своей сущностью</div>
-                  <button 
-                    onClick={() => trainCharacter()}
-                    className="fantasy-button w-full mt-2"
-                  >
-                    Медитировать
-                  </button>
                 </div>
-                <div className="fantasy-panel p-6 flex flex-col items-center gap-3">
-                  <div className="text-fantasy-accent font-serif text-lg">Отправиться в путь</div>
+                <button 
+                  onClick={() => trainCharacter()}
+                  className="fantasy-button w-full mt-4 shadow-lg shadow-fantasy-accent/5"
+                >
+                  Медитировать
+                </button>
+              </div>
+
+              <div className="fantasy-panel p-8 flex flex-col items-center gap-4 bg-fantasy-surface/40 hover:bg-fantasy-surface/60 transition-all group">
+                <div className="w-12 h-12 rounded-full bg-fantasy-accent/10 border border-fantasy-accent/30 flex items-center justify-center group-hover:bg-fantasy-accent/20 transition-all">
+                  <MapIcon size={24} className="text-fantasy-accent" />
+                </div>
+                <div className="text-center">
+                  <div className="text-fantasy-accent font-serif text-xl mb-1">Отправиться в путь</div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-widest">Мир ждёт</div>
-                  <button 
-                    onClick={() => setView('explore')}
-                    className="fantasy-button w-full mt-2"
-                  >
-                    Покинуть убежище
-                  </button>
                 </div>
+                <button 
+                  onClick={() => setView('explore')}
+                  className="fantasy-button w-full mt-4 shadow-lg shadow-fantasy-accent/5"
+                >
+                  Покинуть убежище
+                </button>
               </div>
             </div>
-          )}
-
-          {view === 'explore' && <WorldNavigation />}
-          {view === 'inventory' && <Inventory />}
-          {view === 'combat' && <CombatScreen />}
-          {view === 'crafting' && <CraftingView />}
-        </div>
-
-        {/* Sidebar for Quests and Info */}
-        <div className="hidden lg:block h-full border-l border-fantasy-border/30 pl-8 overflow-y-auto custom-scrollbar">
-          <QuestLog />
-          
-          <div className="mt-8 fantasy-panel p-4 bg-fantasy-accent/5 border-fantasy-accent/20">
-            <h4 className="text-[10px] font-bold text-fantasy-accent uppercase mb-2">Информация о персонаже</h4>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-500">Деньги:</span>
-              <span className="text-white font-bold">{character?.money}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-gray-500">Локация:</span>
-              <span className="text-white">{character?.location.position}</span>
-            </div>
           </div>
-        </div>
+        )}
+
+        {view === 'explore' && <WorldNavigation />}
+        {view === 'inventory' && <Inventory />}
+        {view === 'combat' && <CombatScreen />}
+        {view === 'crafting' && <CraftingView />}
       </div>
     </Layout>
   );
