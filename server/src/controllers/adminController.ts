@@ -97,3 +97,35 @@ export const forceRest = async (req: Request, res: Response) => {
   }
 };
 
+export const getConfigs = async (req: Request, res: Response) => {
+  try {
+    const configs = await prisma.gameConfig.findMany();
+    res.json(configs);
+  } catch (error) {
+    console.error('Get configs error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updateConfig = async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+
+    if (!key || value === undefined) {
+      return res.status(400).json({ error: 'Key and value are required' });
+    }
+
+    const config = await prisma.gameConfig.upsert({
+      where: { key },
+      update: { value: typeof value === 'string' ? value : JSON.stringify(value) },
+      create: { key, value: typeof value === 'string' ? value : JSON.stringify(value) }
+    });
+
+    res.json({ message: `Config ${key} updated`, config });
+  } catch (error) {
+    console.error('Update config error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+

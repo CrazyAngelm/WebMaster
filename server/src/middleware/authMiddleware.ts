@@ -29,8 +29,16 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   // @ts-ignore
-  if (req.userRole !== 'ADMIN') {
+  if (req.userRole !== 'ADMIN' && req.userRole !== 'OWNER') {
     return res.status(403).json({ error: 'Forbidden: Admin access required' });
+  }
+  next();
+};
+
+export const isOwner = (req: Request, res: Response, next: NextFunction) => {
+  // @ts-ignore
+  if (req.userRole !== 'OWNER') {
+    return res.status(403).json({ error: 'Forbidden: Owner access required' });
   }
   next();
 };

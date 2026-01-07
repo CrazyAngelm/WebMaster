@@ -95,7 +95,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
 
           <div className="h-6 w-px bg-fantasy-border/50 hidden md:block" />
 
-          {user?.role === 'ADMIN' && (
+          {(user?.role === 'ADMIN' || user?.role === 'OWNER') && (
             <button 
               onClick={() => setShowAdminPanel(true)}
               className="p-2 text-yellow-600/70 hover:text-yellow-500 transition-colors bg-yellow-500/5 rounded"

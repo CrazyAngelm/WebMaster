@@ -32,7 +32,7 @@ const API_BASE = 'http://localhost:5000/api';
 interface User {
   id: string;
   login: string;
-  role: 'USER' | 'ADMIN';
+  role: 'USER' | 'ADMIN' | 'OWNER';
 }
 
 interface GameState {
@@ -60,6 +60,7 @@ interface GameState {
     baseRealTime: number;
     baseServerTime: number;
   } | null;
+  serverConfigs: { key: string, value: string }[];
   timeSyncIntervals: {
     interpolation: number | null;
     sync: number | null;
@@ -105,6 +106,8 @@ interface GameState {
   adminSkipTime: (hours: number) => Promise<void>;
   adminSetMultiplier: (multiplier: number) => Promise<void>;
   adminForceRest: () => Promise<void>;
+  adminGetConfigs: () => Promise<void>;
+  adminUpdateConfig: (key: string, value: any) => Promise<void>;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -123,6 +126,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   isSaving: false,
   serverTime: 0,
   serverTimeData: null,
+  serverConfigs: [],
   timeSyncIntervals: {
     interpolation: null,
     sync: null
@@ -367,6 +371,36 @@ export const useGameStore = create<GameState>((set, get) => ({
     stats.protection.current = stats.protection.max;
     set({ character: { ...character, stats } });
     await get().saveGame();
+  },
+
+  adminGetConfigs: async () => {
+    const { token } = get();
+    if (!token) return;
+    const res = await fetch(`${API_BASE}/admin/configs`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      set({ serverConfigs: data });
+    }
+  },
+
+  adminUpdateConfig: async (key, value) => {
+    const { token } = get();
+    if (!token) return;
+    const res = await fetch(`${API_BASE}/admin/configs/${key}`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ value })
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
+    await get().adminGetConfigs();
   },
 
   // --- Existing Game Actions (Adapted) ---

@@ -10,7 +10,7 @@ export const AuthView: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<'USER' | 'ADMIN' | 'OWNER'>('USER');
   const [error, setError] = useState('');
   
   const { login: loginAction, register: registerAction } = useGameStore();
@@ -20,7 +20,7 @@ export const AuthView: React.FC = () => {
     setError('');
     
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:18',message:'handleSubmit called',data:{isLogin,loginLength:login.length,passwordLength:password.length,isAdmin},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:18',message:'handleSubmit called',data:{isLogin,loginLength:login.length,passwordLength:password.length,role},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
     try {
@@ -33,7 +33,7 @@ export const AuthView: React.FC = () => {
         fetch('http://127.0.0.1:7242/ingest/ed9326f9-e391-494c-aca3-eda4169daf85',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'AuthView.tsx:27',message:'loginAction completed successfully',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
         // #endregion
       } else {
-        await registerAction(login, password, isAdmin ? 'ADMIN' : 'USER');
+        await registerAction(login, password, role);
       }
     } catch (err: any) {
       // #region agent log
@@ -76,17 +76,17 @@ export const AuthView: React.FC = () => {
           </div>
           
           {!isLogin && (
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="admin-check"
-                checked={isAdmin}
-                onChange={(e) => setIsAdmin(e.target.checked)}
-                className="accent-fantasy-accent"
-              />
-              <label htmlFor="admin-check" className="text-[10px] text-gray-500 uppercase tracking-widest">
-                Аккаунт администратора (тест)
-              </label>
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Роль (тест)</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as any)}
+                className="w-full bg-fantasy-dark border border-fantasy-border p-2 text-white focus:border-fantasy-accent outline-none"
+              >
+                <option value="USER">Игрок</option>
+                <option value="ADMIN">Администратор</option>
+                <option value="OWNER">Владелец (Owner)</option>
+              </select>
             </div>
           )}
           

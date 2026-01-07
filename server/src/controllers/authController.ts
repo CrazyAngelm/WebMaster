@@ -32,7 +32,7 @@ export const register = async (req: Request, res: Response) => {
       data: {
         login,
         passwordHash,
-        role: role === 'ADMIN' ? 'ADMIN' : 'USER',
+        role: (role === 'ADMIN' || role === 'OWNER') ? role : 'USER',
       },
     });
 
