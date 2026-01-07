@@ -17,11 +17,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// * Initialize Time Service
-TimeService.init().then(() => {
-  console.log('Server time system ready');
-});
-
 app.use(cors());
 app.use(express.json());
 
@@ -34,7 +29,20 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// * Initialize Time Service before starting server
+async function startServer() {
+  try {
+    await TimeService.init();
+    console.log('Server time system ready');
+    
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to initialize TimeService:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
 

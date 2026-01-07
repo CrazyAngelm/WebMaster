@@ -52,13 +52,19 @@ export class TimeService {
 
   /**
    * * Returns full time metadata for synchronization.
+   * * Ensures initialization is complete before returning data.
    */
-  public static getTimeMetadata() {
+  public static async getTimeMetadata() {
+    // * Defensive check: ensure initialization is complete
+    if (!this.data) {
+      await this.init();
+    }
+    
     return {
       currentTime: this.getCurrentTime(),
-      multiplier: this.data?.multiplier || 1.0,
-      baseRealTime: this.data?.baseRealTime || Date.now(),
-      baseServerTime: this.data?.baseServerTime || 0
+      multiplier: this.data!.multiplier,
+      baseRealTime: this.data!.baseRealTime,
+      baseServerTime: this.data!.baseServerTime
     };
   }
 

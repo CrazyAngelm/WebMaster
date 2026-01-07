@@ -41,8 +41,8 @@ model Character {
   isDead        Boolean   @default(false)
   money         Int       @default(0)
   activeQuests  String    @default("[]") // Quest[] (JSON string)
-  lastTrainTime Int?
-  lastRestTime  Int?      // * Track last rest time (in server time hours)
+  lastTrainTime Float?    // * Track last training time (in server time hours, float for sub-hour precision)
+  lastRestTime  Float?    // * Track last rest time (in server time hours, float for sub-hour precision)
   
   inventory     Inventory?
   createdAt     DateTime  @default(now())

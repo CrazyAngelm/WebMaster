@@ -37,7 +37,7 @@ export const skipTime = async (req: Request, res: Response) => {
     
     res.json({ 
       message: `World time advanced by ${hours} hours`,
-      timeData: TimeService.getTimeMetadata()
+      timeData: await TimeService.getTimeMetadata()
     });
   } catch (error) {
     console.error('Skip time error:', error);
@@ -56,7 +56,7 @@ export const setTimeMultiplier = async (req: Request, res: Response) => {
     
     res.json({ 
       message: `Time multiplier set to ${multiplier}`,
-      timeData: TimeService.getTimeMetadata()
+      timeData: await TimeService.getTimeMetadata()
     });
   } catch (error) {
     console.error('Set multiplier error:', error);
