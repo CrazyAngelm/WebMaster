@@ -19,7 +19,6 @@ import {
 } from '../types/game';
 import { CharacterService } from '../services/CharacterService';
 import { InventoryService } from '../services/InventoryService';
-import { StorageService } from '../services/StorageService';
 import { StaticDataService } from '../services/StaticDataService';
 import { WorldService } from '../services/WorldService';
 import { TradeService } from '../services/TradeService';
@@ -54,6 +53,7 @@ interface GameState {
   activeEvent: GameEvent | null;
   recipes: Recipe[];
   isLoading: boolean;
+  isSaving: boolean;
   worldTime: number; 
   
   // Auth Actions
@@ -108,6 +108,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   activeEvent: null,
   recipes: [],
   isLoading: true,
+  isSaving: false,
   worldTime: 0,
 
   // --- Auth Actions ---
@@ -187,7 +188,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     try {
       const res = await fetch(`${API_BASE}/characters`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-store' // * Prevent browser caching
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
@@ -245,6 +247,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ 
         character, 
         inventory: (character as any).inventory,
+        activeQuests: character.activeQuests || [],
+        worldTime: character.worldTime || 0,
         isLoading: true 
       });
       // Initialize game data if needed
@@ -290,7 +294,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       const data = await res.json();
       throw new Error(data.error);
     }
-    set({ worldTime: get().worldTime + hours });
+    const nextTime = get().worldTime + hours;
+    set({ worldTime: nextTime });
+    await get().saveGame();
   },
 
   adminForceRest: async () => {
@@ -315,6 +321,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     stats.energy.current = stats.energy.max;
     stats.protection.current = stats.protection.max;
     set({ character: { ...character, stats } });
+    await get().saveGame();
   },
 
   // --- Existing Game Actions (Adapted) ---
@@ -348,20 +355,65 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   saveGame: async () => {
-    // In the new system, important actions save to DB immediately.
-    // For now, we can leave this as a local save or ignore.
-    const { character, inventory, worldTime, activeQuests } = get();
-    if (character) {
-      await StorageService.saveCharacter(character);
+    const { character, inventory, worldTime, activeQuests, token } = get();
+    if (!character || !token) return;
+
+    set({ isSaving: true });
+    try {
+      console.log('Saving game...', { 
+        money: character.money, 
+        itemsCount: inventory?.items?.length 
+      });
+
+      // * Sync everything in a single atomic request to avoid race conditions
+      const res = await fetch(`${API_BASE}/characters/${character.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          stats: character.stats,
+          money: character.money,
+          professions: character.professions,
+          location: character.location,
+          bonuses: character.bonuses,
+          worldTime,
+          activeQuests,
+          lastTrainTime: typeof character.lastTrainTime === 'number' ? character.lastTrainTime : null,
+          inventory: inventory ? {
+            items: inventory.items,
+            baseSlots: inventory.baseSlots
+          } : undefined
+        }),
+        keepalive: true
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(`Save failed: ${err.error || res.statusText}`);
+      }
+
+      const updatedData = await res.json();
+      
+      // * Sync state with server data
+      set({ 
+        character: updatedData,
+        inventory: updatedData.inventory,
+        worldTime: updatedData.worldTime,
+        activeQuests: updatedData.activeQuests,
+        isSaving: false
+      });
+      
+      console.log('Game saved successfully');
+    } catch (e) {
+      console.error('Save game failed:', e);
+      set({ isSaving: false });
+      throw e;
     }
-    if (inventory) {
-      await StorageService.saveInventory(inventory);
-    }
-    await StorageService.saveMeta('worldTime', worldTime);
-    await StorageService.saveMeta('activeQuests', activeQuests);
   },
 
-  trainCharacter: () => {
+  trainCharacter: async () => {
     const { character, worldTime } = get();
     if (!character) return;
     const config = StaticDataService.getConfig<{ cooldownHours: number }>('TRAINING_CONFIG');
@@ -377,11 +429,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (result) {
       updatedCharacter.lastTrainTime = worldTime;
       set({ character: updatedCharacter, worldTime: worldTime + 2 });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  rest: () => {
+  rest: async () => {
     const { character, worldTime } = get();
     if (!character) return;
     if (!character.location.buildingId) return;
@@ -402,10 +454,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
     const nextWorldTime = worldTime + (config?.hoursDuration || 8);
     set({ character: updatedCharacter, worldTime: nextWorldTime });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  equipItem: (itemId) => {
+  equipItem: async (itemId) => {
     const { character, inventory, ranks, itemTemplates } = get();
     if (!character || !inventory) return;
     
@@ -470,18 +522,18 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
     
     set({ inventory: { ...inventory, items: updatedItems } });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  unequipItem: (itemId) => {
+  unequipItem: async (itemId) => {
     const { inventory } = get();
     if (!inventory) return;
     const updatedItems = inventory.items.map(i => i.id === itemId ? { ...i, isEquipped: false } : i);
     set({ inventory: { ...inventory, items: updatedItems } });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  discardItem: (itemId, quantity = 1) => {
+  discardItem: async (itemId, quantity = 1) => {
     const { inventory } = get();
     if (!inventory) return;
     
@@ -507,10 +559,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
     
     set({ inventory: { ...inventory, items: updatedItems } });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  craftItem: (recipeId) => {
+  craftItem: async (recipeId) => {
     const { character, inventory, recipes, itemTemplates } = get();
     if (!character || !inventory) return;
     const recipe = recipes.find(r => r.id === recipeId);
@@ -520,21 +572,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     const result = CraftingService.craft(character, inventory, recipe, itemTemplates, workstations);
     if (result.success && result.character && result.inventory) {
       set({ character: result.character, inventory: result.inventory });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  repairItem: (itemId) => {
+  repairItem: async (itemId) => {
     const { character, inventory, itemTemplates } = get();
     if (!character || !inventory) return;
     const result = CraftingService.repair(character, inventory, itemId, itemTemplates);
     if (result.success && result.inventory) {
       set({ inventory: result.inventory });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  moveToLocation: (locationId) => {
+  moveToLocation: async (locationId) => {
     const { character, activeQuests, worldTime } = get();
     if (!character) return;
     const moveResult = WorldService.canMoveTo(character, locationId);
@@ -544,59 +596,69 @@ export const useGameStore = create<GameState>((set, get) => ({
       const { updatedQuests } = QuestService.updateProgress(activeQuests, 'VISIT', locationId);
       const event = EventService.rollForTravelEvent();
       set({ character: updatedCharacter, activeQuests: updatedQuests, activeEvent: event, worldTime: nextWorldTime });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  enterBuilding: (buildingId) => {
+  enterBuilding: async (buildingId) => {
     const { character } = get();
     if (!character) return;
     const result = WorldService.enterBuilding(character, buildingId);
     if (result.allowed && result.character) {
       set({ character: result.character });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  exitBuilding: () => {
+  exitBuilding: async () => {
     const { character } = get();
     if (!character) return;
     const updatedCharacter = WorldService.exitBuilding(character);
     set({ character: updatedCharacter });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  buyItem: (templateId, quantity = 1) => {
+  buyItem: async (templateId, quantity = 1) => {
     const { character, inventory, activeQuests, itemTemplates } = get();
     if (!character || !inventory) return;
-    const result = TradeService.buyItem(character, inventory, templateId, quantity, itemTemplates);
-    if (result.success && result.character && result.inventory) {
-      const { updatedQuests } = QuestService.updateProgress(activeQuests, 'COLLECT', templateId, quantity);
-      set({ character: result.character, inventory: result.inventory, activeQuests: updatedQuests });
-      get().saveGame();
+    
+    try {
+      const result = TradeService.buyItem(character, inventory, templateId, quantity, itemTemplates);
+      if (result.success && result.character && result.inventory) {
+        const { updatedQuests } = QuestService.updateProgress(activeQuests, 'COLLECT', templateId, quantity);
+        set({ character: result.character, inventory: result.inventory, activeQuests: updatedQuests });
+        await get().saveGame();
+      } else if (result.reason) {
+        alert(result.reason);
+      }
+    } catch (error: any) {
+      console.error('Purchase failed:', error);
+      alert(`Ошибка при покупке: ${error.message}`);
+      // * Reload characters to sync state back to server if save failed
+      await get().fetchCharacters();
     }
   },
 
-  sellItem: (itemId, quantity = 1) => {
+  sellItem: async (itemId, quantity = 1) => {
     const { character, inventory } = get();
     if (!character || !inventory) return;
     const result = TradeService.sellItem(character, inventory, itemId, quantity);
     if (result.success && result.character && result.inventory) {
       set({ character: result.character, inventory: result.inventory });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
-  acceptQuest: (questId) => {
+  acceptQuest: async (questId) => {
     const { activeQuests } = get();
     const quest = activeQuests.find(q => q.id === questId);
     if (!quest || quest.status !== QuestStatus.NOT_STARTED) return;
     const updatedQuests = activeQuests.map(q => q.id === questId ? { ...q, status: QuestStatus.IN_PROGRESS } : q);
     set({ activeQuests: updatedQuests });
-    get().saveGame();
+    await get().saveGame();
   },
 
-  completeQuest: (questId) => {
+  completeQuest: async (questId) => {
     const { character, inventory, activeQuests } = get();
     if (!character || !inventory) return;
     const quest = activeQuests.find(q => q.id === questId);
@@ -604,18 +666,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       const { character: updatedCharacter, inventory: updatedInventory } = QuestService.claimRewards(character, inventory, quest);
       const updatedQuests = activeQuests.filter(q => q.id !== questId);
       set({ character: updatedCharacter, inventory: updatedInventory, activeQuests: updatedQuests });
-      get().saveGame();
+      await get().saveGame();
     }
   },
 
   setActiveEvent: (event) => set({ activeEvent: event }),
 
-  handleEventChoice: (choiceId) => {
+  handleEventChoice: async (choiceId) => {
     const { character, activeEvent } = get();
     if (!character || !activeEvent) return;
     const characterToProcess = { ...character, stats: { ...character.stats, essence: { ...character.stats.essence }, energy: { ...character.stats.energy }, protection: { ...character.stats.protection } } };
     const { character: updatedCharacter, message } = EventService.processChoice(characterToProcess, choiceId);
     set({ character: updatedCharacter, activeEvent: null });
-    get().saveGame();
+    await get().saveGame();
   }
 }));

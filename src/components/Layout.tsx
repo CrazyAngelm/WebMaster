@@ -6,7 +6,6 @@
 import React, { ReactNode, useState } from 'react';
 import { Shield, User, Package, Map as MapIcon, Sword, Clock, Hammer, Settings } from 'lucide-react';
 import { CharacterSheet } from './CharacterSheet';
-import { SaveManager } from './SaveManager';
 import { AdminPanel } from './AdminPanel';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
@@ -59,7 +58,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate, activeView
               <Settings size={20} />
             </button>
           )}
-          <SaveManager />
           <nav className="flex gap-6">
             <button 
               onClick={() => onNavigate?.('character')}

@@ -23,6 +23,7 @@ export const getCharacters = async (req: Request, res: Response) => {
       bonuses: JSON.parse(char.bonuses),
       professions: JSON.parse(char.professions),
       location: JSON.parse(char.location),
+      activeQuests: JSON.parse(char.activeQuests || '[]'),
       inventory: char.inventory ? {
         ...char.inventory,
         items: JSON.parse(char.inventory.items)
@@ -100,6 +101,8 @@ export const createCharacter = async (req: Request, res: Response) => {
         professions: JSON.stringify(defaults.professions),
         location: JSON.stringify(defaults.location),
         money: defaults.money,
+        worldTime: 0,
+        activeQuests: JSON.stringify([]),
         inventory: {
           create: {
             baseSlots: defaults.inventory.baseSlots,
@@ -110,7 +113,21 @@ export const createCharacter = async (req: Request, res: Response) => {
       include: { inventory: true }
     });
 
-    res.status(201).json(newCharacter);
+    // * Deserialize for response to keep frontend consistent
+    const response = {
+      ...newCharacter,
+      stats: JSON.parse(newCharacter.stats),
+      bonuses: JSON.parse(newCharacter.bonuses),
+      professions: JSON.parse(newCharacter.professions),
+      location: JSON.parse(newCharacter.location),
+      activeQuests: JSON.parse(newCharacter.activeQuests || '[]'),
+      inventory: newCharacter.inventory ? {
+        ...newCharacter.inventory,
+        items: JSON.parse(newCharacter.inventory.items)
+      } : null
+    };
+
+    res.status(201).json(response);
   } catch (error) {
     console.error('Create character error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -141,16 +158,44 @@ export const updateCharacter = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { stats, money, professions, location, bonuses } = req.body;
+    const { stats, money, professions, location, bonuses, worldTime, activeQuests, lastTrainTime, inventory } = req.body;
+
+    console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
     // * Check ownership
-    const character = await prisma.character.findUnique({ where: { id } });
+    const character = await prisma.character.findUnique({ 
+      where: { id },
+      include: { inventory: true }
+    });
     if (!character || character.userId !== userId) {
       return res.status(404).json({ error: 'Character not found' });
     }
 
     // * Validate and prepare update data
     const updateData: any = {};
+
+    if (worldTime !== undefined) {
+      if (typeof worldTime !== 'number' || worldTime < 0) {
+        return res.status(400).json({ error: 'Invalid worldTime' });
+      }
+      updateData.worldTime = worldTime;
+    }
+
+    if (lastTrainTime !== undefined && lastTrainTime !== null) {
+      if (typeof lastTrainTime !== 'number' || lastTrainTime < 0) {
+        return res.status(400).json({ error: 'Invalid lastTrainTime' });
+      }
+      updateData.lastTrainTime = lastTrainTime;
+    } else if (lastTrainTime === null) {
+      updateData.lastTrainTime = null;
+    }
+
+    if (activeQuests !== undefined) {
+      if (!Array.isArray(activeQuests)) {
+        return res.status(400).json({ error: 'activeQuests must be an array' });
+      }
+      updateData.activeQuests = JSON.stringify(activeQuests);
+    }
 
     if (stats !== undefined) {
       // * Validate stats structure
@@ -175,8 +220,9 @@ export const updateCharacter = async (req: Request, res: Response) => {
       if (typeof money !== 'number' || money < 0) {
         return res.status(400).json({ error: 'Money cannot be negative' });
       }
-      // * Prevent excessive money (anti-cheat: max 1 million)
-      if (money > 1000000) {
+      // * Allow higher cap to avoid false positives when крупные суммы легальны
+      const MONEY_CAP = 1000000000; // 1000M hard cap
+      if (money > MONEY_CAP) {
         return res.status(400).json({ error: 'Money value too high' });
       }
       updateData.money = money;
@@ -212,12 +258,36 @@ export const updateCharacter = async (req: Request, res: Response) => {
       updateData.bonuses = JSON.stringify(bonuses);
     }
 
+    if (inventory !== undefined) {
+      if (typeof inventory === 'object' && Array.isArray(inventory.items)) {
+        // * Validate each item structure
+        for (const item of inventory.items) {
+          if (!item.id || !item.templateId || typeof item.quantity !== 'number') {
+            return res.status(400).json({ error: 'Invalid inventory item structure' });
+          }
+        }
+        
+        updateData.inventory = {
+          update: {
+            items: JSON.stringify(inventory.items),
+            baseSlots: inventory.baseSlots || 10
+          }
+        };
+      }
+    }
+
     // * Update character
     const updatedCharacter = await prisma.character.update({
       where: { id },
       data: updateData,
       include: { inventory: true }
     });
+
+    console.log(`Character ${id} updated. Money in DB: ${updatedCharacter.money}`);
+    if (updatedCharacter.inventory) {
+      const items = JSON.parse(updatedCharacter.inventory.items);
+      console.log(`Inventory in DB has ${items.length} items`);
+    }
 
     // * Deserialize JSON strings for response
     const response = {
@@ -226,6 +296,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
       bonuses: JSON.parse(updatedCharacter.bonuses),
       professions: JSON.parse(updatedCharacter.professions),
       location: JSON.parse(updatedCharacter.location),
+      activeQuests: JSON.parse(updatedCharacter.activeQuests || '[]'),
       inventory: updatedCharacter.inventory ? {
         ...updatedCharacter.inventory,
         items: JSON.parse(updatedCharacter.inventory.items)

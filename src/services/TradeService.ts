@@ -67,7 +67,10 @@ export const TradeService = {
     };
 
     // * Update inventory
-    const updatedInventory = { ...inventory };
+    const updatedInventory = { 
+      ...inventory,
+      items: [...inventory.items] // * Create a deep copy of the items array
+    };
     
     // Check if item is stackable and already exists
     const existingItemIndex = updatedInventory.items.findIndex(
@@ -84,7 +87,7 @@ export const TradeService = {
           quantity: newQuantity
         };
       } else {
-        // Need to create a new stack (simplified: just add new item for now)
+        // Need to create a new stack
         updatedInventory.items.push(this.createNewItem(templateId, quantity));
       }
     } else {
