@@ -24,7 +24,8 @@ export const getStaticBundle = async (req: Request, res: Response) => {
       professionThresholds,
       speeds,
       events,
-      gameConfigs
+      gameConfigs,
+      effectTemplates
     ] = await Promise.all([
       prisma.race.findMany(),
       prisma.rank.findMany({ orderBy: { order: 'asc' } }),
@@ -38,7 +39,8 @@ export const getStaticBundle = async (req: Request, res: Response) => {
       prisma.professionRankThreshold.findMany({ orderBy: { rank: 'asc' } }),
       prisma.speed.findMany(),
       prisma.gameEvent.findMany(),
-      prisma.gameConfig.findMany()
+      prisma.gameConfig.findMany(),
+      prisma.effectTemplate.findMany()
     ]);
 
     // Parse JSON strings back to objects
@@ -85,6 +87,7 @@ export const getStaticBundle = async (req: Request, res: Response) => {
         ...e,
         choices: e.choices ? JSON.parse(e.choices) : undefined
       })),
+      effectTemplates,
       configs: gameConfigs.reduce((acc: any, config: { key: string; value: string }) => {
         acc[config.key] = JSON.parse(config.value);
         return acc;

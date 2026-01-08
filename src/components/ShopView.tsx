@@ -280,6 +280,55 @@ export const ShopView: React.FC = () => {
                             <span>•</span>
                             <span className={rarityColors[item.rarity].split(' ')[1]}>{translateRarity(item.rarity)}</span>
                           </div>
+
+                          {/* Item Description */}
+                          {item.description && (
+                            <div className="mt-2 text-[10px] text-gray-300 italic leading-relaxed border-l-2 border-fantasy-accent/30 pl-2">
+                              {item.description}
+                            </div>
+                          )}
+
+                          {/* Item Effects */}
+                          {(() => {
+                            try {
+                              if (!item.effects) return null;
+                              const effectsArray = Array.isArray(item.effects) 
+                                ? item.effects 
+                                : (typeof item.effects === 'string' && item.effects.trim() ? JSON.parse(item.effects) : []);
+                              if (!Array.isArray(effectsArray) || effectsArray.length === 0) return null;
+                              
+                              const validEffects = effectsArray
+                                .map((effectId: string) => {
+                                  if (!effectId || typeof effectId !== 'string') return null;
+                                  const effect = StaticDataService.getEffectTemplate(effectId);
+                                  return effect ? { id: effectId, effect } : null;
+                                })
+                                .filter((e: any) => e !== null);
+                              
+                              if (validEffects.length === 0) return null;
+                              
+                              return (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {validEffects.map(({ id, effect }: { id: string; effect: any }) => (
+                                    <div 
+                                      key={id}
+                                      className={clsx(
+                                        "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase border flex items-center gap-1",
+                                        effect.isNegative ? "bg-red-900/20 border-red-500/30 text-red-400" : "bg-green-900/20 border-green-500/30 text-green-400"
+                                      )}
+                                      title={effect.description || effect.name}
+                                    >
+                                      <span className="text-[10px]">✨</span>
+                                      <span>{effect.name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            } catch (e) {
+                              // Silently fail if effects can't be rendered
+                              return null;
+                            }
+                          })()}
                         </div>
                       </div>
                       <div className="text-right">

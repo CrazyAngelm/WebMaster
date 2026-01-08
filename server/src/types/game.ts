@@ -72,6 +72,18 @@ export interface CharacterBonuses {
   initiative: number;
 }
 
+export interface ActiveEffect {
+  id: UUID;
+  templateId: UUID;
+  name: string;
+  type: EffectType;
+  level: 'WEAK' | 'ORDINARY' | 'STRONG';
+  value: number;
+  remainingTurns: number;
+  parameter?: string; // e.g., 'accuracy', 'evasion', 'damageResistance'
+  isNegative: boolean;
+}
+
 export interface ExistingItem {
   id: UUID;
   templateId: UUID;
@@ -97,6 +109,7 @@ export interface BattleParticipant {
   isPlayer: boolean;
   distance: number;
   bonuses?: string;
+  activeEffects?: string; // JSON string of ActiveEffect[]
 }
 
 export interface Battle {

@@ -31,6 +31,7 @@ interface StaticDataBundle {
   professionThresholds: { rank: number; minExp: number; maxExp: number; name: string }[];
   speeds: Speed[];
   events: GameEvent[];
+  effectTemplates: any[];
   configs: Record<string, any>;
 }
 
@@ -47,6 +48,7 @@ let data: StaticDataBundle = {
   professionThresholds: [],
   speeds: [],
   events: [],
+  effectTemplates: [],
   configs: {}
 };
 
@@ -94,6 +96,10 @@ export const StaticDataService = {
   },
   getEvent(id: UUID): GameEvent | undefined {
     return data.events.find(e => e.id === id);
+  },
+
+  getEffectTemplate(id: UUID): any | undefined {
+    return data.effectTemplates.find(e => e.id === id);
   },
 
   // Items

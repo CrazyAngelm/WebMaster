@@ -449,6 +449,55 @@ export const Inventory: React.FC = () => {
             </button>
           </div>
 
+          {/* Item Description */}
+          {selectedItem.template.description && (
+            <div className="text-xs text-gray-400 italic bg-black/20 p-2 rounded border border-fantasy-border/20 leading-relaxed">
+              {selectedItem.template.description}
+            </div>
+          )}
+
+          {/* Item Effects */}
+          {(() => {
+            try {
+              if (!selectedItem.template.effects) return null;
+              const effectsArray = Array.isArray(selectedItem.template.effects) 
+                ? selectedItem.template.effects 
+                : (typeof selectedItem.template.effects === 'string' && selectedItem.template.effects.trim() ? JSON.parse(selectedItem.template.effects) : []);
+              if (!Array.isArray(effectsArray) || effectsArray.length === 0) return null;
+              
+              const validEffects = effectsArray
+                .map((effectId: string) => {
+                  if (!effectId || typeof effectId !== 'string') return null;
+                  const effect = StaticDataService.getEffectTemplate(effectId);
+                  return effect ? { id: effectId, effect } : null;
+                })
+                .filter((e: any) => e !== null);
+              
+              if (validEffects.length === 0) return null;
+              
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {validEffects.map(({ id, effect }: { id: string; effect: any }) => (
+                    <div 
+                      key={id}
+                      className={clsx(
+                        "px-2 py-1 rounded text-[10px] font-bold uppercase border flex items-center gap-1.5 shadow-sm",
+                        effect.isNegative ? "bg-red-900/30 border-red-500/50 text-red-300" : "bg-green-900/30 border-green-500/50 text-green-300"
+                      )}
+                      title={effect.description || effect.name}
+                    >
+                      <span className="text-xs">✨</span>
+                      <span>{effect.name}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            } catch (e) {
+              // Silently fail if effects can't be rendered
+              return null;
+            }
+          })()}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-gray-300">
             {selectedItem.template.type === ItemType.BAG && selectedItem.template.slotCount && (
               <InfoRow label="Доп. слоты" value={`+${selectedItem.template.slotCount}`} accent="text-fantasy-accent" />

@@ -4,10 +4,12 @@
 // 💡 Usage: Called by battleRoutes
 
 import { Request, Response } from 'express';
+import * as crypto from 'crypto';
 import prisma from '../db';
 import { CombatEngine } from '../utils/combatEngine';
+import { EffectsEngine } from '../utils/effectsEngine';
 import { DiceEngine as DICE } from '../utils/diceEngine';
-import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats } from '../types/game';
+import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats, ActiveEffect, EffectType } from '../types/game';
 
 const syncParticipantToCharacter = async (participant: any) => {
   if (!participant.characterId) return;
@@ -28,6 +30,19 @@ const syncParticipantToCharacter = async (participant: any) => {
       stats: JSON.stringify(stats)
     }
   });
+};
+
+const formatBattle = (battle: any) => {
+  if (!battle) return null;
+  return {
+    ...battle,
+    log: typeof battle.log === 'string' ? JSON.parse(battle.log) : battle.log,
+    participants: battle.participants.map((p: any) => ({
+      ...p,
+      bonuses: p.bonuses ? JSON.parse(p.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 },
+      activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : []
+    }))
+  };
 };
 
 export const startBattle = async (req: Request, res: Response) => {
@@ -57,8 +72,7 @@ export const startBattle = async (req: Request, res: Response) => {
         });
       } else {
         return res.json({
-          ...existingBattle,
-          log: JSON.parse(existingBattle.log),
+          battle: formatBattle(existingBattle),
           message: 'Active battle resumed'
         });
       }
@@ -167,8 +181,7 @@ export const startBattle = async (req: Request, res: Response) => {
     });
 
     res.status(201).json({
-      ...battle,
-      log: JSON.parse(battle.log),
+      battle: formatBattle(battle),
       rolls: initialRolls
     });
   } catch (error) {
@@ -361,7 +374,7 @@ export const move = async (req: Request, res: Response) => {
     });
 
     res.json({
-      battle: updatedBattle ? { ...updatedBattle, log: JSON.parse(updatedBattle.log) } : undefined,
+      battle: formatBattle(updatedBattle),
       message: 'Movement complete'
     });
 
@@ -539,12 +552,49 @@ export const resolveAttack = async (req: Request, res: Response) => {
       }
     }
 
-    // * Update target state with NEW values after damage application
+    // * NEW: Apply effects from weapon if any
+    let activeEffectsOnTarget = target.activeEffects || "[]";
+    let bonusesOnTarget = target.bonuses;
+
+    if (result.hit && weaponTemplate && weaponTemplate.effects) {
+      try {
+        const effectIds: string[] = JSON.parse(weaponTemplate.effects);
+        const targetForEffects = { ...target, activeEffects: target.activeEffects, bonuses: target.bonuses };
+        
+        for (const effectId of effectIds) {
+          const template = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+          if (template) {
+            const activeEffect: ActiveEffect = {
+              id: crypto.randomUUID(),
+              templateId: template.id,
+              name: template.name,
+              type: template.type as EffectType,
+              level: 'ORDINARY',
+              value: template.value,
+              remainingTurns: template.duration,
+              parameter: template.parameter || undefined,
+              isNegative: template.isNegative
+            };
+            
+            EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+            itemUpdatesLog.push(`${attacker.name}: На цель наложен эффект "${template.name}"!`);
+          }
+        }
+        activeEffectsOnTarget = targetForEffects.activeEffects || "[]";
+        bonusesOnTarget = targetForEffects.bonuses;
+      } catch (e) {
+        console.error('Error applying effects:', e);
+      }
+    }
+
+    // * Update target state with NEW values after damage and effects application
     const updatedTarget = await prisma.battleParticipant.update({
       where: { id: target.id },
       data: {
         currentHp: Math.max(0, targetCopy.currentHp),
-        currentProtection: Math.max(0, targetCopy.currentProtection)
+        currentProtection: Math.max(0, targetCopy.currentProtection),
+        activeEffects: activeEffectsOnTarget,
+        bonuses: bonusesOnTarget
       }
     });
 
@@ -623,10 +673,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
       battleStatus: isTargetDead ? BattleStatus.FINISHED : BattleStatus.ACTIVE,
       updatedLog,
       rolls: result.rolls,
-      battle: updatedBattle ? {
-        ...updatedBattle,
-        log: JSON.parse(updatedBattle.log)
-      } : undefined
+      battle: formatBattle(updatedBattle)
     });
   } catch (error) {
     console.error('Resolve attack error:', error);
@@ -647,30 +694,68 @@ export const nextTurn = async (req: Request, res: Response) => {
         const nextIndex = (battle.currentTurnIndex + 1) % battle.participants.length;
         const nextParticipant = battle.participants[nextIndex];
 
-        // * Reset actions for the participant whose turn it now is
-        await prisma.battleParticipant.update({
+        // * 1. Process Effects Ticks
+        const { updatedParticipant, logs } = EffectsEngine.processTicks(nextParticipant as any);
+        
+        // * 2. Check for stun
+        const isStunned = EffectsEngine.isStunned(updatedParticipant as any);
+        const finalMainActions = isStunned ? 0 : 1;
+        const finalBonusActions = isStunned ? 0 : 1;
+
+        // * 3. Update participant in DB
+        const updatedInDb = await prisma.battleParticipant.update({
             where: { id: nextParticipant.id },
             data: {
-                mainActions: 1,
-                bonusActions: 1
+                currentHp: updatedParticipant.currentHp,
+                currentProtection: updatedParticipant.currentProtection,
+                activeEffects: updatedParticipant.activeEffects,
+                bonuses: updatedParticipant.bonuses,
+                mainActions: finalMainActions,
+                bonusActions: finalBonusActions
             }
         });
 
+        // * 4. Sync to character if player
+        if (updatedInDb.isPlayer) {
+            await syncParticipantToCharacter(updatedInDb);
+        }
+
         const currentLog = JSON.parse(battle.log);
-        currentLog.push(`Ход: ${nextParticipant.name}`);
+        currentLog.push(...logs);
+        currentLog.push(`Ход: ${nextParticipant.name}${isStunned ? ' (ОГЛУШЕН)' : ''}`);
+
+        // * 5. Check if died from ticks
+        const isDead = updatedInDb.currentHp <= 0;
+        let finalStatus = BattleStatus.ACTIVE;
+        if (isDead) {
+            currentLog.push(`${updatedInDb.name} повержен эффектом!`);
+            // * Check if this was the last enemy or player
+            const aliveTeams = new Set(
+                battle.participants
+                .filter(p => (p.id === updatedInDb.id ? updatedInDb.currentHp > 0 : p.currentHp > 0))
+                .map(p => {
+                    // This is a bit simplified, ideally we'd have teamId in DB
+                    return p.isPlayer ? 'players' : 'monsters';
+                })
+            );
+            
+            if (aliveTeams.size <= 1) {
+                finalStatus = BattleStatus.FINISHED;
+            }
+        }
 
         const updatedBattle = await prisma.battle.update({
             where: { id: battle.id },
             data: {
                 currentTurnIndex: nextIndex,
+                status: finalStatus,
                 log: JSON.stringify(currentLog)
             },
             include: { participants: true }
         });
 
         res.json({
-            ...updatedBattle,
-            log: JSON.parse(updatedBattle.log)
+            battle: formatBattle(updatedBattle)
         });
     } catch (error) {
         console.error('Next turn error:', error);
@@ -689,8 +774,7 @@ export const getBattle = async (req: Request, res: Response) => {
         if (!battle) return res.status(404).json({ error: 'Battle not found' });
 
         res.json({
-            ...battle,
-            log: JSON.parse(battle.log)
+            battle: formatBattle(battle)
         });
     } catch (error) {
         console.error('Get battle error:', error);

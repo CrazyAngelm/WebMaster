@@ -44,9 +44,9 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       const res = await fetch(`${API_BASE}/battle/active/${characterId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const battle = await res.json();
-      if (res.ok) {
-        set({ battle, player: useGameStore.getState().character });
+      const result = await res.json();
+      if (res.ok && result.battle) {
+        set({ battle: result.battle, player: useGameStore.getState().character });
         return true;
       }
       return false;
@@ -74,16 +74,16 @@ export const useCombatStore = create<CombatState>((set, get) => ({
         })
       });
       
-      const battle = await res.json();
-      if (!res.ok) throw new Error(battle.error);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
       
       // * Trigger initiative rolls
-      if (battle.rolls && Array.isArray(battle.rolls)) {
+      if (result.rolls && Array.isArray(result.rolls)) {
         const { triggerRoll } = useDiceStore.getState();
-        await Promise.all(battle.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
+        await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
       }
 
-      set({ battle, player: character });
+      set({ battle: result.battle, player: character });
     } catch (error) {
       console.error('Failed to initiate battle:', error);
       throw error;
@@ -105,24 +105,26 @@ export const useCombatStore = create<CombatState>((set, get) => ({
         body: JSON.stringify({ battleId: battle.id })
       });
       
-      const updatedBattle = await res.json();
-      if (!res.ok) throw new Error(updatedBattle.error);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
       
-      set({ battle: updatedBattle });
-      
-      // * Sync local character stats even on turn change (passive effects might apply)
-      const playerPart = updatedBattle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
-      if (playerPart) {
-        const char = useGameStore.getState().character;
-        if (char) {
-          useGameStore.getState().setCharacter({
-            ...char,
-            stats: {
-              ...char.stats,
-              essence: { ...char.stats.essence, current: playerPart.currentHp },
-              protection: { ...char.stats.protection, current: playerPart.currentProtection }
-            }
-          });
+      if (result.battle) {
+        set({ battle: result.battle });
+        
+        // * Sync local character stats even on turn change (passive effects might apply)
+        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+        if (playerPart) {
+          const char = useGameStore.getState().character;
+          if (char) {
+            useGameStore.getState().setCharacter({
+              ...char,
+              stats: {
+                ...char.stats,
+                essence: { ...char.stats.essence, current: playerPart.currentHp },
+                protection: { ...char.stats.protection, current: playerPart.currentProtection }
+              }
+            });
+          }
         }
       }
     } catch (error) {
@@ -245,9 +247,9 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       const res = await fetch(`${API_BASE}/battle/${battleId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const battle = await res.json();
-      if (res.ok) {
-        set({ battle });
+      const result = await res.json();
+      if (res.ok && result.battle) {
+        set({ battle: result.battle });
       }
     } catch (error) {
       console.error('Failed to sync battle:', error);

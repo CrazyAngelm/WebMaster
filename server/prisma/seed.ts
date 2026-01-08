@@ -326,6 +326,22 @@ async function main() {
       basePrice: 120
     },
     {
+      id: 'wpn-steel-hammer-poisoned',
+      name: 'Стальной молот',
+      type: 'WEAPON',
+      category: 'TWO_HANDED',
+      rarity: 'RARE',
+      stackSize: 1,
+      isUnique: false,
+      baseEssence: 60,
+      maxEssence: 150,
+      penetration: 'LIGHT',
+      distance: JSON.stringify({ minRange: 0, maxRange: 5 }),
+      effects: JSON.stringify(['effect-poison']),
+      description: 'Тяжелый молот с отравленным наконечником. Наносит яд при попадании.',
+      basePrice: 300
+    },
+    {
       id: 'arm-light-leather',
       name: 'Лёгкая кожаная броня',
       type: 'ARMOR',

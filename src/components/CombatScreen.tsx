@@ -336,6 +336,25 @@ export const CombatScreen: React.FC = () => {
                         <div className={clsx("w-2 h-2 rounded-full", p.mainActions > 0 ? "bg-orange-500" : "bg-gray-700")} title="Основное действие" />
                         <div className={clsx("w-2 h-2 rounded-full", p.bonusActions > 0 ? "bg-blue-400" : "bg-gray-700")} title="Доп. действие" />
                       </div>
+
+                      {/* Active Effects */}
+                      {p.activeEffects && p.activeEffects.length > 0 && (
+                        <div className="flex gap-1 mt-1.5 flex-wrap justify-center max-w-[100px]">
+                          {p.activeEffects.map(effect => (
+                            <div 
+                              key={effect.id}
+                              className={clsx(
+                                "px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-tighter border flex items-center gap-0.5",
+                                effect.isNegative ? "bg-red-900/40 border-red-500/50 text-red-300" : "bg-green-900/40 border-green-500/50 text-green-300"
+                              )}
+                              title={`${effect.name}: ${effect.value} (${effect.remainingTurns} ходов)`}
+                            >
+                              <span>{effect.name}</span>
+                              <span className="opacity-60 bg-black/30 px-0.5 rounded">{effect.remainingTurns}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
