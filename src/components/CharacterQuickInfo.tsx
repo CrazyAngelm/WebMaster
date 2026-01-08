@@ -33,3 +33,4 @@ export const CharacterQuickInfo: React.FC = () => {
   );
 };
 
+
