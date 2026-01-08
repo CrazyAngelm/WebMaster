@@ -190,6 +190,7 @@ export interface Character {
   professions: CharacterProfession[];
   lastTrainTime?: number; // * Added to track training cooldown (in server time hours)
   lastRestTime?: number;  // * Added to track rest cooldown (in server time hours)
+  activeSkills?: CharacterSkill[];
 }
 
 export interface Location {
@@ -373,8 +374,23 @@ export interface Skill {
   rarity: Rarity;
   castTime: number;
   cooldown: number;
-  range: number;
-  effects: UUID[];
+  targetType: 'SELF' | 'TARGET' | 'AREA';
+  distance?: { minRange: number; maxRange: number } | string;
+  penetration?: PenetrationType;
+  alwaysPenetrates?: boolean;
+  effects?: UUID[];
+  isCombat: boolean;
+  isStarter: boolean;
+}
+
+export interface CharacterSkill {
+  id: UUID;
+  characterId: UUID;
+  skillTemplateId: UUID;
+  currentCooldown: number;
+  castTimeRemaining?: number | null;
+  isItemSkill: boolean;
+  baseEssence: number;
 }
 
 export interface Battle {

@@ -8,8 +8,9 @@ import * as crypto from 'crypto';
 import prisma from '../db';
 import { CombatEngine } from '../utils/combatEngine';
 import { EffectsEngine } from '../utils/effectsEngine';
+import { SkillsEngine } from '../utils/skillsEngine';
 import { DiceEngine as DICE } from '../utils/diceEngine';
-import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats, ActiveEffect, EffectType } from '../types/game';
+import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats, ActiveEffect, EffectType, BattleParticipant, CharacterBonuses } from '../types/game';
 
 const syncParticipantToCharacter = async (participant: any) => {
   if (!participant.characterId) return;
@@ -697,7 +698,87 @@ export const nextTurn = async (req: Request, res: Response) => {
         // * 1. Process Effects Ticks
         const { updatedParticipant, logs } = EffectsEngine.processTicks(nextParticipant as any);
         
-        // * 2. Check for stun
+        // * 2. Process Skill Cooldowns and Cast Time (if player has skills)
+        let skillLogs: string[] = [];
+        if (nextParticipant.characterId) {
+          const character = await prisma.character.findUnique({
+            where: { id: nextParticipant.characterId },
+            include: { characterSkills: { include: { skillTemplate: true } } }
+          });
+          
+          if (character && character.characterSkills && character.characterSkills.length > 0) {
+            // * Process cooldowns
+            SkillsEngine.processCooldowns(character.characterSkills);
+            
+            // * Process cast time
+            const { completedSkills, logs: castLogs } = SkillsEngine.processCastTime(
+              updatedParticipant as any,
+              character.characterSkills
+            );
+            skillLogs.push(...castLogs);
+            
+            // * Apply completed skills automatically (if self-target, else wait for player action)
+            for (const completedSkill of completedSkills) {
+              const skillTemplate = await prisma.skillTemplate.findUnique({
+                where: { id: completedSkill.skillTemplateId }
+              });
+              
+              if (skillTemplate) {
+                // * Auto-apply self-target skills, others wait for player confirmation
+                if (skillTemplate.targetType === 'SELF') {
+                  // Apply to self
+                  const effectIds: string[] = skillTemplate.effects ? JSON.parse(skillTemplate.effects) : [];
+                  const targetForEffects = { ...updatedParticipant };
+                  
+                  for (const effectId of effectIds) {
+                    const effectTemplate = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+                    if (effectTemplate) {
+                      const activeEffect: ActiveEffect = {
+                        id: crypto.randomUUID(),
+                        templateId: effectTemplate.id,
+                        name: effectTemplate.name,
+                        type: effectTemplate.type as EffectType,
+                        level: 'ORDINARY',
+                        value: effectTemplate.value,
+                        remainingTurns: effectTemplate.duration,
+                        parameter: effectTemplate.parameter || undefined,
+                        isNegative: effectTemplate.isNegative
+                      };
+                      EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+                    }
+                  }
+                  
+                  updatedParticipant.activeEffects = targetForEffects.activeEffects;
+                  updatedParticipant.bonuses = targetForEffects.bonuses;
+                  skillLogs.push(`${updatedParticipant.name}: Применил "${skillTemplate.name}" на себя!`);
+                  
+                  // * Update skill cooldown only for auto-applied skills
+                  completedSkill.currentCooldown = skillTemplate.cooldown;
+                  completedSkill.castTimeRemaining = null;
+                } else {
+                  // * For TARGET/AREA skills, skill remains "ready" (castTimeRemaining: 0) until player selects target
+                  // * This is handled in the useSkill endpoint
+                  skillLogs.push(`${updatedParticipant.name}: "${skillTemplate.name}" готова к применению!`);
+                  // DO NOT set cooldown or clear castTimeRemaining here!
+                  // It must be cleared only when the skill is actually released in useSkill
+                }
+              }
+            }
+            
+            // * Save updated skills
+            for (const skill of character.characterSkills) {
+              await prisma.characterSkill.update({
+                where: { id: skill.id },
+                data: {
+                  currentCooldown: skill.currentCooldown,
+                  castTimeRemaining: skill.castTimeRemaining
+                }
+              });
+            }
+          }
+        }
+        
+        // * 3. Check for stun
         const isStunned = EffectsEngine.isStunned(updatedParticipant as any);
         const finalMainActions = isStunned ? 0 : 1;
         const finalBonusActions = isStunned ? 0 : 1;
@@ -722,6 +803,7 @@ export const nextTurn = async (req: Request, res: Response) => {
 
         const currentLog = JSON.parse(battle.log);
         currentLog.push(...logs);
+        currentLog.push(...skillLogs);
         currentLog.push(`Ход: ${nextParticipant.name}${isStunned ? ' (ОГЛУШЕН)' : ''}`);
 
         // * 5. Check if died from ticks
@@ -761,6 +843,298 @@ export const nextTurn = async (req: Request, res: Response) => {
         console.error('Next turn error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+};
+
+export const useSkill = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    const { battleId, participantId, skillId, targetId } = req.body;
+
+    const battle = await prisma.battle.findUnique({
+      where: { id: battleId },
+      include: { participants: true }
+    });
+
+    if (!battle || battle.status === BattleStatus.FINISHED) {
+      return res.status(404).json({ error: 'Battle not found or finished' });
+    }
+
+    const participant = battle.participants.find(p => p.id === participantId);
+    if (!participant) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    // * Check if it's the participant's turn
+    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+      return res.status(400).json({ error: "It's not your turn" });
+    }
+
+    if (!participant.characterId) {
+      return res.status(400).json({ error: 'Only player characters can use skills' });
+    }
+
+    // * Fetch character and skill
+    const character = await prisma.character.findUnique({
+      where: { id: participant.characterId },
+      include: { characterSkills: { include: { skillTemplate: true } } }
+    });
+
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const characterSkill = character.characterSkills.find(s => s.id === skillId);
+    if (!characterSkill) {
+      return res.status(404).json({ error: 'Skill not found on character' });
+    }
+
+    const skillTemplate = characterSkill.skillTemplate;
+    if (!skillTemplate) {
+      return res.status(404).json({ error: 'Skill template not found' });
+    }
+
+    // * Validate skill can be used
+    const rank = await prisma.rank.findUnique({ where: { id: character.rankId } });
+    const validation = SkillsEngine.canUseSkill(
+      participant as any,
+      characterSkill as any,
+      skillTemplate as any,
+      rank?.maxSkills
+    );
+
+    if (!validation.canUse) {
+      return res.status(400).json({ error: validation.reason || 'Cannot use skill' });
+    }
+
+    // * Validate target if needed
+    let target: BattleParticipant | null = null;
+    if (skillTemplate.targetType === 'TARGET') {
+      if (!targetId) {
+        return res.status(400).json({ error: 'Target required for this skill' });
+      }
+      
+      target = battle.participants.find(p => p.id === targetId) as any || null;
+      if (!target) {
+        return res.status(404).json({ error: 'Target not found' });
+      }
+    } else if (skillTemplate.targetType === 'SELF') {
+      target = participant as any;
+    }
+
+    // * Get weapon essence for hit check
+    let weaponEssence = 0;
+    if (participant.characterId) {
+      const char = await prisma.character.findUnique({
+        where: { id: participant.characterId },
+        include: { inventory: true }
+      });
+      if (char && char.inventory) {
+        const items = JSON.parse(char.inventory.items);
+        const equippedWeapon = items.find((i: any) => i.isEquipped && i.templateId.includes('weapon'));
+        if (equippedWeapon) {
+          weaponEssence = equippedWeapon.currentEssence || 0;
+        }
+      }
+    }
+
+    // * Get rank min rolls
+    const attackerRank = await prisma.rank.findUnique({ where: { id: character.rankId } });
+    const attackerRankMinRoll = attackerRank?.minEssenceRoll || 1;
+    const targetRank = target?.characterId 
+      ? await prisma.character.findUnique({ where: { id: target.characterId } })
+          .then(c => c ? prisma.rank.findUnique({ where: { id: c.rankId } }) : null)
+      : null;
+    const targetRankMinRoll = targetRank?.minEssenceRoll || 1;
+
+    let skillLogs: string[] = [];
+    let updatedParticipant = { ...participant };
+    let updatedTarget = target ? { ...target } : null;
+
+    // * If castTime === 0 or cast is finished (castTimeRemaining === 0), apply immediately
+    if (skillTemplate.castTime === 0 || characterSkill.castTimeRemaining === 0) {
+      // * Apply immediately
+      const result = SkillsEngine.applySkill(
+        updatedParticipant as any,
+        updatedTarget as any,
+        characterSkill as any,
+        skillTemplate as any,
+        weaponEssence,
+        attackerRankMinRoll,
+        targetRankMinRoll
+      );
+
+      skillLogs.push(...result.diceLogs);
+      skillLogs.push(result.log);
+
+      // * Apply Damage for combat skills if hit (only if target is an enemy)
+      if (result.hit && skillTemplate.isCombat && updatedTarget && updatedTarget.isPlayer !== participant.isPlayer) {
+        // Simple damage formula: weaponEssence + 10 (as base)
+        const baseDamage = 10 + (weaponEssence > 0 ? weaponEssence : 0);
+        
+        // Check penetration (simplified)
+        const attackerPen = skillTemplate.penetration as PenetrationType || PenetrationType.NONE;
+        
+        // Get target armor info
+        let armorIgnore = 0;
+        let armorCat: ArmorCategory | undefined;
+        if (updatedTarget.characterId) {
+            const char = await prisma.character.findUnique({
+                where: { id: updatedTarget.characterId },
+                include: { inventory: true }
+            });
+            if (char && char.inventory) {
+                const items = JSON.parse(char.inventory.items);
+                const equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.includes('armor'));
+                if (equippedArmor) {
+                    const template = await prisma.itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
+                    armorIgnore = template?.ignoreDamage || 0;
+                    armorCat = template?.category as ArmorCategory;
+                }
+            }
+        }
+
+        // Apply damage logic similar to CombatEngine
+        const damage = baseDamage;
+        const targetBonuses: CharacterBonuses = updatedTarget.bonuses ? JSON.parse(updatedTarget.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 };
+        const finalDamage = Math.max(0, damage - armorIgnore - (targetBonuses.damageResistance || 0));
+        
+        // Apply damage to target
+        if (updatedTarget.currentProtection >= finalDamage) {
+          updatedTarget.currentProtection -= finalDamage;
+        } else {
+          const remaining = finalDamage - updatedTarget.currentProtection;
+          updatedTarget.currentProtection = 0;
+          updatedTarget.currentHp = Math.max(0, updatedTarget.currentHp - remaining);
+        }
+        
+        skillLogs.push(`Нанесено ${finalDamage} урона!`);
+      }
+
+      // * Apply effects from skill
+      if (skillTemplate.effects && result.hit) {
+        const effectIds: string[] = JSON.parse(skillTemplate.effects);
+        const targetForEffects = updatedTarget || updatedParticipant;
+        
+        for (const effectId of effectIds) {
+          const effectTemplate = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+          if (effectTemplate) {
+            const activeEffect: ActiveEffect = {
+              id: crypto.randomUUID(),
+              templateId: effectTemplate.id,
+              name: effectTemplate.name,
+              type: effectTemplate.type as EffectType,
+              level: 'ORDINARY',
+              value: effectTemplate.value,
+              remainingTurns: effectTemplate.duration,
+              parameter: effectTemplate.parameter || undefined,
+              isNegative: effectTemplate.isNegative
+            };
+            
+            EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+            skillLogs.push(`${participant.name}: На цель наложен эффект "${effectTemplate.name}"!`);
+          }
+        }
+        
+        if (updatedTarget) {
+          updatedTarget.activeEffects = (targetForEffects as any).activeEffects;
+          updatedTarget.bonuses = (targetForEffects as any).bonuses;
+        } else {
+          updatedParticipant.activeEffects = (targetForEffects as any).activeEffects;
+          updatedParticipant.bonuses = (targetForEffects as any).bonuses;
+        }
+      }
+
+      // * Set cooldown
+      characterSkill.currentCooldown = skillTemplate.cooldown;
+      characterSkill.castTimeRemaining = null;
+    } else {
+      // * Start casting
+      SkillsEngine.startCasting(updatedParticipant as any, characterSkill as any, skillTemplate as any);
+      characterSkill.castTimeRemaining = skillTemplate.castTime;
+      skillLogs.push(`${participant.name} начинает применять "${skillTemplate.name}" (${skillTemplate.castTime} хода)...`);
+    }
+
+    // * Update character skill in DB
+    await prisma.characterSkill.update({
+      where: { id: characterSkill.id },
+      data: {
+        currentCooldown: characterSkill.currentCooldown,
+        castTimeRemaining: characterSkill.castTimeRemaining
+      }
+    });
+
+    // * Update participants in DB
+    await prisma.battleParticipant.update({
+      where: { id: participant.id },
+      data: {
+        currentHp: updatedParticipant.currentHp,
+        currentProtection: updatedParticipant.currentProtection,
+        mainActions: updatedParticipant.mainActions,
+        bonuses: updatedParticipant.bonuses,
+        activeEffects: updatedParticipant.activeEffects
+      }
+    });
+
+    if (updatedTarget) {
+      await prisma.battleParticipant.update({
+        where: { id: updatedTarget.id },
+        data: {
+          currentHp: updatedTarget.currentHp,
+          currentProtection: updatedTarget.currentProtection,
+          bonuses: updatedTarget.bonuses,
+          activeEffects: updatedTarget.activeEffects
+        }
+      });
+      
+      await syncParticipantToCharacter(updatedTarget as any);
+    }
+
+    await syncParticipantToCharacter(updatedParticipant as any);
+
+    // * Update battle log
+    const currentLog = JSON.parse(battle.log);
+    currentLog.push(...skillLogs);
+
+    // * Check if target died
+    const isTargetDead = updatedTarget && updatedTarget.currentHp <= 0;
+    let finalStatus = BattleStatus.ACTIVE;
+    
+    if (isTargetDead) {
+      currentLog.push(`${updatedTarget!.name} повержен способностью!`);
+      
+      // * Check if battle should end
+      const aliveTeams = new Set(
+        battle.participants
+        .filter(p => {
+          if (p.id === updatedTarget!.id) return updatedTarget!.currentHp > 0;
+          return p.currentHp > 0;
+        })
+        .map(p => p.isPlayer ? 'players' : 'monsters')
+      );
+      
+      if (aliveTeams.size <= 1) {
+        finalStatus = BattleStatus.FINISHED;
+      }
+    }
+
+    const updatedBattle = await prisma.battle.update({
+      where: { id: battle.id },
+      data: {
+        status: finalStatus,
+        log: JSON.stringify(currentLog)
+      },
+      include: { participants: true }
+    });
+
+    res.json({
+      battle: formatBattle(updatedBattle),
+      message: 'Skill used'
+    });
+  } catch (error) {
+    console.error('Use skill error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 export const getBattle = async (req: Request, res: Response) => {

@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
-import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair } from 'lucide-react';
+import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
-import { BattleStatus } from '../types/game';
+import { BattleStatus, CharacterSkill } from '../types/game';
+import { StaticDataService } from '../services/StaticDataService';
 
 export const CombatScreen: React.FC = () => {
   const { 
@@ -12,11 +13,13 @@ export const CombatScreen: React.FC = () => {
     enemy, 
     executeAttack, 
     move,
+    useSkill,
     nextTurn, 
     initiateBattle, 
     endBattle 
   } = useCombatStore();
   const { character, inventory, itemTemplates, setCharacter } = useGameStore();
+  const characterSkills = (character as any)?.activeSkills || [];
 
   // * Auto-handle enemy turns
   useEffect(() => {
@@ -94,6 +97,39 @@ export const CombatScreen: React.FC = () => {
     if (!currentParticipant || !isPlayerTurn) return;
 
     await move(currentParticipant.id, direction, targetDistance);
+  };
+
+  // * Refresh character once on battle start
+  useEffect(() => {
+    if (battle && character) {
+      useGameStore.getState().refreshCharacter();
+    }
+  }, [battle?.id]);
+
+  const handleUseSkill = async (skillId: string, targetId?: string) => {
+    if (!battle || !character) return;
+    
+    const currentParticipant = battle.participants[battle.currentTurnIndex];
+    if (!currentParticipant || currentParticipant.characterId !== character.id) return;
+
+    const skill = characterSkills.find(s => s.id === skillId);
+    if (!skill) return;
+
+    const skillTemplate = StaticDataService.getSkillTemplate(skill.skillTemplateId);
+    if (!skillTemplate) return;
+
+    // * Determine target based on skill type
+    let target: string | undefined = targetId;
+    if (skillTemplate.targetType === 'TARGET' && !target) {
+      // * Default to first enemy
+      const enemy = battle.participants.find(p => !p.isPlayer);
+      target = enemy?.id;
+    } else if (skillTemplate.targetType === 'SELF') {
+      target = currentParticipant.id;
+    }
+
+    await useSkill(currentParticipant.id, skillId, target);
+    await nextTurn();
   };
 
   if (!battle || !battle.participants || battle.participants.length === 0) {
@@ -418,12 +454,93 @@ export const CombatScreen: React.FC = () => {
                 <Sword size={18} /> {inRange ? 'Атака' : 'Вне дальности'}
               </button>
               
-              <button 
-                disabled={!isPlayerTurn || playerParticipant?.mainActions === 0} 
-                className={clsx("fantasy-button flex items-center gap-2 opacity-30 cursor-not-allowed")}
-              >
-                <Zap size={18} /> Умение
-              </button>
+              {/* Skills Panel */}
+              <div className="flex flex-col gap-2 w-full border-t border-fantasy-border/30 pt-4 mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-[10px] uppercase font-bold text-fantasy-accent">Способности:</div>
+                  <button 
+                    onClick={() => useGameStore.getState().refreshCharacter()}
+                    className="text-[8px] text-gray-500 hover:text-white uppercase tracking-tighter"
+                  >
+                    Обновить
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {characterSkills.length === 0 && (
+                    <div className="text-[10px] text-gray-500 italic">Нет доступных способностей</div>
+                  )}
+                  {characterSkills.map(skill => {
+                    const skillTemplate = StaticDataService.getSkillTemplate(skill.skillTemplateId);
+
+                    if (!skillTemplate) {
+                      console.log('COMBAT RENDER: Template not found for:', skill.skillTemplateId);
+                      return (
+                        <div key={skill.id} className="p-1 border border-red-500/30 bg-red-900/10 rounded text-[7px] text-red-400">
+                          ID: {skill.skillTemplateId.substring(0, 8)}... (Не найден)
+                        </div>
+                      );
+                    }
+
+                    const isOnCooldown = skill.currentCooldown > 0;
+                    const isCasting = skill.castTimeRemaining !== null && skill.castTimeRemaining !== undefined && skill.castTimeRemaining > 0;
+                    const canUse = isPlayerTurn && !isOnCooldown && !isCasting && (playerParticipant?.mainActions ?? 0) > 0;
+                    const isInRange = skillTemplate.targetType === 'SELF' || (() => {
+                      if (skillTemplate.targetType === 'TARGET') {
+                        const enemy = battle.participants.find(p => !p.isPlayer);
+                        if (!enemy || !playerParticipant) return false;
+                        const distance = Math.abs(playerParticipant.distance - enemy.distance);
+                        if (skillTemplate.distance && typeof skillTemplate.distance === 'object') {
+                          return distance >= skillTemplate.distance.minRange && distance <= skillTemplate.distance.maxRange;
+                        }
+                        return true;
+                      }
+                      return true;
+                    })();
+
+                    return (
+                      <button
+                        key={skill.id}
+                        disabled={!canUse || (skillTemplate.targetType === 'TARGET' && !isInRange)}
+                        onClick={() => handleUseSkill(skill.id)}
+                        className={clsx(
+                          "p-2 rounded border flex flex-col items-center gap-1 min-w-[100px] transition-all",
+                          canUse && isInRange 
+                            ? "border-fantasy-accent/50 bg-fantasy-accent/10 hover:bg-fantasy-accent/20" 
+                            : "border-fantasy-border/30 bg-black/20 opacity-50 cursor-not-allowed"
+                        )}
+                        title={skillTemplate.description}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Zap size={14} />
+                          <span className="text-[9px] font-bold uppercase">{skillTemplate.name}</span>
+                        </div>
+                        {isOnCooldown && (
+                          <div className="flex items-center gap-1 text-[8px] text-red-400">
+                            <Clock size={10} />
+                            <span>Откат: {skill.currentCooldown}</span>
+                          </div>
+                        )}
+                        {isCasting && (
+                          <div className="flex items-center gap-1 text-[8px] text-yellow-400">
+                            <Clock size={10} />
+                            <span>Подготовка: {skill.castTimeRemaining}</span>
+                          </div>
+                        )}
+                        {skillTemplate.castTime > 0 && !isCasting && !isOnCooldown && (
+                          <div className="text-[7px] text-gray-400">
+                            Подготовка: {skillTemplate.castTime} ход
+                          </div>
+                        )}
+                        {skillTemplate.cooldown > 0 && !isOnCooldown && !isCasting && (
+                          <div className="text-[7px] text-gray-400">
+                            Откат: {skillTemplate.cooldown} ход
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Bonus Actions Row */}

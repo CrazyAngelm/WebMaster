@@ -4,7 +4,7 @@
 // 💡 Usage: Integrated into main Express app
 
 import { Router } from 'express';
-import { startBattle, resolveAttack, move, nextTurn, getBattle, getActiveBattle, endBattle } from '../controllers/battleController';
+import { startBattle, resolveAttack, move, nextTurn, getBattle, getActiveBattle, endBattle, useSkill } from '../controllers/battleController';
 import { authenticate } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -12,6 +12,7 @@ const router = Router();
 router.post('/start', authenticate, startBattle);
 router.post('/attack', authenticate, resolveAttack);
 router.post('/move', authenticate, move);
+router.post('/use-skill', authenticate, useSkill);
 router.post('/next-turn', authenticate, nextTurn);
 router.post('/end/:id', authenticate, endBattle);
 router.get('/active/:characterId', authenticate, getActiveBattle);

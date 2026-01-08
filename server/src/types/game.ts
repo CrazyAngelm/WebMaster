@@ -112,6 +112,32 @@ export interface BattleParticipant {
   activeEffects?: string; // JSON string of ActiveEffect[]
 }
 
+export interface SkillTemplate {
+  id: UUID;
+  name: string;
+  description: string;
+  rarity: Rarity;
+  castTime: number;
+  cooldown: number;
+  targetType: 'SELF' | 'TARGET' | 'AREA';
+  distance?: string; // JSON: { minRange, maxRange } or legacy string
+  penetration?: PenetrationType;
+  alwaysPenetrates?: boolean;
+  effects?: string; // UUID[] (JSON string)
+  isCombat: boolean;
+  isStarter: boolean;
+}
+
+export interface CharacterSkill {
+  id: UUID;
+  characterId: UUID;
+  skillTemplateId: UUID;
+  currentCooldown: number;
+  castTimeRemaining?: number | null;
+  isItemSkill: boolean;
+  baseEssence: number;
+}
+
 export interface Battle {
   id: UUID;
   locationId: UUID;

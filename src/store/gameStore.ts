@@ -27,7 +27,7 @@ import { EventService } from '../services/EventService';
 import { CraftingService } from '../services/CraftingService';
 import { ProfessionService } from '../services/ProfessionService';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api'; // * Use relative path for better compatibility
 
 interface User {
   id: string;
@@ -65,6 +65,7 @@ interface GameState {
     interpolation: number | null;
     sync: number | null;
   };
+  cooldownTickInterval: number | null;
   
   // Auth Actions
   login: (login: string, password: string) => Promise<void>;
@@ -133,6 +134,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     interpolation: null,
     sync: null
   },
+  cooldownTickInterval: null,
 
   // --- Auth Actions ---
   login: async (login, password) => {
@@ -141,8 +143,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login, password })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (!res.ok) throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      throw new Error('Invalid response from server');
+    }
+    
+    if (!res.ok) throw new Error(data.error || 'Login failed');
     
     localStorage.setItem('token', data.token);
     set({ user: data.user, token: data.token, authStatus: 'authenticated' });
@@ -156,8 +166,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login, password, role })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    
+    let data;
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (!res.ok) throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      throw new Error('Invalid response from server');
+    }
+    
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
     
     localStorage.setItem('token', data.token);
     set({ user: data.user, token: data.token, authStatus: 'authenticated' });
@@ -166,13 +184,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   logout: () => {
-    // * Clear time sync intervals on logout
-    const { timeSyncIntervals } = get();
+    // * Clear all intervals on logout
+    const { timeSyncIntervals, cooldownTickInterval } = get();
     if (timeSyncIntervals.interpolation) {
       clearInterval(timeSyncIntervals.interpolation);
     }
     if (timeSyncIntervals.sync) {
       clearInterval(timeSyncIntervals.sync);
+    }
+    if (cooldownTickInterval) {
+      clearInterval(cooldownTickInterval);
     }
 
     localStorage.removeItem('token');
@@ -186,7 +207,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       timeSyncIntervals: {
         interpolation: null,
         sync: null
-      }
+      },
+      cooldownTickInterval: null
     });
   },
 
@@ -201,7 +223,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       const res = await fetch(`${API_BASE}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        if (!res.ok) {
+          get().logout();
+          return;
+        }
+        throw new Error('Invalid response from server');
+      }
+
       if (res.ok) {
         set({ user: data.user, authStatus: 'authenticated' });
         await get().initializeData();
@@ -227,13 +260,22 @@ export const useGameStore = create<GameState>((set, get) => ({
         headers: { 'Authorization': `Bearer ${token}` },
         cache: 'no-store' // * Prevent browser caching
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Failed to fetch characters:', errorData);
+      
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error('Failed to parse characters response:', e);
         set({ userCharacters: [] });
         return;
       }
-      const data = await res.json();
+
+      if (!res.ok) {
+        console.error('Failed to fetch characters:', data.error || 'Unknown error');
+        set({ userCharacters: [] });
+        return;
+      }
+      console.log('📥 Received characters:', data.map((c: any) => ({ name: c.name, skillsCount: c.activeSkills?.length || 0 })));
       set({ userCharacters: data || [] });
     } catch (e) {
       console.error('Failed to fetch characters:', e);
@@ -280,15 +322,67 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   selectCharacter: async (character) => {
     try {
+      const charWithSkills = character as any;
+      console.log('🎮 Selecting character:', character.name, 'activeSkills:', charWithSkills.activeSkills?.length || 0);
+      
+      // * Clear old cooldown tick interval if exists
+      const { cooldownTickInterval } = get();
+      if (cooldownTickInterval) {
+        clearInterval(cooldownTickInterval);
+      }
+      
       set({ 
-        character, 
-        inventory: (character as any).inventory,
+        character: {
+          ...character,
+          activeSkills: charWithSkills.activeSkills || []
+        }, 
+        inventory: charWithSkills.inventory,
         activeQuests: character.activeQuests || [],
         isLoading: true 
       });
+      
       // Initialize game data if needed
       await get().initializeData();
-      set({ isLoading: false });
+      
+      // * Start cooldown tick interval (every 1 minute = 60000ms)
+      const tickInterval = setInterval(async () => {
+        const { character: currentChar, token } = get();
+        
+        // * Check if in battle by checking combatStore
+        let inBattle = false;
+        try {
+          const { useCombatStore } = await import('./combatStore');
+          const combatState = useCombatStore.getState();
+          inBattle = !!combatState.battle;
+        } catch (e) {
+          // If combatStore not available, assume not in battle
+        }
+        
+        // * Only tick cooldowns if character exists and NOT in battle
+        if (currentChar && token && !inBattle) {
+          try {
+            const res = await fetch(`${API_BASE}/characters/${currentChar.id}/cooldown-tick`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+              const updatedChar = await res.json();
+              set({ 
+                character: {
+                  ...currentChar,
+                  activeSkills: updatedChar.activeSkills || (currentChar as any).activeSkills || []
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Failed to tick skill cooldowns:', error);
+          }
+        }
+      }, 60000); // Every 1 minute
+      
+      set({ cooldownTickInterval: tickInterval, isLoading: false });
+      console.log('✅ Character selected. Final activeSkills:', get().character?.activeSkills?.length || 0);
     } catch (error) {
       console.error('Failed to select character:', error);
       set({ isLoading: false });
@@ -314,6 +408,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           set({ 
             character: updatedChar,
             inventory: updatedChar.inventory,
+            activeQuests: updatedChar.activeQuests || [],
             userCharacters: data
           });
         }
@@ -564,9 +659,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       const updatedData = await res.json();
       
-      // * Sync state with server data
+      // * Sync state with server data, preserving skills if they are not in response
+      const mergedCharacter = {
+        ...updatedData,
+        activeSkills: updatedData.activeSkills || character.activeSkills || []
+      };
+
       set({ 
-        character: updatedData,
+        character: mergedCharacter,
         inventory: updatedData.inventory,
         activeQuests: updatedData.activeQuests,
         isSaving: false

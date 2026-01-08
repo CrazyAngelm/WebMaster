@@ -44,6 +44,16 @@ async function main() {
       parameter: 'accuracy',
       isNegative: false,
       description: 'Повышает точность на 50.'
+    },
+    {
+      id: 'effect-burn',
+      name: 'Горение',
+      type: 'PERIODIC_DAMAGE',
+      duration: 3,
+      value: 15,
+      parameter: null,
+      isNegative: true,
+      description: 'Наносит 15 магического урона каждый ход.'
     }
   ];
 

@@ -10,7 +10,7 @@ import {
 import { useGameStore } from './gameStore';
 import { useDiceStore } from './diceStore';
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 interface CombatState {
   battle: Battle | null;
@@ -25,6 +25,7 @@ interface CombatState {
     targetId: string,
     weaponId: string | null
   ) => Promise<void>;
+  useSkill: (participantId: string, skillId: string, targetId?: string) => Promise<void>;
   move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
@@ -84,6 +85,9 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       }
 
       set({ battle: result.battle, player: character });
+      
+      // * Refresh character to get latest cooldowns before battle
+      await useGameStore.getState().refreshCharacter();
     } catch (error) {
       console.error('Failed to initiate battle:', error);
       throw error;
@@ -111,21 +115,8 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       if (result.battle) {
         set({ battle: result.battle });
         
-        // * Sync local character stats even on turn change (passive effects might apply)
-        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
-        if (playerPart) {
-          const char = useGameStore.getState().character;
-          if (char) {
-            useGameStore.getState().setCharacter({
-              ...char,
-              stats: {
-                ...char.stats,
-                essence: { ...char.stats.essence, current: playerPart.currentHp },
-                protection: { ...char.stats.protection, current: playerPart.currentProtection }
-              }
-            });
-          }
-        }
+        // * Refresh character to get updated cooldowns and stats
+        await useGameStore.getState().refreshCharacter();
       }
     } catch (error) {
       console.error('Failed to advance turn:', error);
@@ -189,6 +180,50 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       }
     } catch (error) {
       console.error('Attack failed:', error);
+    }
+  },
+
+  useSkill: async (participantId, skillId, targetId) => {
+    const { battle } = get();
+    const { token } = useGameStore.getState();
+    if (!battle || !token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/battle/use-skill`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          battleId: battle.id,
+          participantId,
+          skillId,
+          targetId
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+
+      // * Trigger visual dice rolls if any
+      if (result.rolls && Array.isArray(result.rolls)) {
+        const { triggerRoll } = useDiceStore.getState();
+        await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
+      }
+
+      // * Update battle state
+      if (result.battle) {
+        set({ battle: result.battle });
+        
+        // * Sync local character stats and SKILLS
+        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+        if (playerPart) {
+          await useGameStore.getState().refreshCharacter();
+        }
+      }
+    } catch (error) {
+      console.error('Use skill failed:', error);
     }
   },
 

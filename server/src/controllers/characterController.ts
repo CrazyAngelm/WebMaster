@@ -12,23 +12,37 @@ export const getCharacters = async (req: Request, res: Response) => {
     const userId = req.userId;
     const characters = await prisma.character.findMany({
       where: { userId },
-      include: { inventory: true },
+      include: { 
+        inventory: true,
+        characterSkills: { include: { skillTemplate: true } }
+      } as any,
       orderBy: { createdAt: 'desc' }
     });
     
     // * Deserialize JSON strings back to objects for API response
-    const charactersWithParsedJson = characters.map(char => ({
-      ...char,
-      stats: JSON.parse(char.stats),
-      bonuses: JSON.parse(char.bonuses),
-      professions: JSON.parse(char.professions),
-      location: JSON.parse(char.location),
-      activeQuests: JSON.parse((char as any).activeQuests || '[]'),
-      inventory: (char as any).inventory ? {
-        ...(char as any).inventory,
-        items: JSON.parse((char as any).inventory.items)
-      } : null
-    }));
+    const charactersWithParsedJson = characters.map(char => {
+      const charData = char as any;
+      const skillsCount = charData.characterSkills?.length || 0;
+      console.log(`✅ API Response: Character ${charData.name} has ${skillsCount} skills in characterSkills`);
+      
+      const result = {
+        ...charData,
+        stats: JSON.parse(charData.stats),
+        bonuses: JSON.parse(charData.bonuses),
+        professions: JSON.parse(charData.professions),
+        location: JSON.parse(charData.location),
+        activeQuests: JSON.parse(charData.activeQuests || '[]'),
+        skills: JSON.parse(charData.skills || '[]'),
+        inventory: charData.inventory ? {
+          ...charData.inventory,
+          items: JSON.parse(charData.inventory.items)
+        } : null,
+        activeSkills: charData.characterSkills || []
+      };
+      
+      console.log(`📤 Sending activeSkills count: ${result.activeSkills.length}`);
+      return result;
+    });
     
     res.json(charactersWithParsedJson);
   } catch (error) {
@@ -89,6 +103,11 @@ export const createCharacter = async (req: Request, res: Response) => {
       }
     };
 
+    // * Get starter skills
+    const starterSkills = await (prisma as any).skillTemplate.findMany({
+      where: { isStarter: true }
+    });
+
     // * Serialize JSON objects to strings for SQLite
     const newCharacter = await prisma.character.create({
       data: {
@@ -107,9 +126,21 @@ export const createCharacter = async (req: Request, res: Response) => {
             baseSlots: defaults.inventory.baseSlots,
             items: JSON.stringify([]) // Start with empty inventory
           }
+        },
+        characterSkills: {
+          create: starterSkills.map((skill: any) => ({
+            skillTemplateId: skill.id,
+            currentCooldown: 0,
+            castTimeRemaining: null,
+            isItemSkill: false,
+            baseEssence: 0
+          }))
         }
       } as any,
-      include: { inventory: true }
+      include: { 
+        inventory: true,
+        characterSkills: { include: { skillTemplate: true } }
+      } as any
     });
 
     // * Deserialize for response to keep frontend consistent
@@ -120,10 +151,12 @@ export const createCharacter = async (req: Request, res: Response) => {
       professions: JSON.parse(newCharacter.professions),
       location: JSON.parse(newCharacter.location),
       activeQuests: JSON.parse((newCharacter as any).activeQuests || '[]'),
+      skills: JSON.parse((newCharacter as any).skills || '[]'),
       inventory: (newCharacter as any).inventory ? {
         ...(newCharacter as any).inventory,
         items: JSON.parse((newCharacter as any).inventory.items)
-      } : null
+      } : null,
+      activeSkills: (newCharacter as any).characterSkills || []
     };
 
     res.status(201).json(response);
@@ -281,12 +314,16 @@ export const updateCharacter = async (req: Request, res: Response) => {
     const updatedCharacter = await prisma.character.update({
       where: { id },
       data: updateData,
-      include: { inventory: true }
+      include: { 
+        inventory: true,
+        characterSkills: { include: { skillTemplate: true } }
+      } as any
     });
 
     console.log(`Character ${id} updated. Money in DB: ${updatedCharacter.money}`);
-    if (updatedCharacter.inventory) {
-      const items = JSON.parse(updatedCharacter.inventory.items);
+    const inventoryData = (updatedCharacter as any).inventory;
+    if (inventoryData) {
+      const items = JSON.parse(inventoryData.items);
       console.log(`Inventory in DB has ${items.length} items`);
     }
 
@@ -298,15 +335,76 @@ export const updateCharacter = async (req: Request, res: Response) => {
       professions: JSON.parse(updatedCharacter.professions),
       location: JSON.parse(updatedCharacter.location),
       activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
+      skills: JSON.parse((updatedCharacter as any).skills || '[]'),
       inventory: (updatedCharacter as any).inventory ? {
         ...(updatedCharacter as any).inventory,
         items: JSON.parse((updatedCharacter as any).inventory.items)
-      } : null
+      } : null,
+      activeSkills: (updatedCharacter as any).characterSkills || []
     };
 
     res.json(response);
   } catch (error) {
     console.error('Update character error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const tickSkillCooldowns = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    const { id } = req.params;
+
+    // * Check ownership
+    const character = await prisma.character.findUnique({ 
+      where: { id },
+      include: { characterSkills: true }
+    } as any);
+    
+    if (!character || character.userId !== userId) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    // * Decrement all cooldowns by 1 (minimum 0)
+    const skills = (character as any).characterSkills || [];
+    for (const skill of skills) {
+      if (skill.currentCooldown > 0) {
+        await (prisma as any).characterSkill.update({
+          where: { id: skill.id },
+          data: { currentCooldown: skill.currentCooldown - 1 }
+        });
+      }
+    }
+
+    // * Fetch updated character with skills
+    const updatedCharacter = await prisma.character.findUnique({
+      where: { id },
+      include: { 
+        inventory: true,
+        characterSkills: { include: { skillTemplate: true } }
+      } as any
+    });
+
+    // * Deserialize for response
+    const response = {
+      ...updatedCharacter,
+      stats: JSON.parse(updatedCharacter!.stats),
+      bonuses: JSON.parse(updatedCharacter!.bonuses),
+      professions: JSON.parse(updatedCharacter!.professions),
+      location: JSON.parse(updatedCharacter!.location),
+      activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
+      skills: JSON.parse((updatedCharacter as any).skills || '[]'),
+      inventory: (updatedCharacter as any).inventory ? {
+        ...(updatedCharacter as any).inventory,
+        items: JSON.parse((updatedCharacter as any).inventory.items)
+      } : null,
+      activeSkills: (updatedCharacter as any).characterSkills || []
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Tick cooldowns error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

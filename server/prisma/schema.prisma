@@ -43,8 +43,10 @@ model Character {
   activeQuests  String    @default("[]") // Quest[] (JSON string)
   lastTrainTime Float?    // * Track last training time (in server time hours, float for sub-hour precision)
   lastRestTime  Float?    // * Track last rest time (in server time hours, float for sub-hour precision)
+  skills        String    @default("[]") // UUID[] (JSON string) - CharacterSkill IDs for quick access
   
   inventory     Inventory?
+  characterSkills CharacterSkill[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -201,6 +203,38 @@ model EffectTemplate {
   parameter       String? // which stat it affects
   isNegative      Boolean @default(false)
   description     String?
+}
+
+model SkillTemplate {
+  id              String  @id
+  name            String
+  description     String
+  rarity          String  // Rarity enum
+  castTime        Int     // Turns to prepare (1-2+)
+  cooldown        Int     // Turns before reuse
+  targetType      String  // 'SELF' | 'TARGET' | 'AREA'
+  distance        String? // JSON: { minRange, maxRange } or legacy string
+  penetration     String? // PenetrationType enum
+  alwaysPenetrates Boolean @default(false)
+  effects         String? // UUID[] (JSON string)
+  isCombat        Boolean @default(true)
+  isStarter       Boolean @default(false)
+  
+  characterSkills CharacterSkill[]
+}
+
+model CharacterSkill {
+  id                String   @id @default(uuid())
+  characterId       String
+  character         Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  skillTemplateId   String
+  skillTemplate     SkillTemplate @relation(fields: [skillTemplateId], references: [id])
+  currentCooldown  Int      @default(0)
+  castTimeRemaining Int?     // null if not casting
+  isItemSkill       Boolean  @default(false)
+  baseEssence       Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model Battle {

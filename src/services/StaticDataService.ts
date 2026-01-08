@@ -32,6 +32,7 @@ interface StaticDataBundle {
   speeds: Speed[];
   events: GameEvent[];
   effectTemplates: any[];
+  skillTemplates: any[];
   configs: Record<string, any>;
 }
 
@@ -49,10 +50,11 @@ let data: StaticDataBundle = {
   speeds: [],
   events: [],
   effectTemplates: [],
+  skillTemplates: [],
   configs: {}
 };
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 export const StaticDataService = {
   async init(): Promise<void> {
@@ -100,6 +102,14 @@ export const StaticDataService = {
 
   getEffectTemplate(id: UUID): any | undefined {
     return data.effectTemplates.find(e => e.id === id);
+  },
+
+  getSkillTemplate(id: UUID): any | undefined {
+    return data.skillTemplates.find(s => s.id === id);
+  },
+
+  getAllSkillTemplates(): any[] {
+    return data.skillTemplates;
   },
 
   // Items
