@@ -123,6 +123,7 @@ export const startBattle = async (req: Request, res: Response) => {
         maxHp: playerStats.essence.max,
         maxProtection: playerStats.protection.max,
         isPlayer: true,
+        distance: -25, // Updated spawn distance
         bonuses: playerChar.bonuses // Store bonuses at start of combat
       },
       {
@@ -135,6 +136,7 @@ export const startBattle = async (req: Request, res: Response) => {
         maxHp: enemyHp,
         maxProtection: enemyProtection,
         isPlayer: false,
+        distance: 25, // Updated spawn distance, total 50m
         bonuses: JSON.stringify({ accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 }) // Monsters currently have no bonuses
       }
     ].sort((a, b) => b.initiative - a.initiative);
@@ -156,6 +158,7 @@ export const startBattle = async (req: Request, res: Response) => {
             maxHp: p.maxHp,
             maxProtection: p.maxProtection,
             isPlayer: p.isPlayer,
+            distance: p.distance,
             bonuses: p.bonuses
           }))
         }
@@ -170,6 +173,200 @@ export const startBattle = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Start battle error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const move = async (req: Request, res: Response) => {
+  try {
+    const { battleId, participantId, direction, targetDistance } = req.body; // direction: 'left' | 'right' | 'towards' | 'away'
+
+    const battle = await prisma.battle.findUnique({
+      where: { id: battleId },
+      include: { participants: true }
+    });
+
+    if (!battle || battle.status === BattleStatus.FINISHED) {
+      return res.status(404).json({ error: 'Battle not found or finished' });
+    }
+
+    const participant = battle.participants.find(p => p.id === participantId);
+    if (!participant) return res.status(404).json({ error: 'Participant not found' });
+
+    // * Check turn
+    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+      return res.status(400).json({ error: "It's not your turn" });
+    }
+
+    // * Check actions
+    if (participant.mainActions <= 0) {
+      return res.status(400).json({ error: 'No main actions left for movement' });
+    }
+
+    // * Get movement distance based on speed
+    let maxMoveDistance = 5; 
+    let speedId = 'speed-ordinary';
+
+    if (participant.characterId) {
+      const char = await prisma.character.findUnique({ where: { id: participant.characterId } });
+      if (char) {
+        const stats = JSON.parse(char.stats);
+        speedId = stats.speedId;
+      }
+    } else if (participant.monsterTemplateId) {
+      const monster = await prisma.monsterTemplate.findUnique({ where: { id: participant.monsterTemplateId } });
+      if (monster) {
+        speedId = monster.speedId;
+      }
+    }
+
+    const speed = await prisma.speed.findUnique({ where: { id: speedId } });
+    if (speed) maxMoveDistance = speed.distancePerAction;
+
+    const oldDistance = participant.distance;
+    let delta = 0;
+    let newDistance = oldDistance;
+    const MIN_COMBAT_DISTANCE = 1.5; // Minimum distance between combatants (meters)
+
+    if (typeof targetDistance === 'number') {
+      // * Partial movement / Click-to-move
+      const requestedDelta = targetDistance - oldDistance;
+      delta = Math.sign(requestedDelta) * Math.min(Math.abs(requestedDelta), maxMoveDistance);
+      newDistance = oldDistance + delta;
+    } else {
+      // * Legacy direction-based movement
+      const enemies = battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+      const nearestEnemy = enemies.length > 0 
+        ? enemies.reduce((prev, curr) => Math.abs(curr.distance - oldDistance) < Math.abs(prev.distance - oldDistance) ? curr : prev)
+        : null;
+
+      if (direction === 'left') delta = -maxMoveDistance;
+      else if (direction === 'right') delta = maxMoveDistance;
+      else if (direction === 'towards' && nearestEnemy) {
+        const dist = nearestEnemy.distance - oldDistance;
+        const rawDelta = Math.sign(dist) * Math.min(Math.abs(dist), maxMoveDistance);
+        // * Prevent moving too close (maintain minimum combat distance)
+        const finalDist = Math.abs(oldDistance + rawDelta - nearestEnemy.distance);
+        if (finalDist < MIN_COMBAT_DISTANCE) {
+          // Move to exactly MIN_COMBAT_DISTANCE away
+          delta = Math.sign(dist) * Math.max(0, Math.abs(dist) - MIN_COMBAT_DISTANCE);
+        } else {
+          delta = rawDelta;
+        }
+      } else if (direction === 'away' && nearestEnemy) {
+        const dist = nearestEnemy.distance - oldDistance;
+        delta = -Math.sign(dist) * maxMoveDistance;
+      }
+
+      newDistance = oldDistance + delta;
+    }
+
+    // * Final check: ensure we don't violate minimum distance with any enemy
+    const allEnemies = battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+    for (const enemy of allEnemies) {
+      const finalDist = Math.abs(newDistance - enemy.distance);
+      if (finalDist < MIN_COMBAT_DISTANCE) {
+        // Adjust to maintain minimum distance
+        if (newDistance > enemy.distance) {
+          newDistance = enemy.distance + MIN_COMBAT_DISTANCE;
+        } else {
+          newDistance = enemy.distance - MIN_COMBAT_DISTANCE;
+        }
+        break; // Only adjust for first enemy found (should be nearest)
+      }
+    }
+
+    const log: string[] = [];
+    const diceLogs: string[] = [];
+    let isDead = false;
+
+    // * Check for Attacks of Opportunity
+    for (const enemy of battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0)) {
+      const distOld = Math.abs(oldDistance - enemy.distance);
+      const distNew = Math.abs(newDistance - enemy.distance);
+
+      if (distOld <= 5 && distNew > distOld) {
+        log.push(`Внеочередная атака! ${enemy.name} атакует ${participant.name}, пока тот отступает!`);
+        const aooResult = CombatEngine.resolveAttack(
+          enemy as any,
+          5, 
+          PenetrationType.NONE,
+          { minRange: 0, maxRange: 5 },
+          participant as any,
+          0, 
+          undefined
+        );
+        
+        diceLogs.push(...aooResult.diceLogs);
+        log.push(`${enemy.name}: ${aooResult.log}`);
+        
+        participant.currentHp = Math.max(0, participant.currentHp - aooResult.damageDealt);
+        if (participant.currentHp <= 0) {
+          log.push(`${participant.name} повержен при попытке отступления!`);
+          isDead = true;
+          break; 
+        }
+      }
+    }
+
+    // * Update participant in DB
+    const updatedParticipant = await prisma.battleParticipant.update({
+      where: { id: participant.id },
+      data: {
+        distance: newDistance,
+        currentHp: participant.currentHp,
+        mainActions: participant.mainActions - 1 
+      }
+    });
+
+    await syncParticipantToCharacter(updatedParticipant);
+
+    // * Update log
+    const currentLog = JSON.parse(battle.log);
+    let movementMessage = `${participant.name} переместился на ${Math.abs(delta)}м`;
+    if (direction === 'left') movementMessage += ' влево';
+    else if (direction === 'right') movementMessage += ' вправо';
+    else if (direction === 'towards') movementMessage += ' к противнику';
+    else if (direction === 'away') movementMessage += ' от противника';
+    else if (delta > 0) movementMessage += ' вправо';
+    else if (delta < 0) movementMessage += ' влево';
+    movementMessage += '.';
+    const updatedLog = [...currentLog, ...diceLogs, ...log, movementMessage];
+
+    if (isDead) {
+      await prisma.battle.update({
+        where: { id: battle.id },
+        data: {
+          status: BattleStatus.FINISHED,
+          log: JSON.stringify(updatedLog)
+        }
+      });
+      
+      if (participant.characterId) {
+        await prisma.character.update({
+          where: { id: participant.characterId },
+          data: { isDead: true }
+        });
+      }
+    } else {
+      await prisma.battle.update({
+        where: { id: battle.id },
+        data: { log: JSON.stringify(updatedLog) }
+      });
+    }
+
+    const updatedBattle = await prisma.battle.findUnique({
+      where: { id: battle.id },
+      include: { participants: true }
+    });
+
+    res.json({
+      battle: updatedBattle ? { ...updatedBattle, log: JSON.parse(updatedBattle.log) } : undefined,
+      message: 'Movement complete'
+    });
+
+  } catch (error) {
+    console.error('Move error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -208,6 +405,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     // * Fetch weapon/armor info
     let weaponEssence = 5;
     let weaponPen: PenetrationType = PenetrationType.NONE;
+    let weaponRange = { minRange: 0, maxRange: 5 }; // Default unarmed/melee
     let weaponTemplate: any = null;
     let equippedWeapon: any = null;
 
@@ -223,6 +421,22 @@ export const resolveAttack = async (req: Request, res: Response) => {
           weaponEssence = equippedWeapon.currentEssence;
           weaponTemplate = await prisma.itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
           weaponPen = (weaponTemplate?.penetration as PenetrationType) || PenetrationType.NONE;
+          
+          // * Parse range
+          if (weaponTemplate?.distance) {
+            try {
+              const rangeData = JSON.parse(weaponTemplate.distance);
+              weaponRange = { minRange: rangeData.minRange, maxRange: rangeData.maxRange };
+            } catch (e) {
+              // Handle legacy string categories
+              switch (weaponTemplate.distance) {
+                case 'MEDIUM': weaponRange = { minRange: 5, maxRange: 20 }; break;
+                case 'FAR': weaponRange = { minRange: 20, maxRange: 50 }; break;
+                case 'SNIPER': weaponRange = { minRange: 50, maxRange: 200 }; break;
+                default: weaponRange = { minRange: 0, maxRange: 5 }; // CLOSE/MELEE
+              }
+            }
+          }
         }
       }
     }
@@ -259,6 +473,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
       attackerCopy as any,
       weaponEssence,
       weaponPen,
+      weaponRange,
       targetCopy as any,
       armorIgnore,
       armorCat,

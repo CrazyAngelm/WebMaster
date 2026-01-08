@@ -28,6 +28,7 @@ export class CombatEngine {
     attacker: BattleParticipant,
     attackerWeaponEssence: number,
     attackerWeaponPen: PenetrationType | undefined,
+    attackerWeaponRange: { minRange: number; maxRange: number } | undefined,
     defender: BattleParticipant,
     defenderArmorIgnore: number,
     defenderArmorPenetration: ArmorCategory | undefined,
@@ -37,6 +38,20 @@ export class CombatEngine {
     defenderEvasionPenalty: number = 0
   ): { hit: boolean; damageDealt: number; log: string; diceLogs: string[]; rolls: RollResult[] } {
     
+    // * 0. Distance Check
+    if (attackerWeaponRange) {
+      const distance = Math.abs(attacker.distance - defender.distance);
+      if (distance < attackerWeaponRange.minRange || distance > attackerWeaponRange.maxRange) {
+        return { 
+          hit: false, 
+          damageDealt: 0, 
+          log: `Цель вне досягаемости! (Дистанция: ${distance.toFixed(1)}м, Требуется: ${attackerWeaponRange.minRange}-${attackerWeaponRange.maxRange}м)`, 
+          diceLogs: [], 
+          rolls: [] 
+        };
+      }
+    }
+
     // * 1. Hit Check
     const attackerBonusesParsed: CharacterBonuses = attacker.bonuses ? JSON.parse(attacker.bonuses) : { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
     

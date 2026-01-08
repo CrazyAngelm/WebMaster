@@ -120,6 +120,7 @@ model MonsterTemplate {
   name         String
   rankOrder    Int
   baseEssence  Int
+  speedId      String  @default("speed-ordinary")
   description  String?
   skills       String  // UUID[] (JSON string)
   lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
@@ -217,5 +218,6 @@ model BattleParticipant {
   mainActions       Int       @default(1)
   bonusActions      Int       @default(1)
   isPlayer          Boolean   @default(false)
+  distance          Float     @default(0.0)
   bonuses           String?   // CharacterBonuses (JSON string)
 }

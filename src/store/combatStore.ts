@@ -25,6 +25,7 @@ interface CombatState {
     targetId: string,
     weaponId: string | null
   ) => Promise<void>;
+  move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
   checkActiveBattle: (characterId: string) => Promise<boolean>;
@@ -186,6 +187,53 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       }
     } catch (error) {
       console.error('Attack failed:', error);
+    }
+  },
+
+  move: async (participantId, direction, targetDistance) => {
+    const { battle } = get();
+    const { token } = useGameStore.getState();
+    if (!battle || !token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/battle/move`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          battleId: battle.id,
+          participantId,
+          direction,
+          targetDistance
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      
+      if (result.battle) {
+        set({ battle: result.battle });
+        
+        // Sync local character stats (in case of AoO damage)
+        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+        if (playerPart) {
+          const char = useGameStore.getState().character;
+          if (char) {
+            useGameStore.getState().setCharacter({
+              ...char,
+              stats: {
+                ...char.stats,
+                essence: { ...char.stats.essence, current: playerPart.currentHp },
+                protection: { ...char.stats.protection, current: playerPart.currentProtection }
+              }
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Move failed:', error);
     }
   },
 

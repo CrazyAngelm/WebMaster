@@ -612,6 +612,7 @@ async function main() {
       name: 'Wolf',
       rankOrder: 1,
       baseEssence: 100,
+      speedId: 'speed-fast', // Increased speed
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
         { templateId: 'mat-wolf-heart', chance: 0.3, minQuantity: 1, maxQuantity: 1 }
@@ -622,6 +623,7 @@ async function main() {
       name: 'Boar',
       rankOrder: 1,
       baseEssence: 120,
+      speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -630,6 +632,7 @@ async function main() {
       name: 'Orc',
       rankOrder: 2,
       baseEssence: 450,
+      speedId: 'speed-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
         { templateId: 'mat-iron-ore', chance: 0.1, minQuantity: 1, maxQuantity: 2 }
@@ -640,6 +643,7 @@ async function main() {
       name: 'Vampire',
       rankOrder: 3,
       baseEssence: 800,
+      speedId: 'speed-very-fast',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -648,6 +652,7 @@ async function main() {
       name: 'Lich',
       rankOrder: 4,
       baseEssence: 1100,
+      speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -656,6 +661,7 @@ async function main() {
       name: 'Death Knight',
       rankOrder: 5,
       baseEssence: 1400,
+      speedId: 'speed-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -664,6 +670,7 @@ async function main() {
       name: 'Elder Dragon',
       rankOrder: 6,
       baseEssence: 1800,
+      speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -672,6 +679,7 @@ async function main() {
       name: 'Abyssal Horror',
       rankOrder: 7,
       baseEssence: 2300,
+      speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     },
@@ -680,6 +688,7 @@ async function main() {
       name: 'World Eater',
       rankOrder: 8,
       baseEssence: 2800,
+      speedId: 'speed-very-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([])
     }

@@ -387,6 +387,7 @@ export interface BattleParticipant {
   mainActions: number;
   bonusActions: number;
   isPlayer: boolean;
+  distance: number;
 }
 
 export interface Effect {
