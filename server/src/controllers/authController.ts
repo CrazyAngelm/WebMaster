@@ -22,6 +22,10 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
+    // * Validate role - must be one of the allowed roles
+    const allowedRoles = ['USER', 'ADMIN', 'OWNER'];
+    const userRole = role && allowedRoles.includes(role) ? role : 'USER';
+
     const existingUser = await prisma.user.findUnique({ where: { login } });
     if (existingUser) {
       return res.status(400).json({ error: 'Login already taken' });
@@ -32,7 +36,7 @@ export const register = async (req: Request, res: Response) => {
       data: {
         login,
         passwordHash,
-        role: 'USER', // Always register as USER. Admin/Owner roles must be assigned manually.
+        role: userRole,
       },
     });
 

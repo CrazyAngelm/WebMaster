@@ -23,7 +23,9 @@ CREATE TABLE "Character" (
     "location" TEXT NOT NULL,
     "isDead" BOOLEAN NOT NULL DEFAULT false,
     "money" INTEGER NOT NULL DEFAULT 0,
-    "lastTrainTime" INTEGER,
+    "activeQuests" TEXT NOT NULL DEFAULT '[]',
+    "lastTrainTime" REAL,
+    "lastRestTime" REAL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "Character_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -80,6 +82,10 @@ CREATE TABLE "ItemTemplate" (
     "hitPenalty" INTEGER,
     "evasionPenalty" INTEGER,
     "speedPenalty" INTEGER,
+    "accuracyBonus" INTEGER DEFAULT 0,
+    "evasionBonus" INTEGER DEFAULT 0,
+    "initiativeBonus" INTEGER DEFAULT 0,
+    "resistanceBonus" INTEGER DEFAULT 0,
     "slotCount" INTEGER,
     "effects" TEXT,
     "description" TEXT,
@@ -179,6 +185,36 @@ CREATE TABLE "GameEvent" (
 CREATE TABLE "GameConfig" (
     "key" TEXT NOT NULL PRIMARY KEY,
     "value" TEXT NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "Battle" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "locationId" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "currentTurnIndex" INTEGER NOT NULL DEFAULT 0,
+    "log" TEXT NOT NULL DEFAULT '[]',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "BattleParticipant" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "battleId" TEXT NOT NULL,
+    "characterId" TEXT,
+    "monsterTemplateId" TEXT,
+    "name" TEXT NOT NULL,
+    "initiative" INTEGER NOT NULL,
+    "currentHp" INTEGER NOT NULL,
+    "currentProtection" INTEGER NOT NULL,
+    "maxHp" INTEGER NOT NULL,
+    "maxProtection" INTEGER NOT NULL,
+    "mainActions" INTEGER NOT NULL DEFAULT 1,
+    "bonusActions" INTEGER NOT NULL DEFAULT 1,
+    "isPlayer" BOOLEAN NOT NULL DEFAULT false,
+    "bonuses" TEXT,
+    CONSTRAINT "BattleParticipant_battleId_fkey" FOREIGN KEY ("battleId") REFERENCES "Battle" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex

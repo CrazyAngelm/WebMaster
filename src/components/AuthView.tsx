@@ -10,6 +10,7 @@ export const AuthView: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'USER' | 'ADMIN' | 'OWNER'>('USER');
   const [error, setError] = useState('');
   
   const { login: loginAction, register: registerAction } = useGameStore();
@@ -22,7 +23,7 @@ export const AuthView: React.FC = () => {
       if (isLogin) {
         await loginAction(login, password);
       } else {
-        await registerAction(login, password);
+        await registerAction(login, password, role);
       }
     } catch (err: any) {
       setError(err.message || 'Произошла ошибка');
@@ -60,6 +61,21 @@ export const AuthView: React.FC = () => {
               required
             />
           </div>
+          
+          {!isLogin && (
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Роль</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'USER' | 'ADMIN' | 'OWNER')}
+                className="w-full bg-fantasy-dark border border-fantasy-border p-2 text-white focus:border-fantasy-accent outline-none"
+              >
+                <option value="USER">Игрок</option>
+                <option value="ADMIN">Админ</option>
+                <option value="OWNER">Владелец</option>
+              </select>
+            </div>
+          )}
           
           {error && (
             <div className="text-red-500 text-xs italic text-center bg-red-950/20 py-2 rounded border border-red-900/30">
