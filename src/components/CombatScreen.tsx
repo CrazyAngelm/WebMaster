@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
-import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair } from 'lucide-react';
+import { StaticDataService } from '../services/StaticDataService';
+import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair, X } from 'lucide-react';
 import { clsx } from 'clsx';
-import { BattleStatus } from '../types/game';
+import { BattleStatus, CharacterSkill } from '../types/game';
 
 export const CombatScreen: React.FC = () => {
   const { 
@@ -14,9 +15,13 @@ export const CombatScreen: React.FC = () => {
     move,
     nextTurn, 
     initiateBattle, 
-    endBattle 
+    endBattle,
+    useSkill
   } = useCombatStore();
   const { character, inventory, itemTemplates, setCharacter } = useGameStore();
+  const [showSkillsPanel, setShowSkillsPanel] = useState(false);
+  const [skillError, setSkillError] = useState<string | null>(null);
+  const [selectedSkillForTarget, setSelectedSkillForTarget] = useState<string | null>(null);
 
   // * Auto-handle enemy turns
   useEffect(() => {
@@ -94,6 +99,84 @@ export const CombatScreen: React.FC = () => {
     if (!currentParticipant || !isPlayerTurn) return;
 
     await move(currentParticipant.id, direction, targetDistance);
+  };
+
+  // * Get available targets for a skill
+  const getAvailableTargets = (skillTemplate: any) => {
+    if (!battle || !playerParticipant || skillTemplate.targetType !== 'TARGET') {
+      return [];
+    }
+
+    const availableTargets: typeof battle.participants = [];
+    
+    // * Parse skill range
+    let skillRange = { minRange: 0, maxRange: 999 };
+    if (skillTemplate.distance) {
+      try {
+        const parsed = JSON.parse(skillTemplate.distance);
+        skillRange = { minRange: parsed.minRange || 0, maxRange: parsed.maxRange || 999 };
+      } catch {
+        // Legacy string categories
+        switch (skillTemplate.distance) {
+          case 'CLOSE': skillRange = { minRange: 0, maxRange: 5 }; break;
+          case 'MEDIUM': skillRange = { minRange: 5, maxRange: 20 }; break;
+          case 'FAR': skillRange = { minRange: 20, maxRange: 50 }; break;
+          case 'SNIPER': skillRange = { minRange: 50, maxRange: 200 }; break;
+          default: skillRange = { minRange: 0, maxRange: 999 };
+        }
+      }
+    }
+
+    // * Check all participants
+    for (const participant of battle.participants) {
+      if (participant.id === playerParticipant.id || participant.currentHp <= 0) continue;
+      
+      const distance = Math.abs(playerParticipant.distance - participant.distance);
+      if (distance >= skillRange.minRange && distance <= skillRange.maxRange) {
+        availableTargets.push(participant);
+      }
+    }
+
+    return availableTargets;
+  };
+
+  const handleUseSkill = async (skillId: string, targetId?: string) => {
+    if (!battle || !character) return;
+    
+    const currentParticipant = battle.participants[battle.currentTurnIndex];
+    if (!currentParticipant || currentParticipant.characterId !== character.id) return;
+
+    const skill = character.activeSkills?.find(s => s.id === skillId);
+    if (!skill) return;
+
+    const skillTemplate = StaticDataService.getSkillTemplate(skill.skillTemplateId);
+    if (!skillTemplate) return;
+
+    // * Determine target based on skill type
+    let target: string | undefined = targetId;
+    if (skillTemplate.targetType === 'TARGET') {
+      if (!targetId) {
+        // * Should not happen - target should be selected already
+        setSkillError('Необходимо выбрать цель');
+        return;
+      }
+      target = targetId;
+    } else if (skillTemplate.targetType === 'SELF') {
+      target = currentParticipant.id;
+    }
+
+    setSkillError(null);
+    setSelectedSkillForTarget(null);
+    try {
+      await useSkill(currentParticipant.id, skillId, target);
+      setShowSkillsPanel(false);
+      setSelectedSkillForTarget(null);
+    } catch (error) {
+      // * Show error to user - action was not consumed
+      setSkillError(error instanceof Error ? error.message : 'Не удалось применить способность');
+      // * Don't close panel on error so user can try again
+      // * Keep target selection open if it was open
+    }
   };
 
   if (!battle || !battle.participants || battle.participants.length === 0) {
@@ -400,10 +483,14 @@ export const CombatScreen: React.FC = () => {
               </button>
               
               <button 
-                disabled={!isPlayerTurn || playerParticipant?.mainActions === 0} 
-                className={clsx("fantasy-button flex items-center gap-2 opacity-30 cursor-not-allowed")}
+                disabled={!isPlayerTurn || playerParticipant?.mainActions === 0 || !character?.activeSkills || character.activeSkills.length === 0} 
+                onClick={() => setShowSkillsPanel(true)}
+                className={clsx(
+                  "fantasy-button flex items-center gap-2", 
+                  (!isPlayerTurn || playerParticipant?.mainActions === 0 || !character?.activeSkills || character.activeSkills.length === 0) && "opacity-30 cursor-not-allowed"
+                )}
               >
-                <Zap size={18} /> Умение
+                <Zap size={18} /> Умение {character?.activeSkills && character.activeSkills.length > 0 && `(${character.activeSkills.length})`}
               </button>
             </div>
 
@@ -528,6 +615,224 @@ export const CombatScreen: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* Skills Panel Modal */}
+      {showSkillsPanel && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-fantasy-surface border-2 border-fantasy-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-fantasy-border">
+              <h2 className="text-xl font-serif text-fantasy-accent uppercase tracking-wider flex items-center gap-2">
+                <Zap size={20} /> Панель умений
+              </h2>
+              <button
+                onClick={() => {
+                  setShowSkillsPanel(false);
+                  setSkillError(null);
+                  setSelectedSkillForTarget(null);
+                }}
+                className="p-2 hover:bg-white/10 rounded transition-colors"
+              >
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {skillError && (
+              <div className="mx-4 mt-4 p-3 bg-red-500/20 border border-red-500 rounded text-sm text-red-400">
+                {skillError}
+              </div>
+            )}
+
+            {/* Skills List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {character?.activeSkills && character.activeSkills.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {character.activeSkills.map((skill: CharacterSkill) => {
+                    const skillTemplate = StaticDataService.getSkillTemplate(skill.skillTemplateId);
+                    if (!skillTemplate) return null;
+
+                    const availableTargets = skillTemplate.targetType === 'TARGET' ? getAvailableTargets(skillTemplate) : [];
+                    const hasAvailableTarget = skillTemplate.targetType !== 'TARGET' || availableTargets.length > 0;
+                    const singleTarget = availableTargets.length === 1;
+
+                    const canUse = isPlayerTurn && 
+                                   playerParticipant?.mainActions! > 0 && 
+                                   skill.currentCooldown === 0 && 
+                                   (skillTemplate.castTime === 0 || (skill.castTimeRemaining !== null && skill.castTimeRemaining === 0)) &&
+                                   hasAvailableTarget;
+                    
+                    const isCasting = skill.castTimeRemaining !== null && skill.castTimeRemaining !== undefined && skill.castTimeRemaining > 0;
+                    const isTargetSelectionMode = selectedSkillForTarget === skill.id && availableTargets.length > 1;
+
+                    return (
+                      <div
+                        key={skill.id}
+                        className={clsx(
+                          "border rounded-lg p-4 transition-all",
+                          canUse && !isTargetSelectionMode
+                            ? "border-fantasy-accent bg-fantasy-accent/10 hover:bg-fantasy-accent/20 cursor-pointer" 
+                            : isTargetSelectionMode
+                            ? "border-blue-500 bg-blue-500/10"
+                            : "border-fantasy-border/30 bg-black/20 opacity-60 cursor-not-allowed"
+                        )}
+                        onClick={() => {
+                          if (canUse && !isTargetSelectionMode) {
+                            if (skillTemplate.targetType === 'TARGET') {
+                              if (singleTarget) {
+                                // * Auto-select single target
+                                handleUseSkill(skill.id, availableTargets[0].id);
+                              } else if (availableTargets.length > 1) {
+                                // * Show target selection
+                                setSelectedSkillForTarget(skill.id);
+                              } else {
+                                // * No targets available (should not happen due to canUse check)
+                                setSkillError('Нет доступных целей');
+                              }
+                            } else {
+                              handleUseSkill(skill.id);
+                            }
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-serif text-fantasy-accent uppercase text-sm">
+                                {skillTemplate.name}
+                              </h3>
+                              {skillTemplate.rarity && (
+                                <span className={clsx(
+                                  "text-[10px] px-2 py-0.5 rounded uppercase font-bold",
+                                  skillTemplate.rarity === 'COMMON' && "bg-gray-600 text-gray-300",
+                                  skillTemplate.rarity === 'RARE' && "bg-blue-600 text-blue-200",
+                                  skillTemplate.rarity === 'EPIC' && "bg-purple-600 text-purple-200",
+                                  skillTemplate.rarity === 'MYTHIC' && "bg-pink-600 text-pink-200",
+                                  skillTemplate.rarity === 'LEGENDARY' && "bg-orange-600 text-orange-200",
+                                  skillTemplate.rarity === 'DIVINE' && "bg-yellow-600 text-yellow-200"
+                                )}>
+                                  {skillTemplate.rarity}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 mb-2">{skillTemplate.description}</p>
+                            
+                            <div className="flex flex-wrap gap-3 text-[10px] text-gray-500">
+                              <span>Цель: {skillTemplate.targetType === 'SELF' ? 'Себя' : skillTemplate.targetType === 'TARGET' ? 'Цель' : 'Область'}</span>
+                              {skillTemplate.targetType === 'TARGET' && skillTemplate.distance && (() => {
+                                let range = 'Дальность: Любая';
+                                try {
+                                  const parsed = JSON.parse(skillTemplate.distance);
+                                  range = `Дальность: ${parsed.minRange || 0}-${parsed.maxRange || 999}м`;
+                                } catch {
+                                  switch (skillTemplate.distance) {
+                                    case 'CLOSE': range = 'Дальность: 0-5м'; break;
+                                    case 'MEDIUM': range = 'Дальность: 5-20м'; break;
+                                    case 'FAR': range = 'Дальность: 20-50м'; break;
+                                    case 'SNIPER': range = 'Дальность: 50-200м'; break;
+                                  }
+                                }
+                                return <span>{range}</span>;
+                              })()}
+                              {skillTemplate.castTime > 0 && (
+                                <span>Время подготовки: {skillTemplate.castTime} ход(ов)</span>
+                              )}
+                              {skillTemplate.cooldown > 0 && (
+                                <span>Перезарядка: {skillTemplate.cooldown} ход(ов)</span>
+                              )}
+                              {skillTemplate.targetType === 'TARGET' && (
+                                <span className={clsx(
+                                  availableTargets.length > 0 ? "text-green-400" : "text-red-400"
+                                )}>
+                                  Доступных целей: {availableTargets.length}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Status indicators */}
+                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-fantasy-border/30">
+                          {skill.currentCooldown > 0 && (
+                            <div className="px-2 py-1 bg-red-500/20 border border-red-500 rounded text-[10px] text-red-400 font-bold">
+                              Перезарядка: {skill.currentCooldown}
+                            </div>
+                          )}
+                          {isCasting && skill.castTimeRemaining !== null && skill.castTimeRemaining !== undefined && (
+                            <div className="px-2 py-1 bg-blue-500/20 border border-blue-500 rounded text-[10px] text-blue-400 font-bold">
+                              Применяется: {skill.castTimeRemaining}/{skillTemplate.castTime}
+                            </div>
+                          )}
+                          {canUse && !isCasting && (
+                            <div className="px-2 py-1 bg-green-500/20 border border-green-500 rounded text-[10px] text-green-400 font-bold">
+                              Готово к использованию
+                            </div>
+                          )}
+                          {!canUse && skill.currentCooldown === 0 && !isCasting && (
+                            <div className="px-2 py-1 bg-gray-500/20 border border-gray-500 rounded text-[10px] text-gray-400 font-bold">
+                              {skillTemplate.targetType === 'TARGET' && availableTargets.length === 0 
+                                ? 'Нет доступных целей' 
+                                : 'Недоступно'}
+                            </div>
+                          )}
+                          {skillTemplate.targetType === 'TARGET' && availableTargets.length > 1 && canUse && !isTargetSelectionMode && (
+                            <div className="px-2 py-1 bg-yellow-500/20 border border-yellow-500 rounded text-[10px] text-yellow-400 font-bold">
+                              Выберите цель ({availableTargets.length})
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Target Selection UI */}
+                        {isTargetSelectionMode && availableTargets.length > 1 && (
+                          <div className="mt-3 pt-3 border-t border-fantasy-border/30">
+                            <div className="text-xs text-gray-400 mb-2 uppercase font-bold">Выберите цель:</div>
+                            <div className="flex flex-wrap gap-2">
+                              {availableTargets.map((target) => (
+                                <button
+                                  key={target.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUseSkill(skill.id, target.id);
+                                  }}
+                                  className={clsx(
+                                    "px-3 py-2 rounded border transition-colors text-xs font-bold uppercase",
+                                    target.isPlayer
+                                      ? "border-fantasy-accent bg-fantasy-accent/20 text-fantasy-accent hover:bg-fantasy-accent/30"
+                                      : "border-fantasy-blood bg-fantasy-blood/20 text-fantasy-blood hover:bg-fantasy-blood/30"
+                                  )}
+                                >
+                                  {target.isPlayer ? '👤' : '💀'} {target.name}
+                                  <div className="text-[10px] opacity-70 mt-1">
+                                    {Math.abs((playerParticipant?.distance || 0) - target.distance).toFixed(1)}м
+                                  </div>
+                                </button>
+                              ))}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSkillForTarget(null);
+                                }}
+                                className="px-3 py-2 rounded border border-fantasy-border/30 bg-black/20 text-gray-400 hover:bg-black/40 text-xs font-bold uppercase"
+                              >
+                                Отмена
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Zap size={48} className="mx-auto mb-4 opacity-30" />
+                  <p className="text-sm uppercase tracking-wider">Нет доступных умений</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

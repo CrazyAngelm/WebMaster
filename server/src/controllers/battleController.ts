@@ -993,7 +993,18 @@ export const useSkill = async (req: Request, res: Response) => {
       skillLogs.push(...result.diceLogs);
       skillLogs.push(result.log);
 
-      // * BUG 1 FIX: Decrement mainActions for instant skills
+      // * Only consume action if skill was successfully applied (not failed due to range/target issues)
+      if (!result.success) {
+        // * Skill failed to apply - don't consume action, don't set cooldown, don't update participant
+        // * Note: applySkill does NOT set cooldown on failure, so we don't need to clear it
+        return res.status(400).json({ 
+          error: result.log || 'Не удалось применить способность',
+          battle: formatBattle(battle)
+        });
+      }
+
+      // * BUG 1 FIX: Decrement mainActions for instant skills (only if successful)
+      // * Note: On miss (success: true, hit: false), cooldown is already set by applySkill, so we keep it
       updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
 
       // * Apply Damage for combat skills if hit (only if target is an enemy)
@@ -1074,8 +1085,12 @@ export const useSkill = async (req: Request, res: Response) => {
         }
       }
 
-      // * Set cooldown
-      characterSkill.currentCooldown = skillTemplate.cooldown;
+      // * Set cooldown (applySkill already sets it on hit/miss, but we ensure it's set correctly)
+      // * Note: applySkill sets cooldown on both hit and miss (line 182 and 202), so it should already be set
+      // * We only set it here if it wasn't set (shouldn't happen, but safety check)
+      if (characterSkill.currentCooldown === 0) {
+        characterSkill.currentCooldown = skillTemplate.cooldown;
+      }
       characterSkill.castTimeRemaining = null;
     } else {
       // * Start casting

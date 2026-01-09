@@ -186,7 +186,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
   useSkill: async (participantId, skillId, targetId) => {
     const { battle } = get();
     const { token } = useGameStore.getState();
-    if (!battle || !token) return;
+    if (!battle || !token) throw new Error('No battle or token');
 
     try {
       const res = await fetch(`${API_BASE}/battle/use-skill`, {
@@ -204,7 +204,13 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       });
       
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      if (!res.ok) {
+        // * Update battle state even on error (in case server returned updated state)
+        if (result.battle) {
+          set({ battle: result.battle });
+        }
+        throw new Error(result.error || 'Не удалось применить способность');
+      }
 
       // * Trigger visual dice rolls if any
       if (result.rolls && Array.isArray(result.rolls)) {
@@ -224,6 +230,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       }
     } catch (error) {
       console.error('Use skill failed:', error);
+      throw error; // * Re-throw to allow component to handle it
     }
   },
 
