@@ -34,8 +34,9 @@ export class SkillsEngine {
       return { canUse: false, reason: 'Уже применяется способность' };
     }
 
-    // * 3. Check if participant has main action
-    if (participant.mainActions <= 0) {
+    // * 3. Check if participant has main action (only if starting a new cast or instant skill)
+    const isReleasingPrepared = skill.castTimeRemaining === 0;
+    if (!isReleasingPrepared && participant.mainActions <= 0) {
       return { canUse: false, reason: 'Нет основного действия' };
     }
 
@@ -139,7 +140,7 @@ export class SkillsEngine {
             // Legacy string categories
             switch (skillTemplate.distance) {
               case 'CLOSE': skillRange = { minRange: 0, maxRange: 5 }; break;
-              case 'MEDIUM': skillRange = { minRange: 5, maxRange: 15 }; break;
+              case 'MEDIUM': skillRange = { minRange: 5, maxRange: 20 }; break;
               case 'FAR': skillRange = { minRange: 20, maxRange: 50 }; break;
               case 'SNIPER': skillRange = { minRange: 50, maxRange: 200 }; break;
               default: skillRange = { minRange: 0, maxRange: 5 };

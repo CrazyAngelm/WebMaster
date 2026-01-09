@@ -550,16 +550,23 @@ export const CombatScreen: React.FC = () => {
                 <Sword size={18} /> {inRange ? 'Атака' : 'Вне дальности'}
               </button>
               
-              <button 
-                disabled={!isPlayerTurn || playerParticipant?.mainActions === 0 || !character?.activeSkills || character.activeSkills.length === 0} 
-                onClick={() => setShowSkillsPanel(true)}
-                className={clsx(
-                  "fantasy-button flex items-center gap-2", 
-                  (!isPlayerTurn || playerParticipant?.mainActions === 0 || !character?.activeSkills || character.activeSkills.length === 0) && "opacity-30 cursor-not-allowed"
-                )}
-              >
-                <Zap size={18} /> Умение {character?.activeSkills && character.activeSkills.length > 0 && `(${character.activeSkills.length})`}
-              </button>
+              {(() => {
+                const hasReadySkill = character?.activeSkills?.some((s: CharacterSkill) => s.castTimeRemaining === 0);
+                const canOpenSkills = isPlayerTurn && (playerParticipant?.mainActions! > 0 || hasReadySkill);
+
+                return (
+                  <button 
+                    disabled={!canOpenSkills || !character?.activeSkills || character.activeSkills.length === 0} 
+                    onClick={() => setShowSkillsPanel(true)}
+                    className={clsx(
+                      "fantasy-button flex items-center gap-2", 
+                      (!canOpenSkills || !character?.activeSkills || character.activeSkills.length === 0) && "opacity-30 cursor-not-allowed"
+                    )}
+                  >
+                    <Zap size={18} /> Умение {character?.activeSkills && character.activeSkills.length > 0 && `(${character.activeSkills.length})`}
+                  </button>
+                );
+              })()}
             </div>
 
             {/* Bonus Actions Row */}
@@ -730,10 +737,11 @@ export const CombatScreen: React.FC = () => {
                     const hasAvailableTarget = skillTemplate.targetType !== 'TARGET' || availableTargets.length > 0;
                     const singleTarget = availableTargets.length === 1;
 
+                    const isReleasing = skill.castTimeRemaining === 0;
+                    const canStart = skill.currentCooldown === 0 && (skillTemplate.castTime === 0 || skill.castTimeRemaining === null);
+
                     const canUse = isPlayerTurn && 
-                                   playerParticipant?.mainActions! > 0 && 
-                                   skill.currentCooldown === 0 && 
-                                   (skillTemplate.castTime === 0 || (skill.castTimeRemaining !== null && skill.castTimeRemaining === 0)) &&
+                                   (isReleasing || (canStart && playerParticipant?.mainActions! > 0)) && 
                                    hasAvailableTarget;
                     
                     const isCasting = skill.castTimeRemaining !== null && skill.castTimeRemaining !== undefined && skill.castTimeRemaining > 0;

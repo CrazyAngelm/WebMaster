@@ -405,7 +405,12 @@ async function main() {
       rarity: 'COMMON',
       stackSize: 4,
       isUnique: false,
-      description: 'Восстанавливает 30 ОЗ.',
+      baseEssence: 30,
+      description: JSON.stringify({
+        description: 'Восстанавливает 30 HP.',
+        targetType: 'SELF',
+        actionType: 'BONUS'
+      }),
       basePrice: 15
     },
     {

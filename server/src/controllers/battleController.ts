@@ -1488,9 +1488,16 @@ export const useConsumable = async (req: Request, res: Response) => {
     currentLog.push(...diceLogs, ...logs);
 
     let finalStatus = BattleStatus.ACTIVE;
+    // * Check if any participant died using updated HP values
     const anyEnemyDead = battle.participants.some((p: any) => {
-      if (!updatedTarget || p.id !== updatedTarget.id) return p.currentHp <= 0;
-      return updatedTarget.currentHp <= 0;
+      // * Use updated HP values for participant and target, stale values for others
+      const hp =
+        updatedTarget && p.id === updatedTarget.id
+          ? updatedTarget.currentHp
+          : p.id === updatedParticipant.id
+          ? updatedParticipant.currentHp
+          : p.currentHp;
+      return hp <= 0;
     });
 
     if (anyEnemyDead) {
