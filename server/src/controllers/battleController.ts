@@ -10,12 +10,38 @@ import { CombatEngine } from '../utils/combatEngine';
 import { EffectsEngine } from '../utils/effectsEngine';
 import { SkillsEngine } from '../utils/skillsEngine';
 import { DiceEngine as DICE } from '../utils/diceEngine';
-import { BattleStatus, ArmorCategory, PenetrationType, CharacterStats, ActiveEffect, EffectType, BattleParticipant, CharacterBonuses } from '../types/game';
+import { 
+  BattleStatus, 
+  ArmorCategory, 
+  PenetrationType, 
+  CharacterStats, 
+  ActiveEffect, 
+  EffectType, 
+  BattleParticipant, 
+  CharacterBonuses,
+  SkillTemplate,
+  CharacterSkill
+} from '../types/game';
 
-const syncParticipantToCharacter = async (participant: any) => {
+import type { 
+  BattleParticipant as PrismaBattleParticipant, 
+  Character as PrismaCharacter,
+  // @ts-ignore
+  CharacterSkill as PrismaCharacterSkill,
+  // @ts-ignore
+  SkillTemplate as PrismaSkillTemplate 
+} from '@prisma/client';
+
+// * Local extended types to handle Prisma client inconsistency
+interface ExtendedParticipant extends PrismaBattleParticipant {
+  activeEffects: string;
+  bonuses: string | null;
+}
+
+const syncParticipantToCharacter = async (participant: BattleParticipant | ExtendedParticipant) => {
   if (!participant.characterId) return;
 
-  const character = await prisma.character.findUnique({
+  const character = await (prisma as any).character.findUnique({
     where: { id: participant.characterId }
   });
 
@@ -25,7 +51,7 @@ const syncParticipantToCharacter = async (participant: any) => {
   stats.essence.current = participant.currentHp;
   stats.protection.current = participant.currentProtection;
 
-  await prisma.character.update({
+  await (prisma as any).character.update({
     where: { id: participant.characterId },
     data: {
       stats: JSON.stringify(stats)
@@ -53,7 +79,7 @@ export const startBattle = async (req: Request, res: Response) => {
     const { playerCharacterId, enemyId, isMonster } = req.body;
 
     // * Check if an active battle already exists for this character
-    const existingBattle = await prisma.battle.findFirst({
+    const existingBattle = await (prisma as any).battle.findFirst({
       where: {
         status: BattleStatus.ACTIVE,
         participants: {
@@ -65,9 +91,9 @@ export const startBattle = async (req: Request, res: Response) => {
 
     if (existingBattle) {
       // * Check if this battle should actually be finished
-      const hasDeadParticipant = existingBattle.participants.some(p => p.currentHp <= 0);
+      const hasDeadParticipant = existingBattle.participants.some((p: any) => p.currentHp <= 0);
       if (hasDeadParticipant) {
-        await prisma.battle.update({
+        await (prisma as any).battle.update({
           where: { id: existingBattle.id },
           data: { status: BattleStatus.FINISHED }
         });
@@ -79,7 +105,7 @@ export const startBattle = async (req: Request, res: Response) => {
       }
     }
 
-    const playerChar = await prisma.character.findUnique({
+    const playerChar = await (prisma as any).character.findUnique({
       where: { id: playerCharacterId, userId },
       include: { inventory: true }
     });
@@ -95,7 +121,7 @@ export const startBattle = async (req: Request, res: Response) => {
     let enemyCharacterId: string | null = null;
 
     if (isMonster) {
-      const monsterTemplate = await prisma.monsterTemplate.findUnique({
+      const monsterTemplate = await (prisma as any).monsterTemplate.findUnique({
         where: { id: enemyId }
       });
       if (!monsterTemplate) return res.status(404).json({ error: 'Monster template not found' });
@@ -104,7 +130,7 @@ export const startBattle = async (req: Request, res: Response) => {
       enemyProtection = monsterTemplate.baseEssence;
       enemyMonsterId = monsterTemplate.id;
     } else {
-      const enemyChar = await prisma.character.findUnique({
+      const enemyChar = await (prisma as any).character.findUnique({
         where: { id: enemyId }
       });
       if (!enemyChar) return res.status(404).json({ error: 'Enemy character not found' });
@@ -156,7 +182,7 @@ export const startBattle = async (req: Request, res: Response) => {
       }
     ].sort((a, b) => b.initiative - a.initiative);
 
-    const battle = await prisma.battle.create({
+    const battle = await (prisma as any).battle.create({
       data: {
         locationId: JSON.parse(playerChar.location).locationId,
         status: BattleStatus.ACTIVE,
@@ -165,7 +191,7 @@ export const startBattle = async (req: Request, res: Response) => {
         participants: {
           create: participants.map(p => ({
             characterId: p.characterId,
-            monsterTemplateId: (p as any).monsterTemplateId,
+            monsterTemplateId: p.monsterTemplateId,
             name: p.name,
             initiative: p.initiative,
             currentHp: p.currentHp,
@@ -195,7 +221,7 @@ export const move = async (req: Request, res: Response) => {
   try {
     const { battleId, participantId, direction, targetDistance } = req.body; // direction: 'left' | 'right' | 'towards' | 'away'
 
-    const battle = await prisma.battle.findUnique({
+    const battle = await (prisma as any).battle.findUnique({
       where: { id: battleId },
       include: { participants: true }
     });
@@ -204,7 +230,7 @@ export const move = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Battle not found or finished' });
     }
 
-    const participant = battle.participants.find(p => p.id === participantId);
+    const participant = battle.participants.find((p: any) => p.id === participantId);
     if (!participant) return res.status(404).json({ error: 'Participant not found' });
 
     // * Check turn
@@ -222,19 +248,19 @@ export const move = async (req: Request, res: Response) => {
     let speedId = 'speed-ordinary';
 
     if (participant.characterId) {
-      const char = await prisma.character.findUnique({ where: { id: participant.characterId } });
+      const char = await (prisma as any).character.findUnique({ where: { id: participant.characterId } });
       if (char) {
         const stats = JSON.parse(char.stats);
         speedId = stats.speedId;
       }
     } else if (participant.monsterTemplateId) {
-      const monster = await prisma.monsterTemplate.findUnique({ where: { id: participant.monsterTemplateId } });
+      const monster = await (prisma as any).monsterTemplate.findUnique({ where: { id: participant.monsterTemplateId } });
       if (monster) {
         speedId = monster.speedId;
       }
     }
 
-    const speed = await prisma.speed.findUnique({ where: { id: speedId } });
+    const speed = await (prisma as any).speed.findUnique({ where: { id: speedId } });
     if (speed) maxMoveDistance = speed.distancePerAction;
 
     const oldDistance = participant.distance;
@@ -249,9 +275,9 @@ export const move = async (req: Request, res: Response) => {
       newDistance = oldDistance + delta;
     } else {
       // * Legacy direction-based movement
-      const enemies = battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+      const enemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
       const nearestEnemy = enemies.length > 0 
-        ? enemies.reduce((prev, curr) => Math.abs(curr.distance - oldDistance) < Math.abs(prev.distance - oldDistance) ? curr : prev)
+        ? enemies.reduce((prev: any, curr: any) => Math.abs(curr.distance - oldDistance) < Math.abs(prev.distance - oldDistance) ? curr : prev)
         : null;
 
       if (direction === 'left') delta = -maxMoveDistance;
@@ -276,15 +302,15 @@ export const move = async (req: Request, res: Response) => {
     }
 
     // * Final check: ensure we don't violate minimum distance with any enemy
-    const allEnemies = battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+    const allEnemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
     for (const enemy of allEnemies) {
-      const finalDist = Math.abs(newDistance - enemy.distance);
+      const finalDist = Math.abs(newDistance - (enemy as any).distance);
       if (finalDist < MIN_COMBAT_DISTANCE) {
         // Adjust to maintain minimum distance
-        if (newDistance > enemy.distance) {
-          newDistance = enemy.distance + MIN_COMBAT_DISTANCE;
+        if (newDistance > (enemy as any).distance) {
+          newDistance = (enemy as any).distance + MIN_COMBAT_DISTANCE;
         } else {
-          newDistance = enemy.distance - MIN_COMBAT_DISTANCE;
+          newDistance = (enemy as any).distance - MIN_COMBAT_DISTANCE;
         }
         break; // Only adjust for first enemy found (should be nearest)
       }
@@ -295,18 +321,18 @@ export const move = async (req: Request, res: Response) => {
     let isDead = false;
 
     // * Check for Attacks of Opportunity
-    for (const enemy of battle.participants.filter(p => p.isPlayer !== participant.isPlayer && p.currentHp > 0)) {
-      const distOld = Math.abs(oldDistance - enemy.distance);
-      const distNew = Math.abs(newDistance - enemy.distance);
+    for (const enemy of battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0)) {
+      const distOld = Math.abs(oldDistance - (enemy as any).distance);
+      const distNew = Math.abs(newDistance - (enemy as any).distance);
 
       if (distOld <= 5 && distNew > distOld) {
         log.push(`Внеочередная атака! ${enemy.name} атакует ${participant.name}, пока тот отступает!`);
         const aooResult = CombatEngine.resolveAttack(
-          enemy as any,
+          enemy as unknown as BattleParticipant,
           5, 
           PenetrationType.NONE,
           { minRange: 0, maxRange: 5 },
-          participant as any,
+          participant as unknown as BattleParticipant,
           0, 
           undefined
         );
@@ -324,7 +350,7 @@ export const move = async (req: Request, res: Response) => {
     }
 
     // * Update participant in DB
-    const updatedParticipant = await prisma.battleParticipant.update({
+    const updatedParticipant = await (prisma as any).battleParticipant.update({
       where: { id: participant.id },
       data: {
         distance: newDistance,
@@ -348,7 +374,7 @@ export const move = async (req: Request, res: Response) => {
     const updatedLog = [...currentLog, ...diceLogs, ...log, movementMessage];
 
     if (isDead) {
-      await prisma.battle.update({
+      await (prisma as any).battle.update({
         where: { id: battle.id },
         data: {
           status: BattleStatus.FINISHED,
@@ -357,19 +383,19 @@ export const move = async (req: Request, res: Response) => {
       });
       
       if (participant.characterId) {
-        await prisma.character.update({
+        await (prisma as any).character.update({
           where: { id: participant.characterId },
           data: { isDead: true }
         });
       }
     } else {
-      await prisma.battle.update({
+      await (prisma as any).battle.update({
         where: { id: battle.id },
         data: { log: JSON.stringify(updatedLog) }
       });
     }
 
-    const updatedBattle = await prisma.battle.findUnique({
+    const updatedBattle = await (prisma as any).battle.findUnique({
       where: { id: battle.id },
       include: { participants: true }
     });
@@ -391,7 +417,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     const userId = req.userId;
     const { battleId, attackerId, targetId, weaponId } = req.body;
 
-    const battle = await prisma.battle.findUnique({
+    const battle = await (prisma as any).battle.findUnique({
       where: { id: battleId },
       include: { participants: true }
     });
@@ -400,8 +426,8 @@ export const resolveAttack = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Battle not found or finished' });
     }
 
-    const attacker = battle.participants.find(p => p.id === attackerId);
-    const target = battle.participants.find(p => p.id === targetId);
+    const attacker = battle.participants.find((p: any) => p.id === attackerId);
+    const target = battle.participants.find((p: any) => p.id === targetId);
 
     if (!attacker || !target) {
       return res.status(404).json({ error: 'Participants not found' });
@@ -424,7 +450,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     let equippedWeapon: any = null;
 
     if (attacker.characterId) {
-      const char = await prisma.character.findUnique({
+      const char = await (prisma as any).character.findUnique({
         where: { id: attacker.characterId },
         include: { inventory: true }
       });
@@ -433,7 +459,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
         equippedWeapon = items.find((i: any) => i.isEquipped && i.id === weaponId);
         if (equippedWeapon) {
           weaponEssence = equippedWeapon.currentEssence;
-          weaponTemplate = await prisma.itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
+          weaponTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
           weaponPen = (weaponTemplate?.penetration as PenetrationType) || PenetrationType.NONE;
           
           // * Parse range
@@ -462,7 +488,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     let armorEvasionPenalty = 0;
 
     if (target.characterId) {
-        const char = await prisma.character.findUnique({
+        const char = await (prisma as any).character.findUnique({
             where: { id: target.characterId },
             include: { inventory: true }
         });
@@ -470,7 +496,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
             const items = JSON.parse(char.inventory.items);
             equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.includes('armor')); // Simple check
             if (equippedArmor) {
-                const template = await prisma.itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
+                const template = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
                 armorIgnore = template?.ignoreDamage || 0;
                 armorCat = template?.category as ArmorCategory;
                 armorHitPenalty = template?.hitPenalty || 0;
@@ -484,11 +510,11 @@ export const resolveAttack = async (req: Request, res: Response) => {
     const targetCopy = { ...target, currentHp: target.currentHp, currentProtection: target.currentProtection };
 
     const result = CombatEngine.resolveAttack(
-      attackerCopy as any,
+      attackerCopy as unknown as BattleParticipant,
       weaponEssence,
       weaponPen,
       weaponRange,
-      targetCopy as any,
+      targetCopy as unknown as BattleParticipant,
       armorIgnore,
       armorCat,
       1, // defender min roll
@@ -514,13 +540,13 @@ export const resolveAttack = async (req: Request, res: Response) => {
           
           // Persist weapon change
           if (attacker.characterId) {
-            const inv = await prisma.inventory.findUnique({ where: { characterId: attacker.characterId } });
+            const inv = await (prisma as any).inventory.findUnique({ where: { characterId: attacker.characterId } });
             if (inv) {
               const items = JSON.parse(inv.items);
               const weaponInInv = items.find((i: any) => i.id === equippedWeapon.id);
               if (weaponInInv) {
                 weaponInInv.currentEssence = equippedWeapon.currentEssence;
-                await prisma.inventory.update({
+                await (prisma as any).inventory.update({
                   where: { characterId: attacker.characterId },
                   data: { items: JSON.stringify(items) }
                 });
@@ -538,13 +564,13 @@ export const resolveAttack = async (req: Request, res: Response) => {
       
       // Persist armor change
       if (target.characterId) {
-        const inv = await prisma.inventory.findUnique({ where: { characterId: target.characterId } });
+        const inv = await (prisma as any).inventory.findUnique({ where: { characterId: target.characterId } });
         if (inv) {
           const items = JSON.parse(inv.items);
           const armorInInv = items.find((i: any) => i.id === equippedArmor.id);
           if (armorInInv) {
             armorInInv.currentDurability = equippedArmor.currentDurability;
-            await prisma.inventory.update({
+            await (prisma as any).inventory.update({
               where: { characterId: target.characterId },
               data: { items: JSON.stringify(items) }
             });
@@ -563,7 +589,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
         const targetForEffects = { ...target, activeEffects: target.activeEffects, bonuses: target.bonuses };
         
         for (const effectId of effectIds) {
-          const template = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+          const template = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
           if (template) {
             const activeEffect: ActiveEffect = {
               id: crypto.randomUUID(),
@@ -577,7 +603,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
               isNegative: template.isNegative
             };
             
-            EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+            EffectsEngine.applyEffect(targetForEffects as unknown as BattleParticipant, activeEffect);
             itemUpdatesLog.push(`${attacker.name}: На цель наложен эффект "${template.name}"!`);
           }
         }
@@ -589,7 +615,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     }
 
     // * Update target state with NEW values after damage and effects application
-    const updatedTarget = await prisma.battleParticipant.update({
+    const updatedTarget = await (prisma as any).battleParticipant.update({
       where: { id: target.id },
       data: {
         currentHp: Math.max(0, targetCopy.currentHp),
@@ -600,16 +626,16 @@ export const resolveAttack = async (req: Request, res: Response) => {
     });
 
     // * Sync target state back to character if applicable
-    await syncParticipantToCharacter(updatedTarget);
+    await syncParticipantToCharacter(updatedTarget as unknown as BattleParticipant);
 
     // * If attacker is a player, sync their state (just in case)
     if (attacker.isPlayer) {
-      await syncParticipantToCharacter(attacker);
+      await syncParticipantToCharacter(attacker as unknown as BattleParticipant);
     }
 
     // * Update attacker actions (use current value from database, not from copy)
     const updatedMainActions = Math.max(0, attacker.mainActions - 1);
-    await prisma.battleParticipant.update({
+    await (prisma as any).battleParticipant.update({
       where: { id: attacker.id },
       data: {
         mainActions: updatedMainActions
@@ -618,7 +644,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
 
     // * Final sync for attacker to save reduced actions if needed (though character doesn't track battle actions)
     if (attacker.isPlayer) {
-        await syncParticipantToCharacter(attacker);
+        await syncParticipantToCharacter(attacker as unknown as BattleParticipant);
     }
 
     // * Update log
@@ -631,7 +657,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
       updatedLog.push(`${targetCopy.name} повержен!`);
       
       // * Mark battle as finished
-      await prisma.battle.update({
+      await (prisma as any).battle.update({
         where: { id: battle.id },
         data: {
           status: BattleStatus.FINISHED,
@@ -641,21 +667,21 @@ export const resolveAttack = async (req: Request, res: Response) => {
       
       // * Sync ALL player participants one last time to ensure everything is saved
       for (const participant of battle.participants) {
-        if (participant.isPlayer) {
-          const p = await prisma.battleParticipant.findUnique({ where: { id: participant.id } });
-          if (p) await syncParticipantToCharacter(p);
+        if ((participant as any).isPlayer) {
+          const p = await (prisma as any).battleParticipant.findUnique({ where: { id: participant.id } });
+          if (p) await syncParticipantToCharacter(p as unknown as BattleParticipant);
         }
       }
       
       // * If target was a character, mark as dead in characters table
       if (targetCopy.characterId) {
-        await prisma.character.update({
+        await (prisma as any).character.update({
           where: { id: targetCopy.characterId },
           data: { isDead: true }
         });
       }
     } else {
-      await prisma.battle.update({
+      await (prisma as any).battle.update({
         where: { id: battle.id },
         data: {
           log: JSON.stringify(updatedLog)
@@ -664,7 +690,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     }
 
     // * Fetch updated battle state to return fresh data
-    const updatedBattle = await prisma.battle.findUnique({
+    const updatedBattle = await (prisma as any).battle.findUnique({
       where: { id: battle.id },
       include: { participants: true }
     });
@@ -685,7 +711,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
 export const nextTurn = async (req: Request, res: Response) => {
     try {
         const { battleId } = req.body;
-        const battle = await prisma.battle.findUnique({
+        const battle = await (prisma as any).battle.findUnique({
             where: { id: battleId },
             include: { participants: true }
         });
@@ -696,30 +722,30 @@ export const nextTurn = async (req: Request, res: Response) => {
         const nextParticipant = battle.participants[nextIndex];
 
         // * 1. Process Effects Ticks
-        const { updatedParticipant, logs } = EffectsEngine.processTicks(nextParticipant as any);
+        const { updatedParticipant, logs } = EffectsEngine.processTicks(nextParticipant as unknown as BattleParticipant);
         
         // * 2. Process Skill Cooldowns and Cast Time (if player has skills)
         let skillLogs: string[] = [];
         if (nextParticipant.characterId) {
-          const character = await prisma.character.findUnique({
+          const character = await (prisma as any).character.findUnique({
             where: { id: nextParticipant.characterId },
             include: { characterSkills: { include: { skillTemplate: true } } }
           });
           
           if (character && character.characterSkills && character.characterSkills.length > 0) {
             // * Process cooldowns
-            SkillsEngine.processCooldowns(character.characterSkills);
+            SkillsEngine.processCooldowns(character.characterSkills as unknown as CharacterSkill[]);
             
             // * Process cast time
             const { completedSkills, logs: castLogs } = SkillsEngine.processCastTime(
-              updatedParticipant as any,
-              character.characterSkills
+              updatedParticipant as unknown as BattleParticipant,
+              character.characterSkills as unknown as CharacterSkill[]
             );
             skillLogs.push(...castLogs);
             
             // * Apply completed skills automatically (if self-target, else wait for player action)
             for (const completedSkill of completedSkills) {
-              const skillTemplate = await prisma.skillTemplate.findUnique({
+              const skillTemplate = await (prisma as any).skillTemplate.findUnique({
                 where: { id: completedSkill.skillTemplateId }
               });
               
@@ -731,7 +757,7 @@ export const nextTurn = async (req: Request, res: Response) => {
                   const targetForEffects = { ...updatedParticipant };
                   
                   for (const effectId of effectIds) {
-                    const effectTemplate = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+                    const effectTemplate = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
                     if (effectTemplate) {
                       const activeEffect: ActiveEffect = {
                         id: crypto.randomUUID(),
@@ -744,12 +770,12 @@ export const nextTurn = async (req: Request, res: Response) => {
                         parameter: effectTemplate.parameter || undefined,
                         isNegative: effectTemplate.isNegative
                       };
-                      EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+                      EffectsEngine.applyEffect(targetForEffects as unknown as BattleParticipant, activeEffect);
                     }
                   }
                   
-                  updatedParticipant.activeEffects = targetForEffects.activeEffects;
-                  updatedParticipant.bonuses = targetForEffects.bonuses;
+                  updatedParticipant.activeEffects = targetForEffects.activeEffects ?? "[]";
+                  updatedParticipant.bonuses = targetForEffects.bonuses ?? null;
                   skillLogs.push(`${updatedParticipant.name}: Применил "${skillTemplate.name}" на себя!`);
                   
                   // * Update skill cooldown only for auto-applied skills
@@ -767,7 +793,7 @@ export const nextTurn = async (req: Request, res: Response) => {
             
             // * Save updated skills
             for (const skill of character.characterSkills) {
-              await prisma.characterSkill.update({
+              await (prisma as any).characterSkill.update({
                 where: { id: skill.id },
                 data: {
                   currentCooldown: skill.currentCooldown,
@@ -779,12 +805,12 @@ export const nextTurn = async (req: Request, res: Response) => {
         }
         
         // * 3. Check for stun
-        const isStunned = EffectsEngine.isStunned(updatedParticipant as any);
+        const isStunned = EffectsEngine.isStunned(updatedParticipant as unknown as BattleParticipant);
         const finalMainActions = isStunned ? 0 : 1;
         const finalBonusActions = isStunned ? 0 : 1;
 
         // * 3. Update participant in DB
-        const updatedInDb = await prisma.battleParticipant.update({
+        const updatedInDb = await (prisma as any).battleParticipant.update({
             where: { id: nextParticipant.id },
             data: {
                 currentHp: updatedParticipant.currentHp,
@@ -798,7 +824,7 @@ export const nextTurn = async (req: Request, res: Response) => {
 
         // * 4. Sync to character if player
         if (updatedInDb.isPlayer) {
-            await syncParticipantToCharacter(updatedInDb);
+            await syncParticipantToCharacter(updatedInDb as unknown as BattleParticipant);
         }
 
         const currentLog = JSON.parse(battle.log);
@@ -814,8 +840,8 @@ export const nextTurn = async (req: Request, res: Response) => {
             // * Check if this was the last enemy or player
             const aliveTeams = new Set(
                 battle.participants
-                .filter(p => (p.id === updatedInDb.id ? updatedInDb.currentHp > 0 : p.currentHp > 0))
-                .map(p => {
+                .filter((p: any) => (p.id === updatedInDb.id ? updatedInDb.currentHp > 0 : p.currentHp > 0))
+                .map((p: any) => {
                     // This is a bit simplified, ideally we'd have teamId in DB
                     return p.isPlayer ? 'players' : 'monsters';
                 })
@@ -826,7 +852,7 @@ export const nextTurn = async (req: Request, res: Response) => {
             }
         }
 
-        const updatedBattle = await prisma.battle.update({
+        const updatedBattle = await (prisma as any).battle.update({
             where: { id: battle.id },
             data: {
                 currentTurnIndex: nextIndex,
@@ -851,7 +877,7 @@ export const useSkill = async (req: Request, res: Response) => {
     const userId = req.userId;
     const { battleId, participantId, skillId, targetId } = req.body;
 
-    const battle = await prisma.battle.findUnique({
+    const battle = await (prisma as any).battle.findUnique({
       where: { id: battleId },
       include: { participants: true }
     });
@@ -860,7 +886,7 @@ export const useSkill = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Battle not found or finished' });
     }
 
-    const participant = battle.participants.find(p => p.id === participantId);
+    const participant = battle.participants.find((p: any) => p.id === participantId);
     if (!participant) {
       return res.status(404).json({ error: 'Participant not found' });
     }
@@ -875,7 +901,7 @@ export const useSkill = async (req: Request, res: Response) => {
     }
 
     // * Fetch character and skill
-    const character = await prisma.character.findUnique({
+    const character = await (prisma as any).character.findUnique({
       where: { id: participant.characterId },
       include: { characterSkills: { include: { skillTemplate: true } } }
     });
@@ -884,22 +910,22 @@ export const useSkill = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Character not found' });
     }
 
-    const characterSkill = character.characterSkills.find(s => s.id === skillId);
+    const characterSkill = (character as any).characterSkills.find((s: any) => s.id === skillId);
     if (!characterSkill) {
       return res.status(404).json({ error: 'Skill not found on character' });
     }
 
-    const skillTemplate = characterSkill.skillTemplate;
+    const skillTemplate = (characterSkill as any).skillTemplate;
     if (!skillTemplate) {
       return res.status(404).json({ error: 'Skill template not found' });
     }
 
     // * Validate skill can be used
-    const rank = await prisma.rank.findUnique({ where: { id: character.rankId } });
+    const rank = await (prisma as any).rank.findUnique({ where: { id: character.rankId } });
     const validation = SkillsEngine.canUseSkill(
-      participant as any,
-      characterSkill as any,
-      skillTemplate as any,
+      participant as unknown as BattleParticipant,
+      characterSkill as unknown as CharacterSkill,
+      skillTemplate as unknown as SkillTemplate,
       rank?.maxSkills
     );
 
@@ -914,24 +940,24 @@ export const useSkill = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Target required for this skill' });
       }
       
-      target = battle.participants.find(p => p.id === targetId) as any || null;
+      target = (battle.participants.find((p: any) => p.id === targetId) as unknown as BattleParticipant) || null;
       if (!target) {
         return res.status(404).json({ error: 'Target not found' });
       }
     } else if (skillTemplate.targetType === 'SELF') {
-      target = participant as any;
+      target = (participant as unknown as BattleParticipant);
     }
 
     // * Get weapon essence for hit check
     let weaponEssence = 0;
     if (participant.characterId) {
-      const char = await prisma.character.findUnique({
+      const char = await (prisma as any).character.findUnique({
         where: { id: participant.characterId },
         include: { inventory: true }
       });
       if (char && char.inventory) {
         const items = JSON.parse(char.inventory.items);
-        const equippedWeapon = items.find((i: any) => i.isEquipped && i.templateId.includes('weapon'));
+        const equippedWeapon = items.find((i: any) => i.isEquipped && i.templateId.toLowerCase().includes('weapon'));
         if (equippedWeapon) {
           weaponEssence = equippedWeapon.currentEssence || 0;
         }
@@ -939,26 +965,26 @@ export const useSkill = async (req: Request, res: Response) => {
     }
 
     // * Get rank min rolls
-    const attackerRank = await prisma.rank.findUnique({ where: { id: character.rankId } });
+    const attackerRank = await (prisma as any).rank.findUnique({ where: { id: character.rankId } });
     const attackerRankMinRoll = attackerRank?.minEssenceRoll || 1;
     const targetRank = target?.characterId 
-      ? await prisma.character.findUnique({ where: { id: target.characterId } })
-          .then(c => c ? prisma.rank.findUnique({ where: { id: c.rankId } }) : null)
+      ? await (prisma as any).character.findUnique({ where: { id: target.characterId } })
+          .then((c: any) => c ? (prisma as any).rank.findUnique({ where: { id: c.rankId } }) : null)
       : null;
     const targetRankMinRoll = targetRank?.minEssenceRoll || 1;
 
     let skillLogs: string[] = [];
-    let updatedParticipant = { ...participant };
-    let updatedTarget = target ? { ...target } : null;
+    const updatedParticipant: BattleParticipant = { ...participant } as unknown as BattleParticipant;
+    const updatedTarget: BattleParticipant | null = target ? ({ ...target } as unknown as BattleParticipant) : null;
 
     // * If castTime === 0 or cast is finished (castTimeRemaining === 0), apply immediately
     if (skillTemplate.castTime === 0 || characterSkill.castTimeRemaining === 0) {
       // * Apply immediately
       const result = SkillsEngine.applySkill(
-        updatedParticipant as any,
-        updatedTarget as any,
-        characterSkill as any,
-        skillTemplate as any,
+        updatedParticipant,
+        updatedTarget as BattleParticipant,
+        characterSkill as unknown as CharacterSkill,
+        skillTemplate as unknown as SkillTemplate,
         weaponEssence,
         attackerRankMinRoll,
         targetRankMinRoll
@@ -966,6 +992,9 @@ export const useSkill = async (req: Request, res: Response) => {
 
       skillLogs.push(...result.diceLogs);
       skillLogs.push(result.log);
+
+      // * BUG 1 FIX: Decrement mainActions for instant skills
+      updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
 
       // * Apply Damage for combat skills if hit (only if target is an enemy)
       if (result.hit && skillTemplate.isCombat && updatedTarget && updatedTarget.isPlayer !== participant.isPlayer) {
@@ -979,15 +1008,15 @@ export const useSkill = async (req: Request, res: Response) => {
         let armorIgnore = 0;
         let armorCat: ArmorCategory | undefined;
         if (updatedTarget.characterId) {
-            const char = await prisma.character.findUnique({
+            const char = await (prisma as any).character.findUnique({
                 where: { id: updatedTarget.characterId },
                 include: { inventory: true }
             });
             if (char && char.inventory) {
                 const items = JSON.parse(char.inventory.items);
-                const equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.includes('armor'));
+                const equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.toLowerCase().includes('armor'));
                 if (equippedArmor) {
-                    const template = await prisma.itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
+                    const template = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
                     armorIgnore = template?.ignoreDamage || 0;
                     armorCat = template?.category as ArmorCategory;
                 }
@@ -1014,10 +1043,10 @@ export const useSkill = async (req: Request, res: Response) => {
       // * Apply effects from skill
       if (skillTemplate.effects && result.hit) {
         const effectIds: string[] = JSON.parse(skillTemplate.effects);
-        const targetForEffects = updatedTarget || updatedParticipant;
+        const targetForEffects: BattleParticipant = (updatedTarget || updatedParticipant);
         
         for (const effectId of effectIds) {
-          const effectTemplate = await prisma.effectTemplate.findUnique({ where: { id: effectId } });
+          const effectTemplate = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
           if (effectTemplate) {
             const activeEffect: ActiveEffect = {
               id: crypto.randomUUID(),
@@ -1031,17 +1060,17 @@ export const useSkill = async (req: Request, res: Response) => {
               isNegative: effectTemplate.isNegative
             };
             
-            EffectsEngine.applyEffect(targetForEffects as any, activeEffect);
+            EffectsEngine.applyEffect(targetForEffects, activeEffect);
             skillLogs.push(`${participant.name}: На цель наложен эффект "${effectTemplate.name}"!`);
           }
         }
         
         if (updatedTarget) {
-          updatedTarget.activeEffects = (targetForEffects as any).activeEffects;
-          updatedTarget.bonuses = (targetForEffects as any).bonuses;
+          updatedTarget.activeEffects = targetForEffects.activeEffects ?? "[]";
+          updatedTarget.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
         } else {
-          updatedParticipant.activeEffects = (targetForEffects as any).activeEffects;
-          updatedParticipant.bonuses = (targetForEffects as any).bonuses;
+          updatedParticipant.activeEffects = (targetForEffects.activeEffects as string) ?? "[]";
+          updatedParticipant.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
         }
       }
 
@@ -1050,13 +1079,13 @@ export const useSkill = async (req: Request, res: Response) => {
       characterSkill.castTimeRemaining = null;
     } else {
       // * Start casting
-      SkillsEngine.startCasting(updatedParticipant as any, characterSkill as any, skillTemplate as any);
+      SkillsEngine.startCasting(updatedParticipant as unknown as BattleParticipant, characterSkill as unknown as CharacterSkill, skillTemplate as unknown as SkillTemplate);
       characterSkill.castTimeRemaining = skillTemplate.castTime;
       skillLogs.push(`${participant.name} начинает применять "${skillTemplate.name}" (${skillTemplate.castTime} хода)...`);
     }
 
     // * Update character skill in DB
-    await prisma.characterSkill.update({
+    await (prisma as any).characterSkill.update({
       where: { id: characterSkill.id },
       data: {
         currentCooldown: characterSkill.currentCooldown,
@@ -1065,7 +1094,7 @@ export const useSkill = async (req: Request, res: Response) => {
     });
 
     // * Update participants in DB
-    await prisma.battleParticipant.update({
+    await (prisma as any).battleParticipant.update({
       where: { id: participant.id },
       data: {
         currentHp: updatedParticipant.currentHp,
@@ -1077,7 +1106,7 @@ export const useSkill = async (req: Request, res: Response) => {
     });
 
     if (updatedTarget) {
-      await prisma.battleParticipant.update({
+      await (prisma as any).battleParticipant.update({
         where: { id: updatedTarget.id },
         data: {
           currentHp: updatedTarget.currentHp,
@@ -1087,10 +1116,10 @@ export const useSkill = async (req: Request, res: Response) => {
         }
       });
       
-      await syncParticipantToCharacter(updatedTarget as any);
+      await syncParticipantToCharacter(updatedTarget);
     }
 
-    await syncParticipantToCharacter(updatedParticipant as any);
+    await syncParticipantToCharacter(updatedParticipant);
 
     // * Update battle log
     const currentLog = JSON.parse(battle.log);
@@ -1106,11 +1135,11 @@ export const useSkill = async (req: Request, res: Response) => {
       // * Check if battle should end
       const aliveTeams = new Set(
         battle.participants
-        .filter(p => {
+        .filter((p: any) => {
           if (p.id === updatedTarget!.id) return updatedTarget!.currentHp > 0;
           return p.currentHp > 0;
         })
-        .map(p => p.isPlayer ? 'players' : 'monsters')
+        .map((p: any) => p.isPlayer ? 'players' : 'monsters')
       );
       
       if (aliveTeams.size <= 1) {
@@ -1118,7 +1147,7 @@ export const useSkill = async (req: Request, res: Response) => {
       }
     }
 
-    const updatedBattle = await prisma.battle.update({
+    const updatedBattle = await (prisma as any).battle.update({
       where: { id: battle.id },
       data: {
         status: finalStatus,
@@ -1140,7 +1169,7 @@ export const useSkill = async (req: Request, res: Response) => {
 export const getBattle = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
-        const battle = await prisma.battle.findUnique({
+        const battle = await (prisma as any).battle.findUnique({
             where: { id },
             include: { participants: true }
         });
@@ -1162,7 +1191,7 @@ export const endBattle = async (req: Request, res: Response) => {
         const userId = req.userId;
         const { id } = req.params;
         
-        const battle = await prisma.battle.findUnique({
+        const battle = await (prisma as any).battle.findUnique({
             where: { id },
             include: { participants: true }
         });
@@ -1170,24 +1199,24 @@ export const endBattle = async (req: Request, res: Response) => {
         if (!battle) return res.status(404).json({ error: 'Battle not found' });
 
         // * Verify user owns one of the participants
-        const playerParticipant = battle.participants.find(p => p.characterId && p.isPlayer);
+        const playerParticipant = battle.participants.find((p: any) => p.characterId && p.isPlayer);
         if (playerParticipant && playerParticipant.characterId) {
-            const char = await prisma.character.findUnique({ where: { id: playerParticipant.characterId } });
+            const char = await (prisma as any).character.findUnique({ where: { id: playerParticipant.characterId } });
             if (!char || char.userId !== userId) {
                 return res.status(403).json({ error: 'Not authorized' });
             }
         }
 
         // * Mark battle as finished
-        await prisma.battle.update({
+        await (prisma as any).battle.update({
             where: { id },
             data: { status: BattleStatus.FINISHED }
         });
 
         // * Sync all player participants back to characters
         for (const participant of battle.participants) {
-            if (participant.isPlayer) {
-                await syncParticipantToCharacter(participant);
+            if ((participant as any).isPlayer) {
+                await syncParticipantToCharacter(participant as unknown as BattleParticipant);
             }
         }
 
@@ -1201,7 +1230,7 @@ export const endBattle = async (req: Request, res: Response) => {
 export const getActiveBattle = async (req: Request, res: Response) => {
   try {
     const { characterId } = req.params;
-    const battle = await prisma.battle.findFirst({
+    const battle = await (prisma as any).battle.findFirst({
       where: {
         status: BattleStatus.ACTIVE,
         participants: {
@@ -1214,10 +1243,10 @@ export const getActiveBattle = async (req: Request, res: Response) => {
     if (!battle) return res.status(404).json({ error: 'No active battle' });
 
     // * Additional check: ensure no participant is dead (battle should be finished)
-    const hasDeadParticipant = battle.participants.some(p => p.currentHp <= 0);
+    const hasDeadParticipant = battle.participants.some((p: any) => p.currentHp <= 0);
     if (hasDeadParticipant) {
       // * Mark battle as finished if someone is dead
-      await prisma.battle.update({
+      await (prisma as any).battle.update({
         where: { id: battle.id },
         data: { status: BattleStatus.FINISHED }
       });
@@ -1225,12 +1254,10 @@ export const getActiveBattle = async (req: Request, res: Response) => {
     }
 
     res.json({
-      ...battle,
-      log: JSON.parse(battle.log)
+      battle: formatBattle(battle)
     });
   } catch (error) {
     console.error('Get active battle error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-

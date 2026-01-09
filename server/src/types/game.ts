@@ -96,8 +96,8 @@ export interface ExistingItem {
 
 export interface BattleParticipant {
   id: UUID;
-  characterId?: UUID;
-  monsterTemplateId?: UUID;
+  characterId: UUID | null | undefined;
+  monsterTemplateId: UUID | null | undefined;
   name: string;
   initiative: number;
   currentHp: number;
@@ -108,8 +108,8 @@ export interface BattleParticipant {
   bonusActions: number;
   isPlayer: boolean;
   distance: number;
-  bonuses?: string;
-  activeEffects?: string; // JSON string of ActiveEffect[]
+  bonuses: string | null | undefined;
+  activeEffects: string; // JSON string of ActiveEffect[]
 }
 
 export interface SkillTemplate {
@@ -146,4 +146,3 @@ export interface Battle {
   currentTurnIndex: number;
   log: string[];
 }
-

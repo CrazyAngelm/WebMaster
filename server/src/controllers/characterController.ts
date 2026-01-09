@@ -10,17 +10,17 @@ export const getCharacters = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
     const userId = req.userId;
-    const characters = await prisma.character.findMany({
+    const characters = await (prisma as any).character.findMany({
       where: { userId },
       include: { 
         inventory: true,
         characterSkills: { include: { skillTemplate: true } }
-      } as any,
+      },
       orderBy: { createdAt: 'desc' }
     });
     
     // * Deserialize JSON strings back to objects for API response
-    const charactersWithParsedJson = characters.map(char => {
+    const charactersWithParsedJson = characters.map((char: any) => {
       const charData = char as any;
       const skillsCount = charData.characterSkills?.length || 0;
       console.log(`✅ API Response: Character ${charData.name} has ${skillsCount} skills in characterSkills`);
@@ -66,18 +66,18 @@ export const createCharacter = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Character name must contain only letters' });
     }
 
-    const count = await prisma.character.count({ where: { userId } });
+    const count = await (prisma as any).character.count({ where: { userId } });
     if (count >= 10) {
       return res.status(400).json({ error: 'Maximum 10 characters per account' });
     }
 
-    const existingName = await prisma.character.findUnique({ where: { name } });
+    const existingName = await (prisma as any).character.findUnique({ where: { name } });
     if (existingName) {
       return res.status(400).json({ error: 'Character name already taken' });
     }
 
     // Fetch defaults from configuration
-    const config = await prisma.gameConfig.findUnique({ where: { key: 'CHARACTER_CREATION_DEFAULTS' } });
+    const config = await (prisma as any).gameConfig.findUnique({ where: { key: 'CHARACTER_CREATION_DEFAULTS' } });
     const defaults = config ? JSON.parse(config.value) : {
       rankId: 'rank-1',
       stats: {
@@ -109,7 +109,7 @@ export const createCharacter = async (req: Request, res: Response) => {
     });
 
     // * Serialize JSON objects to strings for SQLite
-    const newCharacter = await prisma.character.create({
+    const newCharacter = await (prisma as any).character.create({
       data: {
         userId,
         name,
@@ -172,12 +172,12 @@ export const deleteCharacter = async (req: Request, res: Response) => {
     const userId = req.userId;
     const { id } = req.params;
 
-    const character = await prisma.character.findUnique({ where: { id } });
+    const character = await (prisma as any).character.findUnique({ where: { id } });
     if (!character || character.userId !== userId) {
       return res.status(404).json({ error: 'Character not found' });
     }
 
-    await prisma.character.delete({ where: { id } });
+    await (prisma as any).character.delete({ where: { id } });
     res.json({ message: 'Character deleted successfully' });
   } catch (error) {
     console.error('Delete character error:', error);
@@ -195,7 +195,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
     // * Check ownership
-    const character = await prisma.character.findUnique({ 
+    const character = await (prisma as any).character.findUnique({ 
       where: { id },
       include: { inventory: true }
     });
@@ -311,7 +311,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     }
 
     // * Update character
-    const updatedCharacter = await prisma.character.update({
+    const updatedCharacter = await (prisma as any).character.update({
       where: { id },
       data: updateData,
       include: { 
@@ -357,7 +357,7 @@ export const tickSkillCooldowns = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     // * Check ownership
-    const character = await prisma.character.findUnique({ 
+    const character = await (prisma as any).character.findUnique({ 
       where: { id },
       include: { characterSkills: true }
     } as any);
@@ -378,7 +378,7 @@ export const tickSkillCooldowns = async (req: Request, res: Response) => {
     }
 
     // * Fetch updated character with skills
-    const updatedCharacter = await prisma.character.findUnique({
+    const updatedCharacter = await (prisma as any).character.findUnique({
       where: { id },
       include: { 
         inventory: true,
@@ -417,7 +417,7 @@ export const updateInventory = async (req: Request, res: Response) => {
     const { items, baseSlots } = req.body;
 
     // * Check ownership
-    const character = await prisma.character.findUnique({ 
+    const character = await (prisma as any).character.findUnique({ 
       where: { id },
       include: { inventory: true }
     });
@@ -463,12 +463,12 @@ export const updateInventory = async (req: Request, res: Response) => {
 
     let updatedInventory;
     if (character.inventory) {
-      updatedInventory = await prisma.inventory.update({
+      updatedInventory = await (prisma as any).inventory.update({
         where: { characterId: id },
         data: inventoryData
       });
     } else {
-      updatedInventory = await prisma.inventory.create({
+      updatedInventory = await (prisma as any).inventory.create({
         data: {
           characterId: id,
           baseSlots: baseSlots || 10,
