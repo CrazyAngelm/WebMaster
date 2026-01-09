@@ -54,6 +54,16 @@ async function main() {
       parameter: null,
       isNegative: true,
       description: 'Наносит 15 магического урона каждый ход.'
+    },
+    {
+      id: 'effect-small-heal',
+      name: 'Малое исцеление',
+      type: 'PERIODIC_HEAL',
+      duration: 1,
+      value: 30,
+      parameter: null,
+      isNegative: false,
+      description: 'Мгновенно восстанавливает 30 HP.'
     }
   ];
 

@@ -1186,6 +1186,358 @@ export const useSkill = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * * Uses a consumable item in battle (potions, scrolls, food).
+ * * Follows the same validation pattern as useSkill.
+ */
+export const useConsumable = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    const { battleId, participantId, itemId, targetId } = req.body;
+
+    const battle = await (prisma as any).battle.findUnique({
+      where: { id: battleId },
+      include: { participants: true }
+    });
+
+    if (!battle || battle.status === BattleStatus.FINISHED) {
+      return res.status(404).json({ error: 'Battle not found or finished' });
+    }
+
+    const participant = battle.participants.find((p: any) => p.id === participantId);
+    if (!participant) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    // * Check if it's the participant's turn
+    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+      return res.status(400).json({ error: "It's not your turn" });
+    }
+
+    if (!participant.characterId) {
+      return res.status(400).json({ error: 'Only player characters can use items in battle' });
+    }
+
+    // * Fetch character with inventory
+    const character = await (prisma as any).character.findUnique({
+      where: { id: participant.characterId, userId },
+      include: { inventory: true }
+    });
+
+    if (!character) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    if (!character.inventory) {
+      return res.status(400).json({ error: 'Character has no inventory' });
+    }
+
+    const inventory = character.inventory;
+    const items = JSON.parse(inventory.items || '[]');
+
+    const inventoryItem = items.find((i: any) => i.id === itemId);
+    if (!inventoryItem || inventoryItem.quantity <= 0) {
+      return res.status(404).json({ error: 'Item not found in inventory' });
+    }
+
+    const itemTemplate = await (prisma as any).itemTemplate.findUnique({
+      where: { id: inventoryItem.templateId }
+    });
+
+    if (!itemTemplate) {
+      return res.status(404).json({ error: 'Item template not found' });
+    }
+
+    if (itemTemplate.type !== 'CONSUMABLE') {
+      return res.status(400).json({ error: 'Only consumables can be used in battle' });
+    }
+
+    // * Parse metadata from description (optional JSON) for targetType/actionType
+    let meta: { targetType?: 'SELF' | 'TARGET'; actionType?: 'MAIN' | 'BONUS' } = {};
+    if (itemTemplate.description) {
+      try {
+        const parsed = JSON.parse(itemTemplate.description);
+        meta = {
+          targetType: parsed.targetType,
+          actionType: parsed.actionType
+        };
+      } catch {
+        // * Description is plain text, ignore
+      }
+    }
+
+    const targetType = meta.targetType || 'SELF';
+    const actionType = meta.actionType || 'BONUS';
+
+    // * Validate available actions
+    if (actionType === 'MAIN') {
+      if (participant.mainActions <= 0) {
+        return res.status(400).json({ error: 'Нет основного действия для использования предмета' });
+      }
+    } else {
+      // BONUS: allow spending main action if no bonus actions left
+      if (participant.bonusActions <= 0 && participant.mainActions <= 0) {
+        return res.status(400).json({ error: 'Нет действий для использования предмета' });
+      }
+    }
+
+    // * Resolve target
+    let target: BattleParticipant | null = null;
+    const isSelfTarget = targetType === 'SELF' || targetId === participantId;
+
+    if (!isSelfTarget) {
+      if (targetType === 'TARGET' && !targetId) {
+        return res.status(400).json({ error: 'Target required for this item' });
+      }
+      const foundTarget = battle.participants.find((p: any) => p.id === targetId);
+      if (!foundTarget) {
+        return res.status(404).json({ error: 'Target not found' });
+      }
+      target = { ...foundTarget } as unknown as BattleParticipant;
+    }
+
+    const updatedParticipant: BattleParticipant = { ...participant } as unknown as BattleParticipant;
+    let updatedTarget: BattleParticipant | null = target;
+
+    const logs: string[] = [];
+    const diceLogs: string[] = [];
+
+    // * Helper to consume action according to actionType
+    const applyActionCost = () => {
+      if (actionType === 'MAIN') {
+        updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+      } else {
+        if (updatedParticipant.bonusActions > 0) {
+          updatedParticipant.bonusActions = Math.max(0, updatedParticipant.bonusActions - 1);
+        } else {
+          updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+        }
+      }
+    };
+
+    // * Target for effect application
+    const targetForUse = isSelfTarget ? updatedParticipant : updatedTarget!;
+
+    // * POTIONS / FOOD: simple instant effects (heal / buff)
+    if (itemTemplate.category === 'POTION' || itemTemplate.category === 'FOOD') {
+      const maxHp = targetForUse.maxHp;
+      const currentHp = targetForUse.currentHp;
+      const healBase = itemTemplate.baseEssence || 0;
+      const healAmount = Math.max(0, Math.min(healBase, maxHp - currentHp));
+
+      targetForUse.currentHp = Math.min(maxHp, currentHp + healAmount);
+
+      applyActionCost();
+
+      if (healAmount > 0) {
+        logs.push(`${updatedParticipant.name} использует ${itemTemplate.name} и восстанавливает ${healAmount} HP.`);
+      } else {
+        logs.push(`${updatedParticipant.name} использует ${itemTemplate.name}.`);
+      }
+
+      // * Apply effects from item if any (e.g. buffs from potion)
+      if (itemTemplate.effects) {
+        try {
+          const effectIds: string[] = JSON.parse(itemTemplate.effects);
+          for (const effectId of effectIds) {
+            const template = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
+            if (template) {
+              const activeEffect: ActiveEffect = {
+                id: crypto.randomUUID(),
+                templateId: template.id,
+                name: template.name,
+                type: template.type as EffectType,
+                level: 'ORDINARY',
+                value: template.value,
+                remainingTurns: template.duration,
+                parameter: template.parameter || undefined,
+                isNegative: template.isNegative
+              };
+              EffectsEngine.applyEffect(targetForUse, activeEffect);
+              logs.push(`${updatedParticipant.name}: На ${isSelfTarget ? 'себя' : targetForUse.name} наложен эффект "${template.name}"!`);
+            }
+          }
+        } catch (e) {
+          console.error('Error applying consumable effects:', e);
+        }
+      }
+    } else if (itemTemplate.category === 'SCROLL') {
+      // * SCROLLS: offensive or utility spells, use CombatEngine for attacks
+      if (!updatedTarget || updatedTarget.id === updatedParticipant.id) {
+        return res.status(400).json({ error: 'Scroll requires a separate target' });
+      }
+
+      // * Parse range from itemTemplate.distance
+      let scrollRange: { minRange: number; maxRange: number } | undefined;
+      if (itemTemplate.distance) {
+        try {
+          const parsed = JSON.parse(itemTemplate.distance);
+          scrollRange = { minRange: parsed.minRange || 0, maxRange: parsed.maxRange || 999 };
+        } catch {
+          switch (itemTemplate.distance) {
+            case 'CLOSE':
+              scrollRange = { minRange: 0, maxRange: 5 };
+              break;
+            case 'MEDIUM':
+              scrollRange = { minRange: 5, maxRange: 20 };
+              break;
+            case 'FAR':
+              scrollRange = { minRange: 20, maxRange: 50 };
+              break;
+            case 'SNIPER':
+              scrollRange = { minRange: 50, maxRange: 200 };
+              break;
+            default:
+              scrollRange = { minRange: 0, maxRange: 999 };
+          }
+        }
+      }
+
+      const attackerCopy = { ...updatedParticipant } as unknown as BattleParticipant;
+      const defenderCopy = { ...updatedTarget } as unknown as BattleParticipant;
+
+      const scrollEssence = itemTemplate.baseEssence || 10;
+      const scrollPen = (itemTemplate.penetration as PenetrationType) || PenetrationType.NONE;
+
+      const result = CombatEngine.resolveAttack(
+        attackerCopy,
+        scrollEssence,
+        scrollPen,
+        scrollRange,
+        defenderCopy,
+        0,
+        undefined,
+        1,
+        1,
+        0,
+        0
+      );
+
+      // * If target is out of range, do not consume action or item
+      if (!result.hit && result.damageDealt === 0 && result.log && result.log.includes('вне досягаемости')) {
+        return res.status(400).json({
+          error: result.log,
+          battle: formatBattle(battle)
+        });
+      }
+
+      applyActionCost();
+
+      updatedParticipant.currentHp = attackerCopy.currentHp;
+      updatedParticipant.currentProtection = attackerCopy.currentProtection;
+
+      updatedTarget.currentHp = defenderCopy.currentHp;
+      updatedTarget.currentProtection = defenderCopy.currentProtection;
+
+      diceLogs.push(...result.diceLogs);
+      logs.push(`${updatedParticipant.name} использует свиток ${itemTemplate.name}: ${result.log}`);
+    } else {
+      // * Fallback for other consumables: just consume action with a log
+      applyActionCost();
+      logs.push(`${updatedParticipant.name} использует ${itemTemplate.name}.`);
+    }
+
+    // * Consume one item from stack
+    inventoryItem.quantity -= 1;
+    if (inventoryItem.quantity <= 0) {
+      const idx = items.findIndex((i: any) => i.id === inventoryItem.id);
+      if (idx !== -1) {
+        items.splice(idx, 1);
+      }
+    }
+
+    await (prisma as any).inventory.update({
+      where: { id: inventory.id },
+      data: { items: JSON.stringify(items) }
+    });
+
+    // * Persist participant and target changes
+    await (prisma as any).battleParticipant.update({
+      where: { id: updatedParticipant.id },
+      data: {
+        currentHp: updatedParticipant.currentHp,
+        currentProtection: updatedParticipant.currentProtection,
+        mainActions: updatedParticipant.mainActions,
+        bonusActions: updatedParticipant.bonusActions,
+        activeEffects: updatedParticipant.activeEffects,
+        bonuses: updatedParticipant.bonuses
+      }
+    });
+
+    if (updatedTarget && updatedTarget.id !== updatedParticipant.id) {
+      await (prisma as any).battleParticipant.update({
+        where: { id: updatedTarget.id },
+        data: {
+          currentHp: updatedTarget.currentHp,
+          currentProtection: updatedTarget.currentProtection,
+          activeEffects: updatedTarget.activeEffects,
+          bonuses: updatedTarget.bonuses
+        }
+      });
+    }
+
+    // * Sync participants back to characters where applicable
+    await syncParticipantToCharacter(updatedParticipant);
+    if (updatedTarget && updatedTarget.characterId) {
+      await syncParticipantToCharacter(updatedTarget);
+    }
+
+    // * Update battle log and status
+    const currentLog = JSON.parse(battle.log);
+    currentLog.push(...diceLogs, ...logs);
+
+    let finalStatus = BattleStatus.ACTIVE;
+    const anyEnemyDead = battle.participants.some((p: any) => {
+      if (!updatedTarget || p.id !== updatedTarget.id) return p.currentHp <= 0;
+      return updatedTarget.currentHp <= 0;
+    });
+
+    if (anyEnemyDead) {
+      // * Simple check: if one side is fully dead, finish battle
+      const aliveTeams = new Set(
+        battle.participants.map((p: any) => {
+          const hp =
+            updatedTarget && p.id === updatedTarget.id
+              ? updatedTarget.currentHp
+              : p.id === updatedParticipant.id
+              ? updatedParticipant.currentHp
+              : p.currentHp;
+          if (hp <= 0) return null;
+          return p.isPlayer ? 'players' : 'monsters';
+        }).filter((t: string | null) => t !== null)
+      );
+
+      if (aliveTeams.size <= 1) {
+        finalStatus = BattleStatus.FINISHED;
+      }
+    }
+
+    // * Update battle log and status
+    await (prisma as any).battle.update({
+      where: { id: battle.id },
+      data: {
+        status: finalStatus,
+        log: JSON.stringify(currentLog)
+      }
+    });
+
+    // * Reload battle with fresh participant data
+    const updatedBattle = await (prisma as any).battle.findUnique({
+      where: { id: battle.id },
+      include: { participants: true }
+    });
+
+    res.json({
+      battle: formatBattle(updatedBattle),
+      rolls: diceLogs.length > 0 ? [] : undefined // * Can add dice rolls here if needed
+    });
+  } catch (error) {
+    console.error('Use consumable error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getBattle = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;

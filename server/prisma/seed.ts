@@ -416,9 +416,32 @@ async function main() {
       rarity: 'COMMON',
       stackSize: 6,
       isUnique: false,
-      baseEssence: 100,
-      description: 'Восстанавливает здоровье.',
+      baseEssence: 30,
+      effects: JSON.stringify(['effect-small-heal']),
+      description: JSON.stringify({
+        description: 'Восстанавливает 30 HP.',
+        targetType: 'SELF',
+        actionType: 'BONUS'
+      }),
       basePrice: 50
+    },
+    {
+      id: 'scroll-simple-bolt',
+      name: 'Простой боевой свиток',
+      type: 'CONSUMABLE',
+      category: 'SCROLL',
+      rarity: 'COMMON',
+      stackSize: 5,
+      isUnique: false,
+      baseEssence: 40,
+      penetration: 'NONE',
+      distance: JSON.stringify({ minRange: 5, maxRange: 20 }),
+      description: JSON.stringify({
+        description: 'Выпускает энергетический заряд по цели на средней дистанции.',
+        targetType: 'TARGET',
+        actionType: 'MAIN'
+      }),
+      basePrice: 80
     },
     {
       id: 'con-essence-potion',

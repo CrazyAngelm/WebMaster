@@ -26,6 +26,7 @@ interface CombatState {
     weaponId: string | null
   ) => Promise<void>;
   useSkill: (participantId: string, skillId: string, targetId?: string) => Promise<void>;
+  useConsumable: (participantId: string, itemId: string, targetId?: string) => Promise<void>;
   move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
@@ -231,6 +232,61 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     } catch (error) {
       console.error('Use skill failed:', error);
       throw error; // * Re-throw to allow component to handle it
+    }
+  },
+
+  useConsumable: async (participantId, itemId, targetId) => {
+    const { battle } = get();
+    const { token } = useGameStore.getState();
+    if (!battle || !token) throw new Error('No battle or token');
+
+    try {
+      const res = await fetch(`${API_BASE}/battle/use-consumable`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          battleId: battle.id,
+          participantId,
+          itemId,
+          targetId
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) {
+        if (result.battle) {
+          set({ battle: result.battle });
+        }
+        throw new Error(result.error || 'Не удалось использовать предмет');
+      }
+
+      if (result.battle) {
+        set({ battle: result.battle });
+
+        // * Sync local character stats immediately after consumable use
+        const playerPart = result.battle.participants.find((p: any) => p.characterId === useGameStore.getState().character?.id);
+        if (playerPart) {
+          const char = useGameStore.getState().character;
+          if (char) {
+            useGameStore.getState().setCharacter({
+              ...char,
+              stats: {
+                ...char.stats,
+                essence: { ...char.stats.essence, current: playerPart.currentHp },
+                protection: { ...char.stats.protection, current: playerPart.currentProtection }
+              }
+            });
+          }
+          // * Also refresh character to get updated inventory
+          await useGameStore.getState().refreshCharacter();
+        }
+      }
+    } catch (error) {
+      console.error('Use consumable failed:', error);
+      throw error;
     }
   },
 

@@ -16,12 +16,16 @@ export const CombatScreen: React.FC = () => {
     nextTurn, 
     initiateBattle, 
     endBattle,
-    useSkill
+    useSkill,
+    useConsumable
   } = useCombatStore();
   const { character, inventory, itemTemplates, setCharacter, setNotification } = useGameStore() as any;
   const [showSkillsPanel, setShowSkillsPanel] = useState(false);
   const [skillError, setSkillError] = useState<string | null>(null);
   const [selectedSkillForTarget, setSelectedSkillForTarget] = useState<string | null>(null);
+  const [showConsumablesPanel, setShowConsumablesPanel] = useState(false);
+  const [consumableError, setConsumableError] = useState<string | null>(null);
+  const [selectedConsumableForTarget, setSelectedConsumableForTarget] = useState<string | null>(null);
 
   // * Auto-handle enemy turns
   useEffect(() => {
@@ -185,6 +189,61 @@ export const CombatScreen: React.FC = () => {
       });
       // * Don't close panel on error so user can try again
       // * Keep target selection open if it was open
+    }
+  };
+
+  const getConsumableMeta = (template: any) => {
+    let meta: { targetType: 'SELF' | 'TARGET'; actionType: 'MAIN' | 'BONUS' } = {
+      targetType: 'SELF',
+      actionType: 'BONUS'
+    };
+    if (template?.description) {
+      try {
+        const parsed = JSON.parse(template.description);
+        if (parsed.targetType === 'SELF' || parsed.targetType === 'TARGET') {
+          meta.targetType = parsed.targetType;
+        }
+        if (parsed.actionType === 'MAIN' || parsed.actionType === 'BONUS') {
+          meta.actionType = parsed.actionType;
+        }
+      } catch {
+        // description is plain text
+      }
+    }
+    return meta;
+  };
+
+  const handleUseConsumable = async (itemId: string, templateId: string, targetId?: string): Promise<void> => {
+    if (!battle || !character || !playerParticipant) return;
+
+    const template = itemTemplates.get(templateId);
+    if (!template) return;
+
+    const meta = getConsumableMeta(template);
+
+    let finalTargetId = targetId;
+    if (meta.targetType === 'SELF') {
+      finalTargetId = playerParticipant.id;
+    }
+
+    setConsumableError(null);
+    setSelectedConsumableForTarget(null);
+
+    try {
+      await useConsumable(playerParticipant.id, itemId, finalTargetId);
+      setShowConsumablesPanel(false);
+      setSelectedConsumableForTarget(null);
+      setNotification({
+        type: 'success',
+        message: `Предмет использован: ${template.name}`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось использовать предмет';
+      setConsumableError(message);
+      setNotification({
+        type: 'error',
+        message
+      });
     }
   };
 
@@ -512,6 +571,12 @@ export const CombatScreen: React.FC = () => {
                   "fantasy-button flex items-center gap-2 py-1 px-4 text-sm", 
                   (!isPlayerTurn || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) && "opacity-30 cursor-not-allowed"
                 )}
+                onClick={() => {
+                  if (!isPlayerTurn || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) return;
+                  setShowConsumablesPanel(true);
+                  setConsumableError(null);
+                  setSelectedConsumableForTarget(null);
+                }}
               >
                 <Shield size={14} /> Использовать предмет
               </button>
@@ -836,6 +901,175 @@ export const CombatScreen: React.FC = () => {
                 <div className="text-center py-8 text-gray-500">
                   <Zap size={48} className="mx-auto mb-4 opacity-30" />
                   <p className="text-sm uppercase tracking-wider">Нет доступных умений</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Consumables Panel Modal */}
+      {showConsumablesPanel && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-fantasy-surface border-2 border-fantasy-border rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-fantasy-border">
+              <h2 className="text-xl font-serif text-fantasy-accent uppercase tracking-wider flex items-center gap-2">
+                <Shield size={20} /> Использовать предмет
+              </h2>
+              <button
+                onClick={() => {
+                  setShowConsumablesPanel(false);
+                  setConsumableError(null);
+                  setSelectedConsumableForTarget(null);
+                }}
+                className="p-2 hover:bg-white/10 rounded transition-colors"
+              >
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {consumableError && (
+              <div className="mx-4 mt-4 p-3 bg-red-500/20 border border-red-500 rounded text-sm text-red-400">
+                {consumableError}
+              </div>
+            )}
+
+            {/* Consumables List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {inventory?.items && inventory.items.filter((i: any) => itemTemplates.get(i.templateId)?.type === 'CONSUMABLE').length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {inventory.items
+                    .filter((i: any) => itemTemplates.get(i.templateId)?.type === 'CONSUMABLE')
+                    .map((item: any) => {
+                      const template = itemTemplates.get(item.templateId);
+                      if (!template) return null;
+
+                      const meta = getConsumableMeta(template);
+                      const isBonus = meta.actionType === 'BONUS';
+                      const hasAction =
+                        isBonus
+                          ? (playerParticipant?.bonusActions || 0) > 0 || (playerParticipant?.mainActions || 0) > 0
+                          : (playerParticipant?.mainActions || 0) > 0;
+
+                      const availableTargets =
+                        meta.targetType === 'TARGET' && battle && playerParticipant
+                          ? battle.participants.filter(p => p.id !== playerParticipant.id && p.currentHp > 0)
+                          : [];
+
+                      const hasAvailableTarget = meta.targetType !== 'TARGET' || availableTargets.length > 0;
+                      const singleTarget = availableTargets.length === 1;
+                      const isTargetSelectionMode = selectedConsumableForTarget === item.id && availableTargets.length > 1;
+
+                      const canUse = isPlayerTurn && hasAction && hasAvailableTarget;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={clsx(
+                            "border rounded-lg p-4 transition-all",
+                            canUse && !isTargetSelectionMode
+                              ? "border-fantasy-accent bg-fantasy-accent/10 hover:bg-fantasy-accent/20 cursor-pointer"
+                              : isTargetSelectionMode
+                              ? "border-blue-500 bg-blue-500/10"
+                              : "border-fantasy-border/30 bg-black/20 opacity-60 cursor-not-allowed"
+                          )}
+                          onClick={() => {
+                            if (!canUse || isTargetSelectionMode) return;
+                            if (meta.targetType === 'TARGET') {
+                              if (singleTarget) {
+                                handleUseConsumable(item.id, item.templateId, availableTargets[0].id);
+                              } else if (availableTargets.length > 1) {
+                                setSelectedConsumableForTarget(item.id);
+                              } else {
+                                setConsumableError('Нет доступных целей');
+                              }
+                            } else {
+                              handleUseConsumable(item.id, item.templateId);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-serif text-fantasy-accent uppercase text-sm">
+                                  {template.name}
+                                </h3>
+                                <span className="text-[10px] px-2 py-0.5 rounded uppercase font-bold bg-gray-600 text-gray-300">
+                                  x{item.quantity}
+                                </span>
+                              </div>
+                              {template.description && typeof template.description === 'string' && (
+                                <p className="text-xs text-gray-400 mb-2">
+                                  {(() => {
+                                    try {
+                                      const parsed = JSON.parse(template.description as string);
+                                      return parsed.description || template.description;
+                                    } catch {
+                                      return template.description;
+                                    }
+                                  })()}
+                                </p>
+                              )}
+
+                              <div className="flex flex-wrap gap-3 text-[10px] text-gray-500">
+                                <span>Цель: {meta.targetType === 'SELF' ? 'Себя' : 'Цель'}</span>
+                                <span>Действие: {meta.actionType === 'MAIN' ? 'Основное' : 'Дополнительное'}</span>
+                                {meta.targetType === 'TARGET' && (
+                                  <span className={clsx(availableTargets.length > 0 ? 'text-green-400' : 'text-red-400')}>
+                                    Доступных целей: {availableTargets.length}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Target Selection UI */}
+                          {isTargetSelectionMode && availableTargets.length > 1 && (
+                            <div className="mt-3 pt-3 border-t border-fantasy-border/30">
+                              <div className="text-xs text-gray-400 mb-2 uppercase font-bold">Выберите цель:</div>
+                              <div className="flex flex-wrap gap-2">
+                                {availableTargets.map((target) => (
+                                  <button
+                                    key={target.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUseConsumable(item.id, item.templateId, target.id);
+                                    }}
+                                    className={clsx(
+                                      "px-3 py-2 rounded border transition-colors text-xs font-bold uppercase",
+                                      target.isPlayer
+                                        ? "border-fantasy-accent bg-fantasy-accent/20 text-fantasy-accent hover:bg-fantasy-accent/30"
+                                        : "border-fantasy-blood bg-fantasy-blood/20 text-fantasy-blood hover:bg-fantasy-blood/30"
+                                    )}
+                                  >
+                                    {target.isPlayer ? '👤' : '💀'} {target.name}
+                                    <div className="text-[10px] opacity-70 mt-1">
+                                      {Math.abs((playerParticipant?.distance || 0) - target.distance).toFixed(1)}м
+                                    </div>
+                                  </button>
+                                ))}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedConsumableForTarget(null);
+                                  }}
+                                  className="px-3 py-2 rounded border border-fantasy-border/30 bg-black/20 text-gray-400 hover:bg-black/40 text-xs font-bold uppercase"
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Shield size={48} className="mx-auto mb-4 opacity-30" />
+                  <p className="text-sm uppercase tracking-wider">Нет доступных предметов</p>
                 </div>
               )}
             </div>
