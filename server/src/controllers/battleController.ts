@@ -1003,9 +1003,14 @@ export const useSkill = async (req: Request, res: Response) => {
         });
       }
 
-      // * BUG 1 FIX: Decrement mainActions for instant skills (only if successful)
-      // * Note: On miss (success: true, hit: false), cooldown is already set by applySkill, so we keep it
-      updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+      // * BUG 1 FIX (refined):
+      // * - Instant skills (castTime === 0) должны тратить основное действие при каждом применении.
+      // * - Многоходовые скиллы (castTime > 0) тратят действие ТОЛЬКО один раз — при старте каста
+      // *   в SkillsEngine.startCasting(), а при выпуске (когда castTimeRemaining === 0) действие
+      // *   повторно не тратится.
+      if (skillTemplate.castTime === 0) {
+        updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+      }
 
       // * Apply Damage for combat skills if hit (only if target is an enemy)
       if (result.hit && skillTemplate.isCombat && updatedTarget && updatedTarget.isPlayer !== participant.isPlayer) {

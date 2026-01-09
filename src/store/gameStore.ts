@@ -35,6 +35,11 @@ interface User {
   role: 'USER' | 'ADMIN' | 'OWNER';
 }
 
+interface GameNotification {
+  type: 'success' | 'error';
+  message: string;
+}
+
 interface GameState {
   // Auth State
   user: User | null;
@@ -66,6 +71,11 @@ interface GameState {
     sync: number | null;
   };
   cooldownTickInterval: number | null;
+  
+  // Notifications
+  notification: GameNotification | null;
+  setNotification: (notification: GameNotification) => void;
+  clearNotification: () => void;
   
   // Auth Actions
   login: (login: string, password: string) => Promise<void>;
@@ -135,6 +145,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     sync: null
   },
   cooldownTickInterval: null,
+  notification: null,
+
+  // * Notifications
+  setNotification: (notification) => set({ notification }),
+  clearNotification: () => set({ notification: null }),
 
   // --- Auth Actions ---
   login: async (login, password) => {

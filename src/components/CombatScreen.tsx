@@ -18,7 +18,7 @@ export const CombatScreen: React.FC = () => {
     endBattle,
     useSkill
   } = useCombatStore();
-  const { character, inventory, itemTemplates, setCharacter } = useGameStore();
+  const { character, inventory, itemTemplates, setCharacter, setNotification } = useGameStore() as any;
   const [showSkillsPanel, setShowSkillsPanel] = useState(false);
   const [skillError, setSkillError] = useState<string | null>(null);
   const [selectedSkillForTarget, setSelectedSkillForTarget] = useState<string | null>(null);
@@ -77,23 +77,23 @@ export const CombatScreen: React.FC = () => {
     initiateBattle('mon-wolf', true);
   };
 
-  const handleAttack = async () => {
+  const handleAttack = async (): Promise<void> => {
     if (!battle || !character) return;
     
     const currentParticipant = battle.participants[battle.currentTurnIndex];
     if (!currentParticipant) return; // Robustness check
 
-    const target = battle.participants.find(p => !p.isPlayer);
+    const target = battle.participants.find((p: any) => !p.isPlayer);
     
     if (!target) return;
 
-    const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON') || null;
+    const equippedWeapon = inventory?.items.find((i: any) => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON') || null;
     
     await executeAttack(currentParticipant.id, target.id, equippedWeapon?.id || null);
     await nextTurn();
   };
 
-  const handleMove = async (direction: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => {
+  const handleMove = async (direction: 'left' | 'right' | 'towards' | 'away', targetDistance?: number): Promise<void> => {
     if (!battle || !character) return;
     const currentParticipant = battle.participants[battle.currentTurnIndex];
     if (!currentParticipant || !isPlayerTurn) return;
@@ -140,13 +140,13 @@ export const CombatScreen: React.FC = () => {
     return availableTargets;
   };
 
-  const handleUseSkill = async (skillId: string, targetId?: string) => {
+  const handleUseSkill = async (skillId: string, targetId?: string): Promise<void> => {
     if (!battle || !character) return;
     
     const currentParticipant = battle.participants[battle.currentTurnIndex];
     if (!currentParticipant || currentParticipant.characterId !== character.id) return;
 
-    const skill = character.activeSkills?.find(s => s.id === skillId);
+    const skill = character.activeSkills?.find((s: CharacterSkill) => s.id === skillId);
     if (!skill) return;
 
     const skillTemplate = StaticDataService.getSkillTemplate(skill.skillTemplateId);
@@ -171,9 +171,18 @@ export const CombatScreen: React.FC = () => {
       await useSkill(currentParticipant.id, skillId, target);
       setShowSkillsPanel(false);
       setSelectedSkillForTarget(null);
+      // * Show global notification about skill usage
+      setNotification({
+        type: 'success',
+        message: `Способность применена: ${skillTemplate.name}`,
+      });
     } catch (error) {
       // * Show error to user - action was not consumed
       setSkillError(error instanceof Error ? error.message : 'Не удалось применить способность');
+      setNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Не удалось применить способность',
+      });
       // * Don't close panel on error so user can try again
       // * Keep target selection open if it was open
     }
@@ -196,13 +205,13 @@ export const CombatScreen: React.FC = () => {
 
   const isPlayerTurn = currentParticipant.characterId === character?.id;
 
-  const playerParticipant = battle.participants.find(p => p.isPlayer);
-  const enemyParticipant = battle.participants.find(p => !p.isPlayer);
+  const playerParticipant = battle.participants.find((p: any) => p.isPlayer);
+  const enemyParticipant = battle.participants.find((p: any) => !p.isPlayer);
 
-  const equippedWeapon = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON');
+  const equippedWeapon = inventory?.items.find((i: any) => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'WEAPON');
   const weaponTemplate = equippedWeapon ? itemTemplates.get(equippedWeapon.templateId) : null;
 
-  const equippedArmor = inventory?.items.find(i => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'ARMOR');
+  const equippedArmor = inventory?.items.find((i: any) => i.isEquipped && itemTemplates.get(i.templateId)?.type === 'ARMOR');
   const armorTemplate = equippedArmor ? itemTemplates.get(equippedArmor.templateId) : null;
 
   // * Fetch speed info
@@ -258,7 +267,7 @@ export const CombatScreen: React.FC = () => {
       <div className="bg-fantasy-surface border border-fantasy-border rounded p-2 overflow-x-auto">
         <div className="flex items-center gap-4 min-w-max">
           <div className="text-[10px] uppercase font-bold text-gray-600 px-2 border-r border-fantasy-border">Инициатива</div>
-          {battle.participants.map((p, i) => (
+          {battle.participants.map((p: any, i: number) => (
             <div 
               key={p.id}
               className={clsx(
@@ -605,7 +614,7 @@ export const CombatScreen: React.FC = () => {
           <ChevronRight size={12} /> История боя
         </div>
         <div className="flex-1 overflow-y-auto space-y-1 font-mono text-xs">
-          {battle.log.map((log, i) => (
+          {battle.log.map((log: string, i: number) => (
             <div key={i} className={clsx(
               "border-l-2 pl-2",
               log.includes('Попадание') || log.includes('damage') ? "border-fantasy-blood text-gray-300" : "border-fantasy-accent/30 text-gray-500"
