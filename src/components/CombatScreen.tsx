@@ -1227,7 +1227,7 @@ export const CombatScreen: React.FC = () => {
             <div className="space-y-1 text-xs text-gray-300">
               {actionResult.dualWieldHits.map((hit: any, index: number) => (
                 <div key={index}>
-                  Удар {index + 1}: {hit?.hit ? 'попадание' : 'промах'} ({hit?.damage || 0} урона)
+                  Удар {index + 1}: {hit?.hit ? 'попадание' : 'промах'} ({hit?.damageDealt || 0} урона)
                 </div>
               ))}
             </div>
@@ -1236,7 +1236,7 @@ export const CombatScreen: React.FC = () => {
             <div className="space-y-1 text-xs text-gray-300 mt-2">
               {actionResult.aoeResults.map((entry: any, index: number) => (
                 <div key={index}>
-                  Цель {entry?.targetName || entry?.targetId || index + 1}: {entry?.hit ? 'попадание' : 'промах'} ({entry?.damage || 0} урона)
+                  Цель {entry?.target?.name || entry?.target?.id || index + 1}: {entry?.hit ? 'попадание' : 'промах'} ({entry?.damageDealt || 0} урона)
                 </div>
               ))}
               {typeof aoeTotalDamage === 'number' && (

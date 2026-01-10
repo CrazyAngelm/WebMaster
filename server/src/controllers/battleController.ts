@@ -1416,7 +1416,7 @@ export const useSkill = async (req: Request, res: Response) => {
         // * Find all targets in AoE radius
         const primaryTargetDistance = target.distance;
         const aoeTargets = battle.participants.filter((p: any) => {
-          if (p.id === participant.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false;
+          if (p.id === participant.id || p.id === target.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false;
           if (p.isPlayer === participant.isPlayer) return false; // Exclude allies
           const distance = Math.abs(primaryTargetDistance - p.distance);
           return distance <= aoeRadius;

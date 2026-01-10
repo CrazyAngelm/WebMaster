@@ -1,7 +1,7 @@
-// 📁 server/src/controllers/adminController.ts - Admin controller
-// 🎯 Core function: Handles administrative actions (gold, time, rest)
-// 🔗 Key dependencies: prisma
-// 💡 Usage: Called by adminRoutes
+﻿// рџ“Ѓ server/src/controllers/adminController.ts - Admin controller
+// рџЋЇ Core function: Handles administrative actions (gold, time, rest)
+// рџ”— Key dependencies: prisma
+// рџ’Ў Usage: Called by adminRoutes
 
 import { Request, Response } from 'express';
 import prisma from '../db';
@@ -120,7 +120,9 @@ export const updateConfig = async (req: Request, res: Response) => {
       where: { key },
       update: { value: typeof value === 'string' ? value : JSON.stringify(value) },
       create: { key, value: typeof value === 'string' ? value : JSON.stringify(value) }
-    });    res.json({ message: `Config ${key} updated`, config });
+    });
+
+    res.json({ message: `Config ${key} updated`, config });
   } catch (error) {
     console.error('Update config error:', error);
     res.status(500).json({ error: 'Internal server error' });
