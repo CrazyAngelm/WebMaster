@@ -269,4 +269,6 @@ model BattleParticipant {
   bonuses           String?   // CharacterBonuses (JSON string)
   activeEffects     String    @default("[]") // ActiveEffect[] (JSON string)
   isBlocking        Boolean   @default(false) // Active shield block flag
+  status            String    @default("ALIVE") // ALIVE | DOWNED | DEAD
+  downedRoundsRemaining Int   @default(0)
 }

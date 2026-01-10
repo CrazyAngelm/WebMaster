@@ -25,6 +25,7 @@ export const CombatScreen: React.FC = () => {
   const useSkill = useCombatStore(state => state.useSkill);
   const useConsumable = useCombatStore(state => state.useConsumable);
   const blockWithShield = useCombatStore(state => state.blockWithShield);
+  const revive = useCombatStore(state => state.revive);
 
   const character = useGameStore(state => state.character) as any;
   const inventory = useGameStore(state => state.inventory);
@@ -56,7 +57,7 @@ export const CombatScreen: React.FC = () => {
       if (!isPlayerTurn) {
         // * Enemy AI Turn
         const timer = setTimeout(async () => {
-          const target = battle.participants.find(p => p.isPlayer);
+          const target = battle.participants.find(p => p.isPlayer && p.status !== 'DOWNED' && p.status !== 'DEAD');
           if (target) {
             // Check range
             const dist = Math.abs(currentParticipant.distance - target.distance);
@@ -92,7 +93,7 @@ export const CombatScreen: React.FC = () => {
               essence: { ...character.stats.essence, current: playerParticipant.currentHp },
               protection: { ...character.stats.protection, current: playerParticipant.currentProtection }
             },
-            isDead: playerParticipant.currentHp <= 0
+            isDead: playerParticipant.status === 'DEAD'
           });
         }
       }
@@ -184,6 +185,22 @@ export const CombatScreen: React.FC = () => {
     }
   };
 
+  const handleRevive = async (): Promise<void> => {
+    if (!battle || !playerParticipant || !reviveTarget) return;
+    if (!canReviveTarget) {
+      setNotification({ type: 'error', message: 'Союзник слишком далеко' });
+      return;
+    }
+
+    try {
+      await revive(playerParticipant.id, reviveTarget.id);
+      await nextTurn();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось поднять союзника';
+      setNotification({ type: 'error', message });
+    }
+  };
+
   const handleAoeTarget = async (centerId: string): Promise<void> => {
     if (!aoeSelection || !battle) return;
     
@@ -194,7 +211,7 @@ export const CombatScreen: React.FC = () => {
     if (!center) return;
 
     const targetsInRadius = battle.participants.filter(p => {
-      if (p.currentHp <= 0) return false;
+      if (!isAlive(p)) return false;
       if (p.id === playerParticipant.id) return false;
       return Math.abs(p.distance - center.distance) <= aoeSelection.radius;
     });
@@ -293,7 +310,7 @@ export const CombatScreen: React.FC = () => {
 
     // * Check all participants
     for (const participant of battle.participants) {
-      if (participant.id === playerParticipant.id || participant.currentHp <= 0) continue;
+      if (participant.id === playerParticipant.id || !isAlive(participant)) continue;
       
       const distance = Math.abs(playerParticipant.distance - participant.distance);
       if (distance >= skillRange.minRange && distance <= skillRange.maxRange) {
@@ -526,6 +543,11 @@ export const CombatScreen: React.FC = () => {
 
   const playerParticipant = battle.participants.find((p: any) => p.isPlayer);
   const enemyParticipant = battle.participants.find((p: any) => !p.isPlayer);
+  const isPlayerDowned = playerParticipant?.status === 'DOWNED' || playerParticipant?.status === 'DEAD';
+  const isAlive = (p: any) => p?.status !== 'DOWNED' && p?.status !== 'DEAD';
+  const downedAllies = battle.participants.filter((p: any) => p.isPlayer === playerParticipant?.isPlayer && p.id !== playerParticipant?.id && p.status === 'DOWNED');
+  const reviveTarget = downedAllies[0] || null;
+  const canReviveTarget = !!(reviveTarget && playerParticipant && Math.abs(playerParticipant.distance - reviveTarget.distance) <= 5);
 
   const equippedWeapons = inventory?.items.filter((i: any) => {
     const template = itemTemplates.get(i.templateId);
@@ -627,28 +649,40 @@ export const CombatScreen: React.FC = () => {
       <div className="bg-fantasy-surface border border-fantasy-border rounded p-2 overflow-x-auto">
         <div className="flex items-center gap-4 min-w-max">
           <div className="text-[10px] uppercase font-bold text-gray-600 px-2 border-r border-fantasy-border">Инициатива</div>
-          {battle.participants.map((p: any, i: number) => (
+          {battle.participants.map((p: any, i: number) => {
+            const isDowned = p.status === 'DOWNED';
+            const isDead = p.status === 'DEAD';
+            return (
             <div 
               key={p.id}
               className={clsx(
                 "px-3 py-1 rounded border transition-all text-xs font-bold uppercase flex items-center gap-2",
                 i === battle.currentTurnIndex 
                 ? "bg-fantasy-accent text-fantasy-dark border-white scale-110 z-10" 
+                : isDead
+                ? "bg-black/10 border-fantasy-border text-gray-600 line-through"
+                : isDowned
+                ? "bg-yellow-900/40 border-yellow-500/40 text-yellow-200"
                 : "bg-black/30 border-fantasy-border text-gray-500"
               )}
             >
               {p.isPlayer ? <UserIcon /> : <Skull size={14} />}
               <span>{p.name}</span>
               <span className="opacity-50">#{p.initiative}</span>
+              {isDowned && (
+                <span className="opacity-70">
+                  DOWNED {typeof p.downedRoundsRemaining === 'number' ? `(${p.downedRoundsRemaining})` : ''}
+                </span>
+              )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
 
       {/* Battle Scene (1D Line) */}
       <div className="relative h-64 bg-black/40 border-y border-fantasy-border/30 rounded-lg overflow-hidden flex flex-col justify-end pb-8">
         {/* Hint text */}
-        {isPlayerTurn && playerParticipant?.mainActions! > 0 && (
+        {isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-[9px] text-gray-400 uppercase tracking-wider pointer-events-none">
             Кликните по линии для перемещения
           </div>
@@ -658,20 +692,20 @@ export const CombatScreen: React.FC = () => {
         <div 
           className={clsx(
             "absolute inset-0 z-10 cursor-crosshair transition-colors",
-            isPlayerTurn && playerParticipant?.mainActions! > 0 && "hover:bg-fantasy-accent/5"
+            isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && "hover:bg-fantasy-accent/5"
           )}
           onClick={(e) => {
-            if (!isPlayerTurn || playerParticipant?.mainActions === 0 || aoeSelection) return;
+            if (!isPlayerTurn || playerParticipant?.mainActions === 0 || aoeSelection || isPlayerDowned) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const percentage = (x / rect.width) * 100;
             const clickedDistance = ((percentage - 50) / 100) * 200; // -100 to 100 range
             handleMove('towards', clickedDistance);
           }}
-          title={isPlayerTurn && playerParticipant?.mainActions! > 0 ? "Кликните по линии для перемещения" : undefined}
+          title={isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned ? "Кликните по линии для перемещения" : undefined}
         >
           {/* Visual reach indicator for movement */}
-          {isPlayerTurn && playerParticipant?.mainActions! > 0 && playerParticipant && (
+          {isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && playerParticipant && (
             <div 
               className="absolute bottom-0 h-1 bg-fantasy-accent/30 pointer-events-none transition-all"
               style={{ 
@@ -703,9 +737,11 @@ export const CombatScreen: React.FC = () => {
             // Range: -100m to 100m for visualization
             const leftPos = 50 + (p.distance / 200) * 100;
             const isCurrent = p.id === currentParticipant.id;
+            const isDowned = p.status === 'DOWNED';
+            const isDead = p.status === 'DEAD';
 
             // * Check distance to nearest enemy for visual separation
-            const otherParticipants = battle.participants.filter(op => op.id !== p.id && op.currentHp > 0);
+            const otherParticipants = battle.participants.filter(op => op.id !== p.id && isAlive(op));
             const nearestOther = otherParticipants.length > 0
               ? otherParticipants.reduce((prev, curr) => 
                   Math.abs(curr.distance - p.distance) < Math.abs(prev.distance - p.distance) ? curr : prev
@@ -734,7 +770,11 @@ export const CombatScreen: React.FC = () => {
             return (
               <div 
                 key={p.id}
-                className="absolute transition-all duration-700 ease-out flex flex-col items-center"
+                className={clsx(
+                  "absolute transition-all duration-700 ease-out flex flex-col items-center",
+                  isDead && "opacity-40 grayscale",
+                  isDowned && !isDead && "opacity-80 grayscale"
+                )}
                 style={{ 
                   left: `${leftPos}%`, 
                   transform: 'translateX(-50%)',
@@ -743,7 +783,7 @@ export const CombatScreen: React.FC = () => {
                 }}
                 title={playerParticipant ? `Дистанция до игрока: ${distanceToPlayer.toFixed(1)}м` : undefined}
                 onMouseEnter={() => {
-                  if (aoeSelection && isPlayerTurn && p.currentHp > 0) {
+                  if (aoeSelection && isPlayerTurn && isAlive(p)) {
                     setAoeHoverCenterId(p.id);
                   }
                 }}
@@ -753,7 +793,7 @@ export const CombatScreen: React.FC = () => {
                   }
                 }}
                 onClick={() => {
-                  if (aoeSelection && isPlayerTurn && p.currentHp > 0) {
+                  if (aoeSelection && isPlayerTurn && isAlive(p)) {
                     handleAoeTarget(p.id);
                   }
                 }}
@@ -785,7 +825,9 @@ export const CombatScreen: React.FC = () => {
                     isCurrent && "ring-4 ring-white ring-offset-2 ring-offset-black/50",
                     isClose && "ring-2 ring-yellow-500/50 ring-offset-1",
                     isAoePreview && "ring-2 ring-fantasy-accent/60 ring-offset-2 ring-offset-black/50",
-                    isAoeCenter && "ring-2 ring-white ring-offset-4 ring-offset-black/60"
+                    isAoeCenter && "ring-2 ring-white ring-offset-4 ring-offset-black/60",
+                    isDowned && "border-yellow-500/70",
+                    isDead && "border-gray-600"
                   )}>
                     {p.isPlayer ? <UserIcon size={32} className="text-fantasy-accent" /> : <Skull size={32} className="text-fantasy-blood" />}
                   </div>
@@ -803,6 +845,14 @@ export const CombatScreen: React.FC = () => {
                     )}>
                       {p.name}
                     </div>
+                    {(isDowned || isDead) && (
+                      <div className={clsx(
+                        "text-[9px] uppercase font-bold",
+                        isDead ? "text-gray-500" : "text-yellow-300"
+                      )}>
+                        {isDead ? "DEAD" : `DOWNED ${typeof p.downedRoundsRemaining === 'number' ? `(${p.downedRoundsRemaining})` : ''}`}
+                      </div>
+                    )}
                     <div className="flex flex-col gap-1 items-center mt-1">
                       <div className="w-16 h-1 bg-black/50 rounded-full overflow-hidden">
                         <div className="h-full bg-fantasy-essence" style={{ width: `${(p.currentHp / p.maxHp) * 100}%` }} />
@@ -855,11 +905,11 @@ export const CombatScreen: React.FC = () => {
             <div className="flex flex-wrap gap-4 justify-center items-center">
               <div className="flex items-center gap-2 border-r border-fantasy-border/30 pr-4">
                 <button 
-                  disabled={!isPlayerTurn || playerParticipant?.mainActions === 0} 
+                  disabled={!isPlayerTurn || playerParticipant?.mainActions === 0 || isPlayerDowned} 
                   onClick={() => handleMove('towards')}
                   className={clsx(
                     "p-2 rounded border border-fantasy-border hover:bg-white/10 transition-colors flex items-center gap-2", 
-                    (!isPlayerTurn || playerParticipant?.mainActions === 0) && "opacity-30 cursor-not-allowed"
+                    (!isPlayerTurn || playerParticipant?.mainActions === 0 || isPlayerDowned) && "opacity-30 cursor-not-allowed"
                   )}
                   title="Подойти к врагу"
                 >
@@ -871,11 +921,11 @@ export const CombatScreen: React.FC = () => {
                   <span className="text-[8px] opacity-70">(Осн.)</span>
                 </div>
                 <button 
-                  disabled={!isPlayerTurn || playerParticipant?.mainActions === 0} 
+                  disabled={!isPlayerTurn || playerParticipant?.mainActions === 0 || isPlayerDowned} 
                   onClick={() => handleMove('away')}
                   className={clsx(
                     "p-2 rounded border border-fantasy-border hover:bg-white/10 transition-colors flex items-center gap-2", 
-                    (!isPlayerTurn || playerParticipant?.mainActions === 0) && "opacity-30 cursor-not-allowed"
+                    (!isPlayerTurn || playerParticipant?.mainActions === 0 || isPlayerDowned) && "opacity-30 cursor-not-allowed"
                   )}
                   title="Отойти от врага"
                 >
@@ -885,11 +935,11 @@ export const CombatScreen: React.FC = () => {
               </div>
 
               <button 
-                disabled={!isPlayerTurn || !inRange || playerParticipant?.mainActions === 0} 
+                disabled={!isPlayerTurn || !inRange || playerParticipant?.mainActions === 0 || isPlayerDowned} 
                 onClick={handleAttack}
                 className={clsx(
                   "fantasy-button flex items-center gap-2 px-8 min-w-[140px]", 
-                  (!isPlayerTurn || !inRange || playerParticipant?.mainActions === 0) && "opacity-30 cursor-not-allowed"
+                  (!isPlayerTurn || !inRange || playerParticipant?.mainActions === 0 || isPlayerDowned) && "opacity-30 cursor-not-allowed"
                 )}
               >
                 <Sword size={18} /> {hasDualWield ? (inRange ? 'Атака двумя оружиями' : 'Вне дальности') : (inRange ? 'Атака' : 'Вне дальности')}
@@ -897,14 +947,14 @@ export const CombatScreen: React.FC = () => {
 
               <div className="relative">
                 <button 
-                  disabled={!canBlockWithShield} 
+                  disabled={!canBlockWithShield || isPlayerDowned} 
                   onClick={() => {
-                    if (!canBlockWithShield) return;
+                    if (!canBlockWithShield || isPlayerDowned) return;
                     setShowShieldBlockOptions(prev => !prev);
                   }}
                   className={clsx(
                     "fantasy-button flex items-center gap-2 px-6", 
-                    !canBlockWithShield && "opacity-30 cursor-not-allowed"
+                    (!canBlockWithShield || isPlayerDowned) && "opacity-30 cursor-not-allowed"
                   )}
                 >
                   <Shield size={18} /> Блокировать щитом
@@ -912,21 +962,21 @@ export const CombatScreen: React.FC = () => {
                 {showShieldBlockOptions && (
                   <div className="absolute left-1/2 -translate-x-1/2 mt-2 z-20 bg-black/90 border border-fantasy-border rounded p-2 flex gap-2">
                     <button
-                      disabled={!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0}
+                      disabled={!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0 || isPlayerDowned}
                       onClick={() => handleBlockWithShield('MAIN')}
                       className={clsx(
                         "px-3 py-1 text-[10px] uppercase font-bold rounded border border-orange-500 text-orange-400",
-                        (!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0) && "opacity-40 cursor-not-allowed"
+                        (!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0 || isPlayerDowned) && "opacity-40 cursor-not-allowed"
                       )}
                     >
                       Основное
                     </button>
                     <button
-                      disabled={!isPlayerTurn || (playerParticipant?.bonusActions || 0) === 0}
+                      disabled={!isPlayerTurn || (playerParticipant?.bonusActions || 0) === 0 || isPlayerDowned}
                       onClick={() => handleBlockWithShield('BONUS')}
                       className={clsx(
                         "px-3 py-1 text-[10px] uppercase font-bold rounded border border-blue-400 text-blue-300",
-                        (!isPlayerTurn || (playerParticipant?.bonusActions || 0) === 0) && "opacity-40 cursor-not-allowed"
+                        (!isPlayerTurn || (playerParticipant?.bonusActions || 0) === 0 || isPlayerDowned) && "opacity-40 cursor-not-allowed"
                       )}
                     >
                       Доп.
@@ -934,10 +984,24 @@ export const CombatScreen: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {reviveTarget && (
+                <button
+                  disabled={!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0 || isPlayerDowned || !canReviveTarget}
+                  onClick={handleRevive}
+                  className={clsx(
+                    "fantasy-button flex items-center gap-2 px-6 border-yellow-500/40",
+                    (!isPlayerTurn || (playerParticipant?.mainActions || 0) === 0 || isPlayerDowned || !canReviveTarget) && "opacity-30 cursor-not-allowed"
+                  )}
+                  title={canReviveTarget ? `Поднять ${reviveTarget.name}` : 'Слишком далеко'}
+                >
+                  <Shield size={18} /> Поднять
+                </button>
+              )}
               
               {(() => {
                 const hasReadySkill = character?.activeSkills?.some((s: CharacterSkill) => s.castTimeRemaining === 0);
-                const canOpenSkills = isPlayerTurn && (playerParticipant?.mainActions! > 0 || hasReadySkill);
+                const canOpenSkills = isPlayerTurn && !isPlayerDowned && (playerParticipant?.mainActions! > 0 || hasReadySkill);
 
                 return (
                   <button 
@@ -958,13 +1022,13 @@ export const CombatScreen: React.FC = () => {
             <div className="flex flex-wrap gap-4 justify-center items-center border-t border-fantasy-border/10 pt-4">
               <div className="text-[10px] uppercase font-bold text-blue-400">Доп. действие:</div>
               <button 
-                disabled={!isPlayerTurn || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)} 
+                disabled={!isPlayerTurn || isPlayerDowned || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)} 
                 className={clsx(
                   "fantasy-button flex items-center gap-2 py-1 px-4 text-sm", 
-                  (!isPlayerTurn || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) && "opacity-30 cursor-not-allowed"
+                  (!isPlayerTurn || isPlayerDowned || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) && "opacity-30 cursor-not-allowed"
                 )}
                 onClick={() => {
-                  if (!isPlayerTurn || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) return;
+                  if (!isPlayerTurn || isPlayerDowned || (playerParticipant?.bonusActions === 0 && playerParticipant?.mainActions === 0)) return;
                   setShowConsumablesPanel(true);
                   setConsumableError(null);
                   setSelectedConsumableForTarget(null);
@@ -1011,6 +1075,42 @@ export const CombatScreen: React.FC = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Status Panel */}
+      <div className="bg-fantasy-surface border border-fantasy-border rounded p-4">
+        <div className="text-[10px] uppercase font-bold text-gray-500 mb-3">Статусы участников</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {battle.participants.map((p: any) => {
+            const isDowned = p.status === 'DOWNED';
+            const isDead = p.status === 'DEAD';
+            return (
+              <div
+                key={p.id}
+                className={clsx(
+                  "flex items-center justify-between gap-3 rounded border px-3 py-2",
+                  isDead
+                    ? "border-gray-700 bg-black/30 text-gray-500"
+                    : isDowned
+                    ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
+                    : "border-fantasy-border/40 bg-black/20 text-gray-300"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {p.isPlayer ? <UserIcon size={14} /> : <Skull size={14} />}
+                  <span className="text-xs uppercase font-bold">{p.name}</span>
+                </div>
+                <div className="text-[10px] uppercase font-bold">
+                  {isDead
+                    ? "DEAD"
+                    : isDowned
+                    ? `DOWNED ${typeof p.downedRoundsRemaining === 'number' ? `(${p.downedRoundsRemaining})` : ''}`
+                    : "ALIVE"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Equipment & Info (Side Panels or bottom) */}
@@ -1184,7 +1284,7 @@ export const CombatScreen: React.FC = () => {
                     if (!skillTemplate) return null;
 
                     const availableTargets = (skillTemplate.targetType === 'TARGET' || skillTemplate.targetType === 'AREA')
-                      ? (skillTemplate.targetType === 'TARGET' ? getAvailableTargets(skillTemplate) : battle.participants.filter(p => p.id !== playerParticipant?.id && p.currentHp > 0))
+                      ? (skillTemplate.targetType === 'TARGET' ? getAvailableTargets(skillTemplate) : battle.participants.filter(p => p.id !== playerParticipant?.id && isAlive(p)))
                       : [];
                     const hasAvailableTarget = (skillTemplate.targetType !== 'TARGET' && skillTemplate.targetType !== 'AREA') || availableTargets.length > 0;
                     const singleTarget = availableTargets.length === 1;
@@ -1418,16 +1518,24 @@ export const CombatScreen: React.FC = () => {
                           ? (playerParticipant?.bonusActions || 0) > 0 || (playerParticipant?.mainActions || 0) > 0
                           : (playerParticipant?.mainActions || 0) > 0;
 
+                      const allowDownedTargets =
+                        template.category === 'POTION' ||
+                        template.category === 'FOOD' ||
+                        template.category === 'TREATMENT';
+
                       const availableTargets =
                         (meta.targetType === 'TARGET' || meta.targetType === 'AREA') && battle && playerParticipant
-                          ? battle.participants.filter(p => p.id !== playerParticipant.id && p.currentHp > 0)
+                          ? battle.participants.filter(p => {
+                              if (p.id === playerParticipant.id) return false;
+                              return allowDownedTargets ? p.status !== 'DEAD' : isAlive(p);
+                            })
                           : [];
 
                       const hasAvailableTarget = (meta.targetType !== 'TARGET' && meta.targetType !== 'AREA') || availableTargets.length > 0;
                       const singleTarget = availableTargets.length === 1;
                       const isTargetSelectionMode = selectedConsumableForTarget === item.id && availableTargets.length > 1;
 
-                      const canUse = isPlayerTurn && hasAction && hasAvailableTarget;
+                      const canUse = isPlayerTurn && !isPlayerDowned && hasAction && hasAvailableTarget;
 
                       return (
                         <div

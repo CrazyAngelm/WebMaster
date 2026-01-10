@@ -28,6 +28,7 @@ interface CombatState {
   useSkill: (participantId: string, skillId: string, targetId?: string) => Promise<any>;
   useConsumable: (participantId: string, itemId: string, targetId?: string) => Promise<any>;
   blockWithShield: (participantId: string, actionType: 'MAIN' | 'BONUS') => Promise<any>;
+  revive: (reviverId: string, targetId: string) => Promise<any>;
   move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
@@ -233,6 +234,45 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
   },
 
+  revive: async (reviverId, targetId) => {
+    const { battle } = get();
+    const { token } = useGameStore.getState();
+    if (!battle || !token) throw new Error('No battle or token');
+
+    try {
+      const res = await fetch(`${API_BASE}/battle/revive`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          battleId: battle.id,
+          reviverId,
+          targetId
+        })
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        if (result.battle) {
+          set({ battle: result.battle });
+        }
+        throw new Error(result.error || 'Не удалось поднять союзника');
+      }
+
+      if (result.battle) {
+        set({ battle: result.battle });
+        await useGameStore.getState().refreshCharacter();
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Revive failed:', error);
+      throw error;
+    }
+  },
+
   useSkill: async (participantId, skillId, targetId) => {
     const { battle } = get();
     const { token } = useGameStore.getState();
@@ -428,5 +468,4 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     await useGameStore.getState().refreshCharacter();
   }
 }));
-
 

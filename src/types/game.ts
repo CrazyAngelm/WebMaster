@@ -29,6 +29,12 @@ export enum BattleStatus {
   FINISHED = 'FINISHED',
 }
 
+export enum ParticipantStatus {
+  ALIVE = 'ALIVE',
+  DOWNED = 'DOWNED',
+  DEAD = 'DEAD',
+}
+
 export enum EffectType {
   BUFF = 'BUFF',
   DEBUFF = 'DEBUFF',
@@ -419,6 +425,8 @@ export interface BattleParticipant {
   distance: number;
   activeEffects?: ActiveEffect[];
   isBlocking?: boolean;
+  status?: ParticipantStatus;
+  downedRoundsRemaining?: number;
 }
 
 export interface Effect {

@@ -18,6 +18,12 @@ export enum BattleStatus {
   FINISHED = 'FINISHED',
 }
 
+export enum ParticipantStatus {
+  ALIVE = 'ALIVE',
+  DOWNED = 'DOWNED',
+  DEAD = 'DEAD',
+}
+
 export enum EffectType {
   BUFF = 'BUFF',
   DEBUFF = 'DEBUFF',
@@ -118,6 +124,8 @@ export interface BattleParticipant {
   bonuses: string | null | undefined;
   activeEffects: string; // JSON string of ActiveEffect[]
   isBlocking?: boolean; // Active shield block flag
+  status?: ParticipantStatus;
+  downedRoundsRemaining?: number;
 }
 
 export interface SkillTemplate {

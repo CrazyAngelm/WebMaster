@@ -19,6 +19,7 @@ import {
   EffectType, 
   BattleParticipant, 
   CharacterBonuses,
+  ParticipantStatus,
   SkillTemplate,
   CharacterSkill
 } from '../types/game';
@@ -68,9 +69,27 @@ const formatBattle = (battle: any) => {
       ...p,
       bonuses: p.bonuses ? JSON.parse(p.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 },
       activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : [],
-      isBlocking: p.isBlocking || false
+      isBlocking: p.isBlocking || false,
+      status: p.status || ParticipantStatus.ALIVE,
+      downedRoundsRemaining: p.downedRoundsRemaining ?? 0
     }))
   };
+};
+
+const DOWNED_ROUNDS = 3;
+
+const getParticipantStatus = (participant: any): ParticipantStatus => {
+  return (participant?.status as ParticipantStatus) || ParticipantStatus.ALIVE;
+};
+
+const ensureDownedStatus = (participant: any, logs?: string[]): void => {
+  if (getParticipantStatus(participant) === ParticipantStatus.ALIVE && participant.currentHp <= 0) {
+    participant.status = ParticipantStatus.DOWNED;
+    participant.downedRoundsRemaining = DOWNED_ROUNDS;
+    if (logs) {
+      logs.push(`${participant.name} падает без сознания.`);
+    }
+  }
 };
 
 export const startBattle = async (req: Request, res: Response) => {
@@ -92,7 +111,7 @@ export const startBattle = async (req: Request, res: Response) => {
 
     if (existingBattle) {
       // * Check if this battle should actually be finished
-      const hasDeadParticipant = existingBattle.participants.some((p: any) => p.currentHp <= 0);
+      const hasDeadParticipant = existingBattle.participants.some((p: any) => getParticipantStatus(p) === ParticipantStatus.DEAD);
       if (hasDeadParticipant) {
         await (prisma as any).battle.update({
           where: { id: existingBattle.id },
@@ -202,7 +221,9 @@ export const startBattle = async (req: Request, res: Response) => {
             isPlayer: p.isPlayer,
             distance: p.distance,
             bonuses: p.bonuses,
-            isBlocking: false // * Initialize blocking flag
+            isBlocking: false, // * Initialize blocking flag
+            status: ParticipantStatus.ALIVE,
+            downedRoundsRemaining: 0
           }))
         }
       },
@@ -239,6 +260,10 @@ export const move = async (req: Request, res: Response) => {
 
     const participant = battle.participants.find((p: any) => p.id === participantId);
     if (!participant) return res.status(404).json({ error: 'Participant not found' });
+
+    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Cannot move while downed or dead' });
+    }
 
     // * Check turn
     if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
@@ -282,7 +307,7 @@ export const move = async (req: Request, res: Response) => {
       newDistance = oldDistance + delta;
     } else {
       // * Legacy direction-based movement
-      const enemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+      const enemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && getParticipantStatus(p) === ParticipantStatus.ALIVE);
       const nearestEnemy = enemies.length > 0 
         ? enemies.reduce((prev: any, curr: any) => Math.abs(curr.distance - oldDistance) < Math.abs(prev.distance - oldDistance) ? curr : prev)
         : null;
@@ -309,7 +334,7 @@ export const move = async (req: Request, res: Response) => {
     }
 
     // * Final check: ensure we don't violate minimum distance with any enemy
-    const allEnemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0);
+    const allEnemies = battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && getParticipantStatus(p) === ParticipantStatus.ALIVE);
     for (const enemy of allEnemies) {
       const finalDist = Math.abs(newDistance - (enemy as any).distance);
       if (finalDist < MIN_COMBAT_DISTANCE) {
@@ -325,10 +350,9 @@ export const move = async (req: Request, res: Response) => {
 
     const log: string[] = [];
     const diceLogs: string[] = [];
-    let isDead = false;
 
     // * Check for Attacks of Opportunity
-    for (const enemy of battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && p.currentHp > 0)) {
+    for (const enemy of battle.participants.filter((p: any) => p.isPlayer !== participant.isPlayer && getParticipantStatus(p) === ParticipantStatus.ALIVE)) {
       const distOld = Math.abs(oldDistance - (enemy as any).distance);
       const distNew = Math.abs(newDistance - (enemy as any).distance);
 
@@ -348,10 +372,9 @@ export const move = async (req: Request, res: Response) => {
         log.push(`${enemy.name}: ${aooResult.log}`);
         
         participant.currentHp = Math.max(0, participant.currentHp - aooResult.damageDealt);
-        if (participant.currentHp <= 0) {
-          log.push(`${participant.name} повержен при попытке отступления!`);
-          isDead = true;
-          break; 
+        ensureDownedStatus(participant, log);
+        if (participant.status === ParticipantStatus.DOWNED) {
+          break;
         }
       }
     }
@@ -362,7 +385,9 @@ export const move = async (req: Request, res: Response) => {
       data: {
         distance: newDistance,
         currentHp: participant.currentHp,
-        mainActions: participant.mainActions - 1 
+        mainActions: participant.mainActions - 1,
+        status: participant.status || ParticipantStatus.ALIVE,
+        downedRoundsRemaining: participant.downedRoundsRemaining ?? 0
       }
     });
 
@@ -380,27 +405,10 @@ export const move = async (req: Request, res: Response) => {
     movementMessage += '.';
     const updatedLog = [...currentLog, ...diceLogs, ...log, movementMessage];
 
-    if (isDead) {
-      await (prisma as any).battle.update({
-        where: { id: battle.id },
-        data: {
-          status: BattleStatus.FINISHED,
-          log: JSON.stringify(updatedLog)
-        }
-      });
-      
-      if (participant.characterId) {
-        await (prisma as any).character.update({
-          where: { id: participant.characterId },
-          data: { isDead: true }
-        });
-      }
-    } else {
-      await (prisma as any).battle.update({
-        where: { id: battle.id },
-        data: { log: JSON.stringify(updatedLog) }
-      });
-    }
+    await (prisma as any).battle.update({
+      where: { id: battle.id },
+      data: { log: JSON.stringify(updatedLog) }
+    });
 
     const updatedBattle = await (prisma as any).battle.findUnique({
       where: { id: battle.id },
@@ -438,6 +446,14 @@ export const resolveAttack = async (req: Request, res: Response) => {
 
     if (!attacker || !target) {
       return res.status(404).json({ error: 'Participants not found' });
+    }
+
+    if (getParticipantStatus(attacker) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Cannot attack while downed or dead' });
+    }
+
+    if (getParticipantStatus(target) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Target is downed or dead' });
     }
 
     // * Check if it's the attacker's turn
@@ -659,7 +675,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
         // * Find all targets in AoE radius from primary target
         const primaryTargetDistance = target.distance;
         const aoeTargets = battle.participants.filter((p: any) => {
-          if (p.id === attacker.id || p.currentHp <= 0) return false; // Exclude attacker and dead participants
+          if (p.id === attacker.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false; // Exclude attacker and downed/dead participants
           if (p.isPlayer === attacker.isPlayer) return false; // Exclude allies
           const distance = Math.abs(primaryTargetDistance - p.distance);
           return distance <= aoeRadius;
@@ -729,12 +745,15 @@ export const resolveAttack = async (req: Request, res: Response) => {
           if (aoeTargetResult.hit) {
             const aoeTarget = aoeTargets[i];
             aoeTarget.currentHp = Math.max(0, aoeTarget.currentHp - aoeTargetResult.damageDealt);
+            ensureDownedStatus(aoeTarget, aoeResult.logs);
             // * Update target in DB
             await (prisma as any).battleParticipant.update({
               where: { id: aoeTarget.id },
               data: {
                 currentHp: aoeTarget.currentHp,
-                currentProtection: aoeTarget.currentProtection
+                currentProtection: aoeTarget.currentProtection,
+                status: aoeTarget.status || ParticipantStatus.ALIVE,
+                downedRoundsRemaining: aoeTarget.downedRoundsRemaining ?? 0
               }
             });
             
@@ -926,6 +945,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     }
 
     // * Update target state with NEW values after damage and effects application
+    ensureDownedStatus(targetCopy, itemUpdatesLog);
     const updatedTarget = await (prisma as any).battleParticipant.update({
       where: { id: target.id },
       data: {
@@ -933,7 +953,9 @@ export const resolveAttack = async (req: Request, res: Response) => {
         currentProtection: Math.max(0, targetCopy.currentProtection),
         activeEffects: activeEffectsOnTarget,
         bonuses: bonusesOnTarget,
-        isBlocking: targetCopy.isBlocking || false // Reset blocking after use
+        isBlocking: targetCopy.isBlocking || false, // Reset blocking after use
+        status: targetCopy.status || ParticipantStatus.ALIVE,
+        downedRoundsRemaining: targetCopy.downedRoundsRemaining ?? 0
       }
     });
 
@@ -963,43 +985,26 @@ export const resolveAttack = async (req: Request, res: Response) => {
     const currentLog = JSON.parse(battle.log);
     const updatedLog = [...currentLog, ...result.diceLogs, ...itemUpdatesLog, `${attacker.name}: ${result.log}`];
 
-    const isTargetDead = targetCopy.currentHp <= 0;
-    
-    if (isTargetDead) {
-      updatedLog.push(`${targetCopy.name} повержен!`);
-      
-      // * Mark battle as finished
-      await (prisma as any).battle.update({
-        where: { id: battle.id },
-        data: {
-          status: BattleStatus.FINISHED,
-          log: JSON.stringify(updatedLog)
-        }
-      });
-      
-      // * Sync ALL player participants one last time to ensure everything is saved
-      for (const participant of battle.participants) {
-        if ((participant as any).isPlayer) {
-          const p = await (prisma as any).battleParticipant.findUnique({ where: { id: participant.id } });
-          if (p) await syncParticipantToCharacter(p as unknown as BattleParticipant);
-        }
+    const aliveTeams = new Set(
+      battle.participants
+        .map((p: any) => {
+          const status =
+            p.id === targetCopy.id ? getParticipantStatus(targetCopy) : getParticipantStatus(p);
+          if (status !== ParticipantStatus.ALIVE) return null;
+          return p.isPlayer ? 'players' : 'monsters';
+        })
+        .filter((t: string | null) => t !== null)
+    );
+
+    const finalStatus = aliveTeams.size <= 1 ? BattleStatus.FINISHED : BattleStatus.ACTIVE;
+
+    await (prisma as any).battle.update({
+      where: { id: battle.id },
+      data: {
+        status: finalStatus,
+        log: JSON.stringify(updatedLog)
       }
-      
-      // * If target was a character, mark as dead in characters table
-      if (targetCopy.characterId) {
-        await (prisma as any).character.update({
-          where: { id: targetCopy.characterId },
-          data: { isDead: true }
-        });
-      }
-    } else {
-      await (prisma as any).battle.update({
-        where: { id: battle.id },
-        data: {
-          log: JSON.stringify(updatedLog)
-        }
-      });
-    }
+    });
 
     // * Fetch updated battle state to return fresh data
     const updatedBattle = await (prisma as any).battle.findUnique({
@@ -1009,7 +1014,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
 
     res.json({
       ...result,
-      battleStatus: isTargetDead ? BattleStatus.FINISHED : BattleStatus.ACTIVE,
+      battleStatus: finalStatus,
       updatedLog,
       rolls: result.rolls,
       battle: formatBattle(updatedBattle)
@@ -1030,11 +1035,75 @@ export const nextTurn = async (req: Request, res: Response) => {
 
         if (!battle) return res.status(404).json({ error: 'Battle not found' });
 
-        const nextIndex = (battle.currentTurnIndex + 1) % battle.participants.length;
-        const nextParticipant = battle.participants[nextIndex];
+        const totalParticipants = battle.participants.length;
+        let nextIndex = battle.currentTurnIndex;
+        let nextParticipant: any = null;
+        let wrappedRound = false;
+
+        for (let i = 0; i < totalParticipants; i++) {
+          nextIndex = (nextIndex + 1) % totalParticipants;
+          if (nextIndex === 0) wrappedRound = true;
+          const candidate = battle.participants[nextIndex];
+          if (getParticipantStatus(candidate) === ParticipantStatus.ALIVE) {
+            nextParticipant = candidate;
+            break;
+          }
+        }
+
+        const currentLog = JSON.parse(battle.log);
+
+        if (!nextParticipant) {
+          for (const p of battle.participants) {
+            if (getParticipantStatus(p) === ParticipantStatus.DOWNED) {
+              await (prisma as any).battleParticipant.update({
+                where: { id: p.id },
+                data: { status: ParticipantStatus.DEAD, downedRoundsRemaining: 0 }
+              });
+              if (p.characterId) {
+                await (prisma as any).character.update({
+                  where: { id: p.characterId },
+                  data: { isDead: true }
+                });
+              }
+              currentLog.push(`${p.name} окончательно погиб.`);
+            }
+          }
+
+          const updatedBattle = await (prisma as any).battle.update({
+            where: { id: battle.id },
+            data: { status: BattleStatus.FINISHED, log: JSON.stringify(currentLog) },
+            include: { participants: true }
+          });
+
+          return res.json({ battle: formatBattle(updatedBattle) });
+        }
+
+        if (wrappedRound) {
+          for (const p of battle.participants) {
+            if (getParticipantStatus(p) !== ParticipantStatus.DOWNED) continue;
+            const remaining = Math.max(0, (p.downedRoundsRemaining ?? DOWNED_ROUNDS) - 1);
+            const status = remaining === 0 ? ParticipantStatus.DEAD : ParticipantStatus.DOWNED;
+
+            await (prisma as any).battleParticipant.update({
+              where: { id: p.id },
+              data: { downedRoundsRemaining: remaining, status }
+            });
+
+            if (status === ParticipantStatus.DEAD) {
+              if (p.characterId) {
+                await (prisma as any).character.update({
+                  where: { id: p.characterId },
+                  data: { isDead: true }
+                });
+              }
+              currentLog.push(`${p.name} окончательно погиб.`);
+            }
+          }
+        }
 
         // * 1. Process Effects Ticks
         const { updatedParticipant, logs } = EffectsEngine.processTicks(nextParticipant as unknown as BattleParticipant);
+        ensureDownedStatus(updatedParticipant, logs);
         
         // * 2. Process Skill Cooldowns and Cast Time (if player has skills)
         let skillLogs: string[] = [];
@@ -1117,9 +1186,10 @@ export const nextTurn = async (req: Request, res: Response) => {
         }
         
         // * 3. Check for stun
-        const isStunned = EffectsEngine.isStunned(updatedParticipant as unknown as BattleParticipant);
-        const finalMainActions = isStunned ? 0 : 1;
-        const finalBonusActions = isStunned ? 0 : 1;
+        const isDowned = getParticipantStatus(updatedParticipant) === ParticipantStatus.DOWNED;
+        const isStunned = !isDowned && EffectsEngine.isStunned(updatedParticipant as unknown as BattleParticipant);
+        const finalMainActions = isDowned || isStunned ? 0 : 1;
+        const finalBonusActions = isDowned || isStunned ? 0 : 1;
 
         // * 3. Reset blocking flags for all participants at start of turn
         for (const p of battle.participants) {
@@ -1141,7 +1211,9 @@ export const nextTurn = async (req: Request, res: Response) => {
                 bonuses: updatedParticipant.bonuses,
                 mainActions: finalMainActions,
                 bonusActions: finalBonusActions,
-                isBlocking: false // Reset blocking at start of turn
+                isBlocking: false, // Reset blocking at start of turn
+                status: updatedParticipant.status || ParticipantStatus.ALIVE,
+                downedRoundsRemaining: updatedParticipant.downedRoundsRemaining ?? 0
             }
         });
 
@@ -1150,29 +1222,26 @@ export const nextTurn = async (req: Request, res: Response) => {
             await syncParticipantToCharacter(updatedInDb as unknown as BattleParticipant);
         }
 
-        const currentLog = JSON.parse(battle.log);
         currentLog.push(...logs);
         currentLog.push(...skillLogs);
-        currentLog.push(`Ход: ${nextParticipant.name}${isStunned ? ' (ОГЛУШЕН)' : ''}`);
+        currentLog.push(`Ход: ${nextParticipant.name}${isDowned ? ' (Нокаут)' : isStunned ? ' (ОГЛУШЕН)' : ''}`);
 
-        // * 5. Check if died from ticks
-        const isDead = updatedInDb.currentHp <= 0;
+        const aliveTeams = new Set(
+          battle.participants
+            .map((p: any) => {
+              const status =
+                p.id === updatedInDb.id
+                  ? getParticipantStatus(updatedInDb)
+                  : getParticipantStatus(p);
+              if (status !== ParticipantStatus.ALIVE) return null;
+              return p.isPlayer ? 'players' : 'monsters';
+            })
+            .filter((t: string | null) => t !== null)
+        );
+
         let finalStatus = BattleStatus.ACTIVE;
-        if (isDead) {
-            currentLog.push(`${updatedInDb.name} повержен эффектом!`);
-            // * Check if this was the last enemy or player
-            const aliveTeams = new Set(
-                battle.participants
-                .filter((p: any) => (p.id === updatedInDb.id ? updatedInDb.currentHp > 0 : p.currentHp > 0))
-                .map((p: any) => {
-                    // This is a bit simplified, ideally we'd have teamId in DB
-                    return p.isPlayer ? 'players' : 'monsters';
-                })
-            );
-            
-            if (aliveTeams.size <= 1) {
-                finalStatus = BattleStatus.FINISHED;
-            }
+        if (aliveTeams.size <= 1) {
+          finalStatus = BattleStatus.FINISHED;
         }
 
         const updatedBattle = await (prisma as any).battle.update({
@@ -1212,6 +1281,18 @@ export const useSkill = async (req: Request, res: Response) => {
     const participant = battle.participants.find((p: any) => p.id === participantId);
     if (!participant) {
       return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Cannot block while downed or dead' });
+    }
+
+    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Cannot use items while downed or dead' });
+    }
+
+    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Cannot use skills while downed or dead' });
     }
 
     // * Check if it's the participant's turn
@@ -1281,6 +1362,10 @@ export const useSkill = async (req: Request, res: Response) => {
       }
     }
 
+    if (target && skillTemplate.targetType !== 'SELF' && getParticipantStatus(target) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Target is downed or dead' });
+    }
+
     // * Get weapon essence for hit check
     let weaponEssence = 0;
     if (participant.characterId) {
@@ -1339,7 +1424,7 @@ export const useSkill = async (req: Request, res: Response) => {
         // * Find all targets in AoE radius
         const primaryTargetDistance = target.distance;
         const aoeTargets = battle.participants.filter((p: any) => {
-          if (p.id === participant.id || p.currentHp <= 0) return false;
+          if (p.id === participant.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false;
           if (p.isPlayer === participant.isPlayer) return false; // Exclude allies
           const distance = Math.abs(primaryTargetDistance - p.distance);
           return distance <= aoeRadius;
@@ -1412,13 +1497,16 @@ export const useSkill = async (req: Request, res: Response) => {
           if (aoeTargetResult.hit) {
             const aoeTarget = aoeTargets[i];
             aoeTarget.currentHp = Math.max(0, aoeTarget.currentHp - aoeTargetResult.damageDealt);
+            ensureDownedStatus(aoeTarget, skillLogs);
             
             // * Update target in DB
             await (prisma as any).battleParticipant.update({
               where: { id: aoeTarget.id },
               data: {
                 currentHp: aoeTarget.currentHp,
-                currentProtection: aoeTarget.currentProtection
+                currentProtection: aoeTarget.currentProtection,
+                status: aoeTarget.status || ParticipantStatus.ALIVE,
+                downedRoundsRemaining: aoeTarget.downedRoundsRemaining ?? 0
               }
             });
             
@@ -1554,6 +1642,10 @@ export const useSkill = async (req: Request, res: Response) => {
           skillLogs.push(`Нанесено ${finalDamage} урона!`);
         }
 
+        if (updatedTarget) {
+          ensureDownedStatus(updatedTarget, skillLogs);
+        }
+
         // * Apply effects from skill (non-AoE only)
         if (skillTemplate.effects && result.hit) {
           const effectIds: string[] = JSON.parse(skillTemplate.effects);
@@ -1620,7 +1712,9 @@ export const useSkill = async (req: Request, res: Response) => {
         currentProtection: updatedParticipant.currentProtection,
         mainActions: updatedParticipant.mainActions,
         bonuses: updatedParticipant.bonuses,
-        activeEffects: updatedParticipant.activeEffects
+        activeEffects: updatedParticipant.activeEffects,
+        status: updatedParticipant.status || ParticipantStatus.ALIVE,
+        downedRoundsRemaining: updatedParticipant.downedRoundsRemaining ?? 0
       }
     });
 
@@ -1631,7 +1725,9 @@ export const useSkill = async (req: Request, res: Response) => {
           currentHp: updatedTarget.currentHp,
           currentProtection: updatedTarget.currentProtection,
           bonuses: updatedTarget.bonuses,
-          activeEffects: updatedTarget.activeEffects
+          activeEffects: updatedTarget.activeEffects,
+          status: updatedTarget.status || ParticipantStatus.ALIVE,
+          downedRoundsRemaining: updatedTarget.downedRoundsRemaining ?? 0
         }
       });
       
@@ -1644,26 +1740,22 @@ export const useSkill = async (req: Request, res: Response) => {
     const currentLog = JSON.parse(battle.log);
     currentLog.push(...skillLogs);
 
-    // * Check if target died
-    const isTargetDead = updatedTarget && updatedTarget.currentHp <= 0;
-    let finalStatus = BattleStatus.ACTIVE;
-    
-    if (isTargetDead) {
-      currentLog.push(`${updatedTarget!.name} повержен способностью!`);
-      
-      // * Check if battle should end
-      const aliveTeams = new Set(
-        battle.participants
-        .filter((p: any) => {
-          if (p.id === updatedTarget!.id) return updatedTarget!.currentHp > 0;
-          return p.currentHp > 0;
+    const aliveTeams = new Set(
+      battle.participants
+        .map((p: any) => {
+          const status =
+            updatedTarget && p.id === updatedTarget.id
+              ? getParticipantStatus(updatedTarget)
+              : getParticipantStatus(p);
+          if (status !== ParticipantStatus.ALIVE) return null;
+          return p.isPlayer ? 'players' : 'monsters';
         })
-        .map((p: any) => p.isPlayer ? 'players' : 'monsters')
-      );
-      
-      if (aliveTeams.size <= 1) {
-        finalStatus = BattleStatus.FINISHED;
-      }
+        .filter((t: string | null) => t !== null)
+    );
+
+    let finalStatus = BattleStatus.ACTIVE;
+    if (aliveTeams.size <= 1) {
+      finalStatus = BattleStatus.FINISHED;
     }
 
     const updatedBattle = await (prisma as any).battle.update({
@@ -1798,6 +1890,15 @@ export const useConsumable = async (req: Request, res: Response) => {
       target = { ...foundTarget } as unknown as BattleParticipant;
     }
 
+    const allowDownedTarget =
+      itemTemplate.category === 'POTION' ||
+      itemTemplate.category === 'FOOD' ||
+      itemTemplate.category === 'TREATMENT';
+
+    if (target && getParticipantStatus(target) !== ParticipantStatus.ALIVE && !allowDownedTarget) {
+      return res.status(400).json({ error: 'Target is downed or dead' });
+    }
+
     const updatedParticipant: BattleParticipant = { ...participant } as unknown as BattleParticipant;
     let updatedTarget: BattleParticipant | null = target;
 
@@ -1828,6 +1929,10 @@ export const useConsumable = async (req: Request, res: Response) => {
       const healAmount = Math.max(0, Math.min(healBase, maxHp - currentHp));
 
       targetForUse.currentHp = Math.min(maxHp, currentHp + healAmount);
+      if (targetForUse.currentHp > 0) {
+        targetForUse.status = ParticipantStatus.ALIVE;
+        targetForUse.downedRoundsRemaining = 0;
+      }
 
       applyActionCost();
 
@@ -1955,7 +2060,7 @@ export const useConsumable = async (req: Request, res: Response) => {
         // * Find all targets in AoE radius
         const primaryTargetDistance = updatedTarget.distance;
         const aoeTargets = battle.participants.filter((p: any) => {
-          if (p.id === updatedParticipant.id || p.currentHp <= 0) return false;
+          if (p.id === updatedParticipant.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false;
           if (p.isPlayer === updatedParticipant.isPlayer) return false; // Exclude allies
           const distance = Math.abs(primaryTargetDistance - p.distance);
           return distance <= aoeRadius;
@@ -2034,7 +2139,9 @@ export const useConsumable = async (req: Request, res: Response) => {
               where: { id: aoeTarget.id },
               data: {
                 currentHp: aoeTarget.currentHp,
-                currentProtection: aoeTarget.currentProtection
+                currentProtection: aoeTarget.currentProtection,
+                status: aoeTarget.status || ParticipantStatus.ALIVE,
+                downedRoundsRemaining: aoeTarget.downedRoundsRemaining ?? 0
               }
             });
             
@@ -2086,6 +2193,7 @@ export const useConsumable = async (req: Request, res: Response) => {
 
         updatedTarget.currentHp = defenderCopy.currentHp;
         updatedTarget.currentProtection = defenderCopy.currentProtection;
+        ensureDownedStatus(updatedTarget, logs);
 
         diceLogs.push(...result.diceLogs);
         logs.push(`${updatedParticipant.name} использует свиток ${itemTemplate.name}: ${result.log}`);
@@ -2119,7 +2227,9 @@ export const useConsumable = async (req: Request, res: Response) => {
         mainActions: updatedParticipant.mainActions,
         bonusActions: updatedParticipant.bonusActions,
         activeEffects: updatedParticipant.activeEffects,
-        bonuses: updatedParticipant.bonuses
+        bonuses: updatedParticipant.bonuses,
+        status: updatedParticipant.status || ParticipantStatus.ALIVE,
+        downedRoundsRemaining: updatedParticipant.downedRoundsRemaining ?? 0
       }
     });
 
@@ -2130,7 +2240,9 @@ export const useConsumable = async (req: Request, res: Response) => {
           currentHp: updatedTarget.currentHp,
           currentProtection: updatedTarget.currentProtection,
           activeEffects: updatedTarget.activeEffects,
-          bonuses: updatedTarget.bonuses
+          bonuses: updatedTarget.bonuses,
+          status: updatedTarget.status || ParticipantStatus.ALIVE,
+          downedRoundsRemaining: updatedTarget.downedRoundsRemaining ?? 0
         }
       });
     }
@@ -2145,37 +2257,24 @@ export const useConsumable = async (req: Request, res: Response) => {
     const currentLog = JSON.parse(battle.log);
     currentLog.push(...diceLogs, ...logs);
 
-    let finalStatus = BattleStatus.ACTIVE;
-    // * Check if any participant died using updated HP values
-    const anyEnemyDead = battle.participants.some((p: any) => {
-      // * Use updated HP values for participant and target, stale values for others
-      const hp =
-        updatedTarget && p.id === updatedTarget.id
-          ? updatedTarget.currentHp
-          : p.id === updatedParticipant.id
-          ? updatedParticipant.currentHp
-          : p.currentHp;
-      return hp <= 0;
-    });
-
-    if (anyEnemyDead) {
-      // * Simple check: if one side is fully dead, finish battle
-      const aliveTeams = new Set(
-        battle.participants.map((p: any) => {
-          const hp =
+    const aliveTeams = new Set(
+      battle.participants
+        .map((p: any) => {
+          const status =
             updatedTarget && p.id === updatedTarget.id
-              ? updatedTarget.currentHp
+              ? getParticipantStatus(updatedTarget)
               : p.id === updatedParticipant.id
-              ? updatedParticipant.currentHp
-              : p.currentHp;
-          if (hp <= 0) return null;
+              ? getParticipantStatus(updatedParticipant)
+              : getParticipantStatus(p);
+          if (status !== ParticipantStatus.ALIVE) return null;
           return p.isPlayer ? 'players' : 'monsters';
-        }).filter((t: string | null) => t !== null)
-      );
+        })
+        .filter((t: string | null) => t !== null)
+    );
 
-      if (aliveTeams.size <= 1) {
-        finalStatus = BattleStatus.FINISHED;
-      }
+    let finalStatus = BattleStatus.ACTIVE;
+    if (aliveTeams.size <= 1) {
+      finalStatus = BattleStatus.FINISHED;
     }
 
     // * Update battle log and status
@@ -2262,6 +2361,86 @@ export const endBattle = async (req: Request, res: Response) => {
         console.error('End battle error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+};
+
+export const reviveParticipant = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    const { battleId, reviverId, targetId } = req.body;
+
+    const battle = await (prisma as any).battle.findUnique({
+      where: { id: battleId },
+      include: { participants: true }
+    });
+
+    if (!battle || battle.status === BattleStatus.FINISHED) {
+      return res.status(404).json({ error: 'Battle not found or finished' });
+    }
+
+    const reviver = battle.participants.find((p: any) => p.id === reviverId);
+    const target = battle.participants.find((p: any) => p.id === targetId);
+
+    if (!reviver || !target) {
+      return res.status(404).json({ error: 'Participants not found' });
+    }
+
+    if (battle.participants[battle.currentTurnIndex].id !== reviver.id) {
+      return res.status(400).json({ error: "It's not your turn" });
+    }
+
+    if (getParticipantStatus(reviver) !== ParticipantStatus.ALIVE) {
+      return res.status(400).json({ error: 'Reviver must be alive' });
+    }
+
+    if (getParticipantStatus(target) !== ParticipantStatus.DOWNED) {
+      return res.status(400).json({ error: 'Target is not downed' });
+    }
+
+    if (reviver.mainActions <= 0) {
+      return res.status(400).json({ error: 'No main actions left' });
+    }
+
+    const distance = Math.abs((reviver as any).distance - (target as any).distance);
+    if (distance > 5) {
+      return res.status(400).json({ error: 'Target is too far to revive' });
+    }
+
+    const updatedReviver = await (prisma as any).battleParticipant.update({
+      where: { id: reviver.id },
+      data: { mainActions: Math.max(0, reviver.mainActions - 1) }
+    });
+
+    const updatedTarget = await (prisma as any).battleParticipant.update({
+      where: { id: target.id },
+      data: {
+        currentHp: Math.max(1, target.currentHp),
+        status: ParticipantStatus.ALIVE,
+        downedRoundsRemaining: 0
+      }
+    });
+
+    if (updatedTarget.characterId) {
+      await syncParticipantToCharacter(updatedTarget as unknown as BattleParticipant);
+    }
+
+    const currentLog = JSON.parse(battle.log);
+    currentLog.push(`${reviver.name} поднимает ${target.name} на ноги!`);
+
+    const updatedBattle = await (prisma as any).battle.update({
+      where: { id: battle.id },
+      data: { log: JSON.stringify(currentLog) },
+      include: { participants: true }
+    });
+
+    res.json({
+      battle: formatBattle(updatedBattle),
+      message: 'Revive successful'
+    });
+  } catch (error) {
+    console.error('Revive error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 export const blockWithShield = async (req: Request, res: Response) => {
@@ -2380,7 +2559,7 @@ export const getActiveBattle = async (req: Request, res: Response) => {
     if (!battle) return res.status(404).json({ error: 'No active battle' });
 
     // * Additional check: ensure no participant is dead (battle should be finished)
-    const hasDeadParticipant = battle.participants.some((p: any) => p.currentHp <= 0);
+    const hasDeadParticipant = battle.participants.some((p: any) => getParticipantStatus(p) === ParticipantStatus.DEAD);
     if (hasDeadParticipant) {
       // * Mark battle as finished if someone is dead
       await (prisma as any).battle.update({

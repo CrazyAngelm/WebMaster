@@ -19,6 +19,10 @@ export class EffectsEngine {
     updatedParticipant: BattleParticipant, 
     logs: string[] 
   } {
+    if (participant.status && participant.status !== 'ALIVE') {
+      return { updatedParticipant: { ...participant }, logs: [] };
+    }
+
     const effects: ActiveEffect[] = participant.activeEffects ? JSON.parse(participant.activeEffects) : [];
     const logs: string[] = [];
     const updatedParticipant = { ...participant };
