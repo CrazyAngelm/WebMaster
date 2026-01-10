@@ -716,7 +716,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   rest: async () => {
-    const { character, serverTime } = get();
+    const { character, serverTime, inventory, itemTemplates } = get();
     if (!character) return;
     if (!character.location.buildingId) return;
     const building = StaticDataService.getBuilding(character.location.buildingId);
@@ -744,7 +744,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     updatedCharacter.stats.energy.current = updatedCharacter.stats.energy.max;
     updatedCharacter.stats.protection.current = updatedCharacter.stats.protection.max;
     
-    set({ character: updatedCharacter });
+    const updatedInventory = inventory ? {
+      ...inventory,
+      items: inventory.items.map(item => {
+        const template = itemTemplates.get(item.templateId);
+        const isStabilizer = template?.category === 'MAGIC_STABILIZER' && item.isEquipped;
+        if (isStabilizer && item.spellSlots) {
+          return { ...item, spellSlots: { ...item.spellSlots, used: 0 } };
+        }
+        return item;
+      })
+    } : inventory;
+
+    set({ character: updatedCharacter, inventory: updatedInventory });
     await get().saveGame();
   },
 

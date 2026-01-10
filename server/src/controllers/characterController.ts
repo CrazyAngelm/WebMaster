@@ -220,6 +220,39 @@ export const updateCharacter = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Invalid lastRestTime' });
       }
       updateData.lastRestTime = lastRestTime;
+      
+      // * Restore spell slots in magic stabilizers when resting
+      if (character.inventory) {
+        const items = JSON.parse(character.inventory.items);
+        let updatedItems = false;
+        
+        for (const item of items) {
+          if (item.isEquipped && item.spellSlots) {
+            const template = await (prisma as any).itemTemplate.findUnique({ where: { id: item.templateId } });
+            if (template && template.category === 'MAGIC_STABILIZER') {
+              // * Restore all spell slots
+              item.spellSlots.used = 0;
+              updatedItems = true;
+            }
+          }
+        }
+        
+        if (updatedItems) {
+          // * Update inventory with restored spell slots
+          if (!updateData.inventory) {
+            updateData.inventory = {
+              update: {
+                items: JSON.stringify(items),
+                baseSlots: character.inventory.baseSlots || 10
+              }
+            };
+          } else {
+            // * Merge with existing inventory update
+            const existingItems = inventory ? inventory.items : items;
+            updateData.inventory.update.items = JSON.stringify(existingItems);
+          }
+        }
+      }
     } else if (lastRestTime === null) {
       updateData.lastRestTime = null;
     }

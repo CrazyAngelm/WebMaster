@@ -144,6 +144,14 @@ export class CraftingService {
       isEquipped: false,
       buffs: []
     };
+    
+    // * Initialize spell slots for magic stabilizers
+    if (resultTemplate.category === 'MAGIC_STABILIZER' && resultTemplate.slotCount) {
+      newItem.spellSlots = {
+        used: 0,
+        max: resultTemplate.slotCount
+      };
+    }
 
     // 7. Check inventory slots before adding the item
     const currentUsedSlots = InventoryService.getUsedSlots({ ...inventory, items: updatedItems });

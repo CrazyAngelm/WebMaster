@@ -81,6 +81,18 @@ export class CombatEngine {
       return { hit: false, damageDealt: 0, log: 'Промах (уворот)!', diceLogs, rolls };
     }
 
+    // * 1.5. Shield Block Check (before damage calculation)
+    if (defender.isBlocking) {
+      // * Shield blocks the attack completely, but shield durability is reduced in controller
+      return { 
+        hit: true, 
+        damageDealt: 0, 
+        log: 'Атака заблокирована щитом!', 
+        diceLogs, 
+        rolls 
+      };
+    }
+
     // * 2. Damage & Penetration
     const damage = attackerWeaponEssence || 5; // * Default unarmed damage
     let finalDamage = 0;
@@ -143,6 +155,205 @@ export class CombatEngine {
       case PenetrationType.VERY_HEAVY: return 4;
       default: return 0;
     }
+  }
+
+  /**
+   * * Resolves a dual-wield attack with two one-handed weapons.
+   * * Performs two independent attack rolls, one for each weapon.
+   */
+  public static resolveDualWieldAttack(
+    attacker: BattleParticipant,
+    weapon1Essence: number,
+    weapon1Pen: PenetrationType | undefined,
+    weapon1Range: { minRange: number; maxRange: number } | undefined,
+    weapon2Essence: number,
+    weapon2Pen: PenetrationType | undefined,
+    weapon2Range: { minRange: number; maxRange: number } | undefined,
+    defender: BattleParticipant,
+    defenderArmorIgnore: number,
+    defenderArmorPenetration: ArmorCategory | undefined,
+    defenderRankMinRoll: number = 1,
+    attackerRankMinRoll: number = 1,
+    attackerHitPenalty: number = 0,
+    defenderEvasionPenalty: number = 0
+  ): { 
+    hits: Array<{ hit: boolean; damageDealt: number; log: string; diceLogs: string[]; rolls: RollResult[] }>;
+    totalDamage: number;
+    logs: string[];
+    diceLogs: string[];
+    rolls: RollResult[];
+  } {
+    // * First weapon attack
+    const result1 = this.resolveAttack(
+      attacker,
+      weapon1Essence,
+      weapon1Pen,
+      weapon1Range,
+      defender,
+      defenderArmorIgnore,
+      defenderArmorPenetration,
+      defenderRankMinRoll,
+      attackerRankMinRoll,
+      attackerHitPenalty,
+      defenderEvasionPenalty
+    );
+
+    // * Second weapon attack (on same target)
+    const result2 = this.resolveAttack(
+      attacker,
+      weapon2Essence,
+      weapon2Pen,
+      weapon2Range,
+      defender,
+      defenderArmorIgnore,
+      defenderArmorPenetration,
+      defenderRankMinRoll,
+      attackerRankMinRoll,
+      attackerHitPenalty,
+      defenderEvasionPenalty
+    );
+
+    const totalDamage = result1.damageDealt + result2.damageDealt;
+    const allLogs: string[] = [];
+    const allDiceLogs: string[] = [];
+    const allRolls: RollResult[] = [];
+
+    // * Combine logs
+    allDiceLogs.push(...result1.diceLogs);
+    allDiceLogs.push(...result2.diceLogs);
+    allRolls.push(...result1.rolls);
+    allRolls.push(...result2.rolls);
+
+    if (result1.hit && result2.hit) {
+      allLogs.push(`Оба удара попали! Нанесено ${totalDamage} урона.`);
+    } else if (result1.hit) {
+      allLogs.push(`Первый удар попал (${result1.damageDealt} урона), второй промахнулся.`);
+    } else if (result2.hit) {
+      allLogs.push(`Первый удар промахнулся, второй попал (${result2.damageDealt} урона).`);
+    } else {
+      allLogs.push('Оба удара промахнулись!');
+    }
+
+    return {
+      hits: [result1, result2],
+      totalDamage,
+      logs: allLogs,
+      diceLogs: allDiceLogs,
+      rolls: allRolls
+    };
+  }
+
+  /**
+   * * Resolves an Area of Effect (AoE) attack.
+   * * One hit roll against multiple evasion rolls (one per target).
+   */
+  public static resolveAoEAttack(
+    attacker: BattleParticipant,
+    attackerWeaponEssence: number,
+    attackerWeaponPen: PenetrationType | undefined,
+    attackerWeaponRange: { minRange: number; maxRange: number } | undefined,
+    targets: BattleParticipant[],
+    defenderArmorIgnore: number[],
+    defenderArmorPenetration: (ArmorCategory | undefined)[],
+    defenderRankMinRoll: number = 1,
+    attackerRankMinRoll: number = 1,
+    attackerHitPenalty: number = 0,
+    defenderEvasionPenalty: number[] = []
+  ): {
+    results: Array<{ target: BattleParticipant; hit: boolean; damageDealt: number; log: string; diceLogs: string[]; rolls: RollResult[] }>;
+    totalDamage: number;
+    logs: string[];
+    diceLogs: string[];
+    rolls: RollResult[];
+  } {
+    // * Single hit roll for attacker
+    const attackerBonusesParsed: CharacterBonuses = attacker.bonuses ? JSON.parse(attacker.bonuses) : { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
+    const hitSides = Math.max(1, attacker.currentHp + attackerWeaponEssence + (attackerBonusesParsed.accuracy || 0) - attackerHitPenalty);
+    const hitRoll = DICE.roll(hitSides, attackerRankMinRoll);
+
+    const allLogs: string[] = [];
+    const allDiceLogs: string[] = [`${attacker.name}: Точность (AoE) 1d${hitSides} = ${hitRoll}`];
+    const allRolls: RollResult[] = [{ sides: hitSides, result: hitRoll, label: `${attacker.name}: Точность (AoE)` }];
+
+    const damage = attackerWeaponEssence || 5;
+    let totalDamage = 0;
+    const results: Array<{ target: BattleParticipant; hit: boolean; damageDealt: number; log: string; diceLogs: string[]; rolls: RollResult[] }> = [];
+
+    // * Check each target
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const armorIgnore = defenderArmorIgnore[i] || 0;
+      const armorPen = defenderArmorPenetration[i];
+      const evasionPenalty = defenderEvasionPenalty[i] || 0;
+
+      // * Distance check
+      if (attackerWeaponRange) {
+        const distance = Math.abs(attacker.distance - target.distance);
+        if (distance < attackerWeaponRange.minRange || distance > attackerWeaponRange.maxRange) {
+          results.push({
+            target,
+            hit: false,
+            damageDealt: 0,
+            log: `${target.name} вне досягаемости AoE атаки`,
+            diceLogs: [],
+            rolls: []
+          });
+          continue;
+        }
+      }
+
+      // * Evasion roll for this target
+      const defenderBonusesParsed: CharacterBonuses = target.bonuses ? JSON.parse(target.bonuses) : { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
+      const evasionSides = Math.max(1, target.currentHp + (defenderBonusesParsed.evasion || 0) - evasionPenalty);
+      const evasionRoll = DICE.roll(evasionSides, defenderRankMinRoll);
+
+      allDiceLogs.push(`${target.name}: Уклонение 1d${evasionSides} = ${evasionRoll}`);
+      allRolls.push({ sides: evasionSides, result: evasionRoll, label: `${target.name}: Уклонение` });
+
+      // * Check if hit (hitRoll > evasionRoll)
+      if (hitRoll > evasionRoll) {
+        // * Calculate damage
+        const weaponPenLevel = this.getPenetrationLevel(attackerWeaponPen);
+        const armorLevel = this.getArmorLevel(armorPen);
+
+        let finalDamage = 0;
+        if (weaponPenLevel >= armorLevel || target.currentHp <= 0) {
+          finalDamage = Math.max(0, damage - armorIgnore - (defenderBonusesParsed.damageResistance || 0));
+          this.applyDamage(target, finalDamage);
+          totalDamage += finalDamage;
+        }
+
+        results.push({
+          target,
+          hit: true,
+          damageDealt: finalDamage,
+          log: `Попадание по ${target.name}! Нанесено ${finalDamage} урона.`,
+          diceLogs: [],
+          rolls: []
+        });
+      } else {
+        results.push({
+          target,
+          hit: false,
+          damageDealt: 0,
+          log: `${target.name} уклонился от AoE атаки!`,
+          diceLogs: [],
+          rolls: []
+        });
+      }
+    }
+
+    // * Build summary log
+    const hitCount = results.filter(r => r.hit).length;
+    allLogs.push(`AoE атака: попадание по ${hitCount} из ${targets.length} целей. Общий урон: ${totalDamage}`);
+
+    return {
+      results,
+      totalDamage,
+      logs: allLogs,
+      diceLogs: allDiceLogs,
+      rolls: allRolls
+    };
   }
 }
 

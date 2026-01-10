@@ -106,6 +106,8 @@ model ItemTemplate {
   effects           String? // UUID[] (JSON string)
   description       String?
   basePrice         Int?
+  shieldType        String? // 'LIGHT' | 'MEDIUM' | 'HEAVY' | 'SUPER_HEAVY'
+  shieldEvasionPenalty Int? // Penalty to evasion (-30, -70, -150, 0)
 }
 
 model Recipe {
@@ -266,4 +268,5 @@ model BattleParticipant {
   distance          Float     @default(0.0)
   bonuses           String?   // CharacterBonuses (JSON string)
   activeEffects     String    @default("[]") // ActiveEffect[] (JSON string)
+  isBlocking        Boolean   @default(false) // Active shield block flag
 }

@@ -20,13 +20,11 @@ import { useCombatStore } from './store/combatStore';
 import { DiceEngine } from './engine/DiceEngine';
 
 function App() {
-  const { 
-    character, 
-    authStatus,
-    checkAuth,
-    trainCharacter,
-    isLoading 
-  } = useGameStore();
+  const checkAuth = useGameStore(state => state.checkAuth);
+  const character = useGameStore(state => state.character);
+  const authStatus = useGameStore(state => state.authStatus);
+  const trainCharacter = useGameStore(state => state.trainCharacter);
+  const isLoading = useGameStore(state => state.isLoading);
   
   const triggerRoll = useDiceStore(state => state.triggerRoll);
   const checkActiveBattle = useCombatStore(state => state.checkActiveBattle);

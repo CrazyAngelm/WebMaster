@@ -67,7 +67,8 @@ const formatBattle = (battle: any) => {
     participants: battle.participants.map((p: any) => ({
       ...p,
       bonuses: p.bonuses ? JSON.parse(p.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 },
-      activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : []
+      activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : [],
+      isBlocking: p.isBlocking || false
     }))
   };
 };
@@ -200,7 +201,8 @@ export const startBattle = async (req: Request, res: Response) => {
             maxProtection: p.maxProtection,
             isPlayer: p.isPlayer,
             distance: p.distance,
-            bonuses: p.bonuses
+            bonuses: p.bonuses,
+            isBlocking: false // * Initialize blocking flag
           }))
         }
       },
@@ -213,7 +215,12 @@ export const startBattle = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Start battle error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    res.status(500).json({ error: errorMessage || 'Internal server error' });
   }
 };
 
@@ -448,6 +455,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
     let weaponRange = { minRange: 0, maxRange: 5 }; // Default unarmed/melee
     let weaponTemplate: any = null;
     let equippedWeapon: any = null;
+    let dualWieldWeapons: any[] = [];
 
     if (attacker.characterId) {
       const char = await (prisma as any).character.findUnique({
@@ -456,26 +464,76 @@ export const resolveAttack = async (req: Request, res: Response) => {
       });
       if (char && char.inventory) {
         const items = JSON.parse(char.inventory.items);
-        equippedWeapon = items.find((i: any) => i.isEquipped && i.id === weaponId);
-        if (equippedWeapon) {
-          weaponEssence = equippedWeapon.currentEssence;
-          weaponTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
-          weaponPen = (weaponTemplate?.penetration as PenetrationType) || PenetrationType.NONE;
-          
-          // * Parse range
-          if (weaponTemplate?.distance) {
-            try {
-              const rangeData = JSON.parse(weaponTemplate.distance);
-              weaponRange = { minRange: rangeData.minRange, maxRange: rangeData.maxRange };
-            } catch (e) {
-              // Handle legacy string categories
-              switch (weaponTemplate.distance) {
-                case 'MEDIUM': weaponRange = { minRange: 5, maxRange: 20 }; break;
-                case 'FAR': weaponRange = { minRange: 20, maxRange: 50 }; break;
-                case 'SNIPER': weaponRange = { minRange: 50, maxRange: 200 }; break;
-                default: weaponRange = { minRange: 0, maxRange: 5 }; // CLOSE/MELEE
+        
+        // * Check for dual-wielding: find all equipped one-handed weapons (excluding shields)
+        const equippedOneHanded = items.filter((i: any) => {
+          if (!i.isEquipped) return false;
+          // * Get template to check category
+          return i.templateId && !i.templateId.includes('shield');
+        });
+        
+        // * Fetch templates for equipped weapons to check if they're one-handed
+        for (const item of equippedOneHanded) {
+          const template = await (prisma as any).itemTemplate.findUnique({ where: { id: item.templateId } });
+          if (template && (template.type === 'WEAPON' || template.type === 'SHIELD')) {
+            // * Check if it's one-handed (not two-handed, not shield, not magic stabilizer)
+            if (template.category !== 'TWO_HANDED' && template.type !== 'SHIELD' && template.category !== 'MAGIC_STABILIZER') {
+              dualWieldWeapons.push({ item, template });
+            }
+          }
+        }
+        
+        // * If dual-wielding (2 one-handed weapons), use both
+        if (dualWieldWeapons.length >= 2) {
+          // * Use first two weapons for dual-wield
+          dualWieldWeapons = dualWieldWeapons.slice(0, 2);
+        } else {
+          // * Single weapon or unarmed
+          equippedWeapon = items.find((i: any) => i.isEquipped && i.id === weaponId);
+          if (equippedWeapon) {
+            weaponTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedWeapon.templateId } });
+            
+            // * Magic stabilizer in melee: use unarmed damage (essence = 0 or minimal)
+            if (weaponTemplate && weaponTemplate.category === 'MAGIC_STABILIZER') {
+              weaponEssence = 0; // * No weapon essence in melee for magic stabilizers
+            } else {
+              weaponEssence = equippedWeapon.currentEssence;
+            }
+            
+            weaponPen = (weaponTemplate?.penetration as PenetrationType) || PenetrationType.NONE;
+            
+            // * Parse range
+            if (weaponTemplate?.distance) {
+              try {
+                const rangeData = JSON.parse(weaponTemplate.distance);
+                weaponRange = { minRange: rangeData.minRange, maxRange: rangeData.maxRange };
+              } catch (e) {
+                // Handle legacy string categories
+                switch (weaponTemplate.distance) {
+                  case 'MEDIUM': weaponRange = { minRange: 5, maxRange: 20 }; break;
+                  case 'FAR': weaponRange = { minRange: 20, maxRange: 50 }; break;
+                  case 'SNIPER': weaponRange = { minRange: 50, maxRange: 200 }; break;
+                  default: weaponRange = { minRange: 0, maxRange: 5 }; // CLOSE/MELEE
+                }
               }
             }
+            
+            // * Parse AoE metadata from description
+            let isAoE = false;
+            let aoeRadius = 0;
+            if (weaponTemplate?.description) {
+              try {
+                const meta = JSON.parse(weaponTemplate.description);
+                isAoE = meta.isAoE === true;
+                aoeRadius = meta.aoeRadius || 0;
+              } catch {
+                // Description is plain text, not JSON
+              }
+            }
+            
+            // * Store AoE info for later use
+            (weaponTemplate as any).isAoE = isAoE;
+            (weaponTemplate as any).aoeRadius = aoeRadius;
           }
         }
       }
@@ -486,6 +544,8 @@ export const resolveAttack = async (req: Request, res: Response) => {
     let equippedArmor: any = null;
     let armorHitPenalty = 0;
     let armorEvasionPenalty = 0;
+    let equippedShield: any = null;
+    let shieldEvasionPenalty = 0;
 
     if (target.characterId) {
         const char = await (prisma as any).character.findUnique({
@@ -502,6 +562,13 @@ export const resolveAttack = async (req: Request, res: Response) => {
                 armorHitPenalty = template?.hitPenalty || 0;
                 armorEvasionPenalty = template?.evasionPenalty || 0;
             }
+            
+            // * Check for equipped shield
+            equippedShield = items.find((i: any) => i.isEquipped && i.templateId.includes('shield'));
+            if (equippedShield) {
+                const shieldTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedShield.templateId } });
+                shieldEvasionPenalty = shieldTemplate?.shieldEvasionPenalty || 0;
+            }
         }
     }
 
@@ -509,47 +576,291 @@ export const resolveAttack = async (req: Request, res: Response) => {
     const attackerCopy = { ...attacker, currentHp: attacker.currentHp, currentProtection: attacker.currentProtection };
     const targetCopy = { ...target, currentHp: target.currentHp, currentProtection: target.currentProtection };
 
-    const result = CombatEngine.resolveAttack(
-      attackerCopy as unknown as BattleParticipant,
-      weaponEssence,
-      weaponPen,
-      weaponRange,
-      targetCopy as unknown as BattleParticipant,
-      armorIgnore,
-      armorCat,
-      1, // defender min roll
-      1, // attacker min roll
-      armorHitPenalty,
-      armorEvasionPenalty
-    );
+    // * Add shield evasion penalty to total evasion penalty
+    const totalEvasionPenalty = armorEvasionPenalty + shieldEvasionPenalty;
+    
+    // * Set isBlocking from target (if it exists)
+    if (target.isBlocking !== undefined) {
+      targetCopy.isBlocking = target.isBlocking;
+    }
+
+    // * Check for dual-wielding
+    let result: any;
+    if (dualWieldWeapons.length >= 2) {
+      // * Dual-wield attack
+      const weapon1 = dualWieldWeapons[0];
+      const weapon2 = dualWieldWeapons[1];
+      
+      // * Parse ranges for both weapons
+      let weapon1Range = { minRange: 0, maxRange: 5 };
+      let weapon2Range = { minRange: 0, maxRange: 5 };
+      
+      if (weapon1.template?.distance) {
+        try {
+          const rangeData = JSON.parse(weapon1.template.distance);
+          weapon1Range = { minRange: rangeData.minRange, maxRange: rangeData.maxRange };
+        } catch (e) {
+          switch (weapon1.template.distance) {
+            case 'MEDIUM': weapon1Range = { minRange: 5, maxRange: 20 }; break;
+            case 'FAR': weapon1Range = { minRange: 20, maxRange: 50 }; break;
+            case 'SNIPER': weapon1Range = { minRange: 50, maxRange: 200 }; break;
+            default: weapon1Range = { minRange: 0, maxRange: 5 };
+          }
+        }
+      }
+      
+      if (weapon2.template?.distance) {
+        try {
+          const rangeData = JSON.parse(weapon2.template.distance);
+          weapon2Range = { minRange: rangeData.minRange, maxRange: rangeData.maxRange };
+        } catch (e) {
+          switch (weapon2.template.distance) {
+            case 'MEDIUM': weapon2Range = { minRange: 5, maxRange: 20 }; break;
+            case 'FAR': weapon2Range = { minRange: 20, maxRange: 50 }; break;
+            case 'SNIPER': weapon2Range = { minRange: 50, maxRange: 200 }; break;
+            default: weapon2Range = { minRange: 0, maxRange: 5 };
+          }
+        }
+      }
+      
+      const dualResult = CombatEngine.resolveDualWieldAttack(
+        attackerCopy as unknown as BattleParticipant,
+        weapon1.item.currentEssence || 5,
+        (weapon1.template?.penetration as PenetrationType) || PenetrationType.NONE,
+        weapon1Range,
+        weapon2.item.currentEssence || 5,
+        (weapon2.template?.penetration as PenetrationType) || PenetrationType.NONE,
+        weapon2Range,
+        targetCopy as unknown as BattleParticipant,
+        armorIgnore,
+        armorCat,
+        1, // defender min roll
+        1, // attacker min roll
+        armorHitPenalty,
+        totalEvasionPenalty
+      );
+      
+      // * Convert dual-wield result to standard format
+      result = {
+        hit: dualResult.totalDamage > 0,
+        damageDealt: dualResult.totalDamage,
+        log: dualResult.logs.join(' '),
+        diceLogs: dualResult.diceLogs,
+        rolls: dualResult.rolls,
+        isDualWield: true,
+        dualWieldHits: dualResult.hits
+      };
+    } else {
+      // * Check for AoE attack
+      const isAoE = (weaponTemplate as any)?.isAoE === true;
+      const aoeRadius = (weaponTemplate as any)?.aoeRadius || 0;
+      
+      if (isAoE && aoeRadius > 0) {
+        // * Find all targets in AoE radius from primary target
+        const primaryTargetDistance = target.distance;
+        const aoeTargets = battle.participants.filter((p: any) => {
+          if (p.id === attacker.id || p.currentHp <= 0) return false; // Exclude attacker and dead participants
+          if (p.isPlayer === attacker.isPlayer) return false; // Exclude allies
+          const distance = Math.abs(primaryTargetDistance - p.distance);
+          return distance <= aoeRadius;
+        });
+        
+        if (aoeTargets.length === 0) {
+          return res.status(400).json({ error: 'Нет целей в радиусе AoE атаки' });
+        }
+        
+        // * Prepare armor data for all targets
+        const targetArmorIgnores: number[] = [];
+        const targetArmorCats: (ArmorCategory | undefined)[] = [];
+        const targetEvasionPenalties: number[] = [];
+        
+        for (const aoeTarget of aoeTargets) {
+          let targetArmorIgnore = 0;
+          let targetArmorCat: ArmorCategory | undefined;
+          let targetEvasionPenalty = 0;
+          
+          if (aoeTarget.characterId) {
+            const targetChar = await (prisma as any).character.findUnique({
+              where: { id: aoeTarget.characterId },
+              include: { inventory: true }
+            });
+            if (targetChar && targetChar.inventory) {
+              const targetItems = JSON.parse(targetChar.inventory.items);
+              const targetArmor = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('armor'));
+              if (targetArmor) {
+                const targetArmorTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetArmor.templateId } });
+                targetArmorIgnore = targetArmorTemplate?.ignoreDamage || 0;
+                targetArmorCat = targetArmorTemplate?.category as ArmorCategory;
+                targetEvasionPenalty = targetArmorTemplate?.evasionPenalty || 0;
+              }
+              
+              // * Check for shield
+              const targetShield = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('shield'));
+              if (targetShield) {
+                const targetShieldTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetShield.templateId } });
+                targetEvasionPenalty += targetShieldTemplate?.shieldEvasionPenalty || 0;
+              }
+            }
+          }
+          
+          targetArmorIgnores.push(targetArmorIgnore);
+          targetArmorCats.push(targetArmorCat);
+          targetEvasionPenalties.push(targetEvasionPenalty);
+        }
+        
+        // * Execute AoE attack
+        const aoeResult = CombatEngine.resolveAoEAttack(
+          attackerCopy as unknown as BattleParticipant,
+          weaponEssence,
+          weaponPen,
+          weaponRange,
+          aoeTargets.map((p: any) => ({ ...p, currentHp: p.currentHp, currentProtection: p.currentProtection })) as unknown as BattleParticipant[],
+          targetArmorIgnores,
+          targetArmorCats,
+          1, // defender min roll
+          1, // attacker min roll
+          armorHitPenalty,
+          targetEvasionPenalties
+        );
+        
+        // * Apply damage to all hit targets
+        for (let i = 0; i < aoeResult.results.length; i++) {
+          const aoeTargetResult = aoeResult.results[i];
+          if (aoeTargetResult.hit) {
+            const aoeTarget = aoeTargets[i];
+            aoeTarget.currentHp = Math.max(0, aoeTarget.currentHp - aoeTargetResult.damageDealt);
+            // * Update target in DB
+            await (prisma as any).battleParticipant.update({
+              where: { id: aoeTarget.id },
+              data: {
+                currentHp: aoeTarget.currentHp,
+                currentProtection: aoeTarget.currentProtection
+              }
+            });
+            
+            if (aoeTarget.characterId) {
+              await syncParticipantToCharacter(aoeTarget as unknown as BattleParticipant);
+            }
+          }
+        }
+        
+        // * Convert AoE result to standard format
+        result = {
+          hit: aoeResult.totalDamage > 0,
+          damageDealt: aoeResult.totalDamage,
+          log: aoeResult.logs.join(' '),
+          diceLogs: aoeResult.diceLogs,
+          rolls: aoeResult.rolls,
+          isAoE: true,
+          aoeResults: aoeResult.results
+        };
+      } else {
+        // * Single weapon attack (non-AoE)
+        result = CombatEngine.resolveAttack(
+          attackerCopy as unknown as BattleParticipant,
+          weaponEssence,
+          weaponPen,
+          weaponRange,
+          targetCopy as unknown as BattleParticipant,
+          armorIgnore,
+          armorCat,
+          1, // defender min roll
+          1, // attacker min roll
+          armorHitPenalty,
+          totalEvasionPenalty
+        );
+      }
+    }
+    
+    // * Handle shield block: reduce shield durability and reset isBlocking
+    if (result.hit && targetCopy.isBlocking && equippedShield) {
+      equippedShield.currentDurability = Math.max(0, (equippedShield.currentDurability || 0) - 1);
+      
+      // * Persist shield durability change
+      if (target.characterId) {
+        const inv = await (prisma as any).inventory.findUnique({ where: { characterId: target.characterId } });
+        if (inv) {
+          const items = JSON.parse(inv.items);
+          const shieldInInv = items.find((i: any) => i.id === equippedShield.id);
+          if (shieldInInv) {
+            shieldInInv.currentDurability = equippedShield.currentDurability;
+            await (prisma as any).inventory.update({
+              where: { characterId: target.characterId },
+              data: { items: JSON.stringify(items) }
+            });
+          }
+        }
+      }
+      
+      // * Reset blocking flag after use
+      targetCopy.isBlocking = false;
+    }
 
     // * Handle Item Progression and Durability
     const itemUpdatesLog: string[] = [];
     
     // * 1. Weapon Mastery Growth (on successful hit)
-    if (result.hit && equippedWeapon && weaponTemplate && weaponTemplate.maxEssence) {
-      const currentMastery = equippedWeapon.currentEssence || 0;
-      const maxMastery = weaponTemplate.maxEssence;
-      
-      if (currentMastery < maxMastery) {
-        // 20% chance to gain 1-3 essence
-        if (Math.random() < 0.2) {
-          const gain = DICE.roll(3);
-          equippedWeapon.currentEssence = Math.min(maxMastery, currentMastery + gain);
-          itemUpdatesLog.push(`${attacker.name}: Мастерство владения ${weaponTemplate.name} повышено! (+${gain})`);
-          
-          // Persist weapon change
-          if (attacker.characterId) {
-            const inv = await (prisma as any).inventory.findUnique({ where: { characterId: attacker.characterId } });
-            if (inv) {
-              const items = JSON.parse(inv.items);
-              const weaponInInv = items.find((i: any) => i.id === equippedWeapon.id);
-              if (weaponInInv) {
-                weaponInInv.currentEssence = equippedWeapon.currentEssence;
-                await (prisma as any).inventory.update({
-                  where: { characterId: attacker.characterId },
-                  data: { items: JSON.stringify(items) }
-                });
+    if (result.hit) {
+      // * Handle dual-wield mastery
+      if (result.isDualWield && dualWieldWeapons.length >= 2) {
+        for (const weaponData of dualWieldWeapons) {
+          const weapon = weaponData.item;
+          const template = weaponData.template;
+          if (template && template.maxEssence) {
+            const currentMastery = weapon.currentEssence || 0;
+            const maxMastery = template.maxEssence;
+            
+            if (currentMastery < maxMastery) {
+              // 20% chance to gain 1-3 essence per weapon
+              if (Math.random() < 0.2) {
+                const gain = DICE.roll(3);
+                weapon.currentEssence = Math.min(maxMastery, currentMastery + gain);
+                itemUpdatesLog.push(`${attacker.name}: Мастерство владения ${template.name} повышено! (+${gain})`);
+                
+                // Persist weapon change
+                if (attacker.characterId) {
+                  const inv = await (prisma as any).inventory.findUnique({ where: { characterId: attacker.characterId } });
+                  if (inv) {
+                    const items = JSON.parse(inv.items);
+                    const weaponInInv = items.find((i: any) => i.id === weapon.id);
+                    if (weaponInInv) {
+                      weaponInInv.currentEssence = weapon.currentEssence;
+                      await (prisma as any).inventory.update({
+                        where: { characterId: attacker.characterId },
+                        data: { items: JSON.stringify(items) }
+                      });
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else if (equippedWeapon && weaponTemplate && weaponTemplate.maxEssence) {
+        // * Single weapon mastery
+        const currentMastery = equippedWeapon.currentEssence || 0;
+        const maxMastery = weaponTemplate.maxEssence;
+        
+        if (currentMastery < maxMastery) {
+          // 20% chance to gain 1-3 essence
+          if (Math.random() < 0.2) {
+            const gain = DICE.roll(3);
+            equippedWeapon.currentEssence = Math.min(maxMastery, currentMastery + gain);
+            itemUpdatesLog.push(`${attacker.name}: Мастерство владения ${weaponTemplate.name} повышено! (+${gain})`);
+            
+            // Persist weapon change
+            if (attacker.characterId) {
+              const inv = await (prisma as any).inventory.findUnique({ where: { characterId: attacker.characterId } });
+              if (inv) {
+                const items = JSON.parse(inv.items);
+                const weaponInInv = items.find((i: any) => i.id === equippedWeapon.id);
+                if (weaponInInv) {
+                  weaponInInv.currentEssence = equippedWeapon.currentEssence;
+                  await (prisma as any).inventory.update({
+                    where: { characterId: attacker.characterId },
+                    data: { items: JSON.stringify(items) }
+                  });
+                }
               }
             }
           }
@@ -621,7 +932,8 @@ export const resolveAttack = async (req: Request, res: Response) => {
         currentHp: Math.max(0, targetCopy.currentHp),
         currentProtection: Math.max(0, targetCopy.currentProtection),
         activeEffects: activeEffectsOnTarget,
-        bonuses: bonusesOnTarget
+        bonuses: bonusesOnTarget,
+        isBlocking: targetCopy.isBlocking || false // Reset blocking after use
       }
     });
 
@@ -809,6 +1121,16 @@ export const nextTurn = async (req: Request, res: Response) => {
         const finalMainActions = isStunned ? 0 : 1;
         const finalBonusActions = isStunned ? 0 : 1;
 
+        // * 3. Reset blocking flags for all participants at start of turn
+        for (const p of battle.participants) {
+          if ((p as any).isBlocking) {
+            await (prisma as any).battleParticipant.update({
+              where: { id: p.id },
+              data: { isBlocking: false }
+            });
+          }
+        }
+        
         // * 3. Update participant in DB
         const updatedInDb = await (prisma as any).battleParticipant.update({
             where: { id: nextParticipant.id },
@@ -818,7 +1140,8 @@ export const nextTurn = async (req: Request, res: Response) => {
                 activeEffects: updatedParticipant.activeEffects,
                 bonuses: updatedParticipant.bonuses,
                 mainActions: finalMainActions,
-                bonusActions: finalBonusActions
+                bonusActions: finalBonusActions,
+                isBlocking: false // Reset blocking at start of turn
             }
         });
 
@@ -946,6 +1269,16 @@ export const useSkill = async (req: Request, res: Response) => {
       }
     } else if (skillTemplate.targetType === 'SELF') {
       target = (participant as unknown as BattleParticipant);
+    } else if (skillTemplate.targetType === 'AREA') {
+      // * AREA skills require a target as center point
+      if (!targetId) {
+        return res.status(400).json({ error: 'Target required as center point for AREA skill' });
+      }
+      
+      target = (battle.participants.find((p: any) => p.id === targetId) as unknown as BattleParticipant) || null;
+      if (!target) {
+        return res.status(404).json({ error: 'Target not found' });
+      }
     }
 
     // * Get weapon essence for hit check
@@ -979,124 +1312,290 @@ export const useSkill = async (req: Request, res: Response) => {
 
     // * If castTime === 0 or cast is finished (castTimeRemaining === 0), apply immediately
     if (skillTemplate.castTime === 0 || characterSkill.castTimeRemaining === 0) {
-      // * Apply immediately
-      const result = SkillsEngine.applySkill(
-        updatedParticipant,
-        updatedTarget as BattleParticipant,
-        characterSkill as unknown as CharacterSkill,
-        skillTemplate as unknown as SkillTemplate,
-        weaponEssence,
-        attackerRankMinRoll,
-        targetRankMinRoll
-      );
-
-      skillLogs.push(...result.diceLogs);
-      skillLogs.push(result.log);
-
-      // * Only consume action if skill was successfully applied (not failed due to range/target issues)
-      if (!result.success) {
-        // * Skill failed to apply - don't consume action, don't set cooldown, don't update participant
-        // * Note: applySkill does NOT set cooldown on failure, so we don't need to clear it
-        return res.status(400).json({ 
-          error: result.log || 'Не удалось применить способность',
-          battle: formatBattle(battle)
-        });
-      }
-
-      // * BUG 1 FIX (refined):
-      // * - Instant skills (castTime === 0) должны тратить основное действие при каждом применении.
-      // * - Многоходовые скиллы (castTime > 0) тратят действие ТОЛЬКО один раз — при старте каста
-      // *   в SkillsEngine.startCasting(), а при выпуске (когда castTimeRemaining === 0) действие
-      // *   повторно не тратится.
-      if (skillTemplate.castTime === 0) {
-        updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
-      }
-
-      // * Apply Damage for combat skills if hit (only if target is an enemy)
-      if (result.hit && skillTemplate.isCombat && updatedTarget && updatedTarget.isPlayer !== participant.isPlayer) {
-        // Simple damage formula: weaponEssence + 10 (as base)
-        const baseDamage = 10 + (weaponEssence > 0 ? weaponEssence : 0);
+      // * Handle AREA skills with AoE logic
+      if (skillTemplate.targetType === 'AREA' && target) {
+        // * Parse skill range for AoE radius
+        let skillRange: { minRange: number; maxRange: number } | undefined;
+        let aoeRadius = 10; // Default AoE radius
         
-        // Check penetration (simplified)
-        const attackerPen = skillTemplate.penetration as PenetrationType || PenetrationType.NONE;
-        
-        // Get target armor info
-        let armorIgnore = 0;
-        let armorCat: ArmorCategory | undefined;
-        if (updatedTarget.characterId) {
-            const char = await (prisma as any).character.findUnique({
-                where: { id: updatedTarget.characterId },
-                include: { inventory: true }
-            });
-            if (char && char.inventory) {
-                const items = JSON.parse(char.inventory.items);
-                const equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.toLowerCase().includes('armor'));
-                if (equippedArmor) {
-                    const template = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
-                    armorIgnore = template?.ignoreDamage || 0;
-                    armorCat = template?.category as ArmorCategory;
-                }
+        if (skillTemplate.distance) {
+          try {
+            const rangeData = JSON.parse(skillTemplate.distance);
+            skillRange = { minRange: rangeData.minRange || 0, maxRange: rangeData.maxRange || 999 };
+            // * Use maxRange as AoE radius (or half of it)
+            aoeRadius = Math.max(5, rangeData.maxRange / 2);
+          } catch {
+            // Legacy string format
+            switch (skillTemplate.distance) {
+              case 'CLOSE': aoeRadius = 5; break;
+              case 'MEDIUM': aoeRadius = 10; break;
+              case 'FAR': aoeRadius = 15; break;
+              case 'SNIPER': aoeRadius = 20; break;
+              default: aoeRadius = 10;
             }
-        }
-
-        // Apply damage logic similar to CombatEngine
-        const damage = baseDamage;
-        const targetBonuses: CharacterBonuses = updatedTarget.bonuses ? JSON.parse(updatedTarget.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 };
-        const finalDamage = Math.max(0, damage - armorIgnore - (targetBonuses.damageResistance || 0));
-        
-        // Apply damage to target
-        if (updatedTarget.currentProtection >= finalDamage) {
-          updatedTarget.currentProtection -= finalDamage;
-        } else {
-          const remaining = finalDamage - updatedTarget.currentProtection;
-          updatedTarget.currentProtection = 0;
-          updatedTarget.currentHp = Math.max(0, updatedTarget.currentHp - remaining);
-        }
-        
-        skillLogs.push(`Нанесено ${finalDamage} урона!`);
-      }
-
-      // * Apply effects from skill
-      if (skillTemplate.effects && result.hit) {
-        const effectIds: string[] = JSON.parse(skillTemplate.effects);
-        const targetForEffects: BattleParticipant = (updatedTarget || updatedParticipant);
-        
-        for (const effectId of effectIds) {
-          const effectTemplate = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
-          if (effectTemplate) {
-            const activeEffect: ActiveEffect = {
-              id: crypto.randomUUID(),
-              templateId: effectTemplate.id,
-              name: effectTemplate.name,
-              type: effectTemplate.type as EffectType,
-              level: 'ORDINARY',
-              value: effectTemplate.value,
-              remainingTurns: effectTemplate.duration,
-              parameter: effectTemplate.parameter || undefined,
-              isNegative: effectTemplate.isNegative
-            };
-            
-            EffectsEngine.applyEffect(targetForEffects, activeEffect);
-            skillLogs.push(`${participant.name}: На цель наложен эффект "${effectTemplate.name}"!`);
           }
         }
         
-        if (updatedTarget) {
-          updatedTarget.activeEffects = targetForEffects.activeEffects ?? "[]";
-          updatedTarget.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
-        } else {
-          updatedParticipant.activeEffects = (targetForEffects.activeEffects as string) ?? "[]";
-          updatedParticipant.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
+        // * Find all targets in AoE radius
+        const primaryTargetDistance = target.distance;
+        const aoeTargets = battle.participants.filter((p: any) => {
+          if (p.id === participant.id || p.currentHp <= 0) return false;
+          if (p.isPlayer === participant.isPlayer) return false; // Exclude allies
+          const distance = Math.abs(primaryTargetDistance - p.distance);
+          return distance <= aoeRadius;
+        });
+        
+        if (aoeTargets.length === 0) {
+          return res.status(400).json({ error: 'Нет целей в радиусе AoE способности' });
         }
-      }
-
-      // * Set cooldown (applySkill already sets it on hit/miss, but we ensure it's set correctly)
-      // * Note: applySkill sets cooldown on both hit and miss (line 182 and 202), so it should already be set
-      // * We only set it here if it wasn't set (shouldn't happen, but safety check)
-      if (characterSkill.currentCooldown === 0) {
+        
+        // * Prepare armor data for all targets
+        const targetArmorIgnores: number[] = [];
+        const targetArmorCats: (ArmorCategory | undefined)[] = [];
+        const targetEvasionPenalties: number[] = [];
+        
+        for (const aoeTarget of aoeTargets) {
+          let targetArmorIgnore = 0;
+          let targetArmorCat: ArmorCategory | undefined;
+          let targetEvasionPenalty = 0;
+          
+          if (aoeTarget.characterId) {
+            const targetChar = await (prisma as any).character.findUnique({
+              where: { id: aoeTarget.characterId },
+              include: { inventory: true }
+            });
+            if (targetChar && targetChar.inventory) {
+              const targetItems = JSON.parse(targetChar.inventory.items);
+              const targetArmor = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('armor'));
+              if (targetArmor) {
+                const targetArmorTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetArmor.templateId } });
+                targetArmorIgnore = targetArmorTemplate?.ignoreDamage || 0;
+                targetArmorCat = targetArmorTemplate?.category as ArmorCategory;
+                targetEvasionPenalty = targetArmorTemplate?.evasionPenalty || 0;
+              }
+              
+              const targetShield = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('shield'));
+              if (targetShield) {
+                const targetShieldTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetShield.templateId } });
+                targetEvasionPenalty += targetShieldTemplate?.shieldEvasionPenalty || 0;
+              }
+            }
+          }
+          
+          targetArmorIgnores.push(targetArmorIgnore);
+          targetArmorCats.push(targetArmorCat);
+          targetEvasionPenalties.push(targetEvasionPenalty);
+        }
+        
+        // * Execute AoE attack for skill
+        const skillDamage = 10 + (weaponEssence > 0 ? weaponEssence : 0);
+        const aoeResult = CombatEngine.resolveAoEAttack(
+          updatedParticipant,
+          skillDamage,
+          skillTemplate.penetration as PenetrationType || PenetrationType.NONE,
+          skillRange,
+          aoeTargets.map((p: any) => ({ ...p, currentHp: p.currentHp, currentProtection: p.currentProtection })) as unknown as BattleParticipant[],
+          targetArmorIgnores,
+          targetArmorCats,
+          targetRankMinRoll,
+          attackerRankMinRoll,
+          0, // hit penalty
+          targetEvasionPenalties
+        );
+        
+        skillLogs.push(...aoeResult.diceLogs);
+        skillLogs.push(...aoeResult.logs);
+        
+        // * Apply damage to all hit targets
+        for (let i = 0; i < aoeResult.results.length; i++) {
+          const aoeTargetResult = aoeResult.results[i];
+          if (aoeTargetResult.hit) {
+            const aoeTarget = aoeTargets[i];
+            aoeTarget.currentHp = Math.max(0, aoeTarget.currentHp - aoeTargetResult.damageDealt);
+            
+            // * Update target in DB
+            await (prisma as any).battleParticipant.update({
+              where: { id: aoeTarget.id },
+              data: {
+                currentHp: aoeTarget.currentHp,
+                currentProtection: aoeTarget.currentProtection
+              }
+            });
+            
+            if (aoeTarget.characterId) {
+              await syncParticipantToCharacter(aoeTarget as unknown as BattleParticipant);
+            }
+          }
+        }
+        
+        // * Apply effects from skill to all hit targets
+        if (skillTemplate.effects) {
+          const effectIds: string[] = JSON.parse(skillTemplate.effects);
+          for (let i = 0; i < aoeResult.results.length; i++) {
+            if (aoeResult.results[i].hit) {
+              const aoeTarget = aoeTargets[i];
+              const targetForEffects: BattleParticipant = aoeTarget as unknown as BattleParticipant;
+              
+              for (const effectId of effectIds) {
+                const effectTemplate = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
+                if (effectTemplate) {
+                  const activeEffect: ActiveEffect = {
+                    id: crypto.randomUUID(),
+                    templateId: effectTemplate.id,
+                    name: effectTemplate.name,
+                    type: effectTemplate.type as EffectType,
+                    level: 'ORDINARY',
+                    value: effectTemplate.value,
+                    remainingTurns: effectTemplate.duration,
+                    parameter: effectTemplate.parameter || undefined,
+                    isNegative: effectTemplate.isNegative
+                  };
+                  
+                  EffectsEngine.applyEffect(targetForEffects, activeEffect);
+                  skillLogs.push(`${participant.name}: На ${aoeTarget.name} наложен эффект "${effectTemplate.name}"!`);
+                }
+              }
+              
+              // * Update target effects
+              await (prisma as any).battleParticipant.update({
+                where: { id: aoeTarget.id },
+                data: {
+                  activeEffects: targetForEffects.activeEffects ?? "[]",
+                  bonuses: targetForEffects.bonuses ?? null
+                }
+              });
+            }
+          }
+        }
+        
+        // * Set cooldown
         characterSkill.currentCooldown = skillTemplate.cooldown;
+        characterSkill.castTimeRemaining = null;
+        
+        // * Consume action
+        if (skillTemplate.castTime === 0) {
+          updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+        }
+      } else {
+        // * Apply immediately (non-AoE skills)
+        const result = SkillsEngine.applySkill(
+          updatedParticipant,
+          updatedTarget as BattleParticipant,
+          characterSkill as unknown as CharacterSkill,
+          skillTemplate as unknown as SkillTemplate,
+          weaponEssence,
+          attackerRankMinRoll,
+          targetRankMinRoll
+        );
+
+        skillLogs.push(...result.diceLogs);
+        skillLogs.push(result.log);
+
+        // * Only consume action if skill was successfully applied (not failed due to range/target issues)
+        if (!result.success) {
+          // * Skill failed to apply - don't consume action, don't set cooldown, don't update participant
+          // * Note: applySkill does NOT set cooldown on failure, so we don't need to clear it
+          return res.status(400).json({ 
+            error: result.log || 'Не удалось применить способность',
+            battle: formatBattle(battle)
+          });
+        }
+
+        // * BUG 1 FIX (refined):
+        // * - Instant skills (castTime === 0) должны тратить основное действие при каждом применении.
+        // * - Многоходовые скиллы (castTime > 0) тратят действие ТОЛЬКО один раз — при старте каста
+        // *   в SkillsEngine.startCasting(), а при выпуске (когда castTimeRemaining === 0) действие
+        // *   повторно не тратится.
+        if (skillTemplate.castTime === 0) {
+          updatedParticipant.mainActions = Math.max(0, updatedParticipant.mainActions - 1);
+        }
+
+        // * Apply Damage for combat skills if hit (only if target is an enemy)
+        if (result.hit && skillTemplate.isCombat && updatedTarget && updatedTarget.isPlayer !== participant.isPlayer) {
+          // Simple damage formula: weaponEssence + 10 (as base)
+          const baseDamage = 10 + (weaponEssence > 0 ? weaponEssence : 0);
+          
+          // Check penetration (simplified)
+          const attackerPen = skillTemplate.penetration as PenetrationType || PenetrationType.NONE;
+          
+          // Get target armor info
+          let armorIgnore = 0;
+          let armorCat: ArmorCategory | undefined;
+          if (updatedTarget.characterId) {
+              const char = await (prisma as any).character.findUnique({
+                  where: { id: updatedTarget.characterId },
+                  include: { inventory: true }
+              });
+              if (char && char.inventory) {
+                  const items = JSON.parse(char.inventory.items);
+                  const equippedArmor = items.find((i: any) => i.isEquipped && i.templateId.toLowerCase().includes('armor'));
+                  if (equippedArmor) {
+                      const template = await (prisma as any).itemTemplate.findUnique({ where: { id: equippedArmor.templateId } });
+                      armorIgnore = template?.ignoreDamage || 0;
+                      armorCat = template?.category as ArmorCategory;
+                  }
+              }
+          }
+
+          // Apply damage logic similar to CombatEngine
+          const damage = baseDamage;
+          const targetBonuses: CharacterBonuses = updatedTarget.bonuses ? JSON.parse(updatedTarget.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 };
+          const finalDamage = Math.max(0, damage - armorIgnore - (targetBonuses.damageResistance || 0));
+          
+          // Apply damage to target
+          if (updatedTarget.currentProtection >= finalDamage) {
+            updatedTarget.currentProtection -= finalDamage;
+          } else {
+            const remaining = finalDamage - updatedTarget.currentProtection;
+            updatedTarget.currentProtection = 0;
+            updatedTarget.currentHp = Math.max(0, updatedTarget.currentHp - remaining);
+          }
+          
+          skillLogs.push(`Нанесено ${finalDamage} урона!`);
+        }
+
+        // * Apply effects from skill (non-AoE only)
+        if (skillTemplate.effects && result.hit) {
+          const effectIds: string[] = JSON.parse(skillTemplate.effects);
+          const targetForEffects: BattleParticipant = (updatedTarget || updatedParticipant);
+          
+          for (const effectId of effectIds) {
+            const effectTemplate = await (prisma as any).effectTemplate.findUnique({ where: { id: effectId } });
+            if (effectTemplate) {
+              const activeEffect: ActiveEffect = {
+                id: crypto.randomUUID(),
+                templateId: effectTemplate.id,
+                name: effectTemplate.name,
+                type: effectTemplate.type as EffectType,
+                level: 'ORDINARY',
+                value: effectTemplate.value,
+                remainingTurns: effectTemplate.duration,
+                parameter: effectTemplate.parameter || undefined,
+                isNegative: effectTemplate.isNegative
+              };
+              
+              EffectsEngine.applyEffect(targetForEffects, activeEffect);
+              skillLogs.push(`${participant.name}: На цель наложен эффект "${effectTemplate.name}"!`);
+            }
+          }
+          
+          if (updatedTarget) {
+            updatedTarget.activeEffects = targetForEffects.activeEffects ?? "[]";
+            updatedTarget.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
+          } else {
+            updatedParticipant.activeEffects = (targetForEffects.activeEffects as string) ?? "[]";
+            updatedParticipant.bonuses = (targetForEffects.bonuses as string | null | undefined) ?? null;
+          }
+        }
+
+        // * Set cooldown (applySkill already sets it on hit/miss, but we ensure it's set correctly)
+        // * Note: applySkill sets cooldown on both hit and miss (line 182 and 202), so it should already be set
+        // * We only set it here if it wasn't set (shouldn't happen, but safety check)
+        if (characterSkill.currentCooldown === 0) {
+          characterSkill.currentCooldown = skillTemplate.cooldown;
+        }
+        characterSkill.castTimeRemaining = null;
       }
-      characterSkill.castTimeRemaining = null;
     } else {
       // * Start casting
       SkillsEngine.startCasting(updatedParticipant as unknown as BattleParticipant, characterSkill as unknown as CharacterSkill, skillTemplate as unknown as SkillTemplate);
@@ -1253,14 +1752,16 @@ export const useConsumable = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Only consumables can be used in battle' });
     }
 
-    // * Parse metadata from description (optional JSON) for targetType/actionType
-    let meta: { targetType?: 'SELF' | 'TARGET'; actionType?: 'MAIN' | 'BONUS' } = {};
+    // * Parse metadata from description (optional JSON) for targetType/actionType/isAoE
+    let meta: { targetType?: 'SELF' | 'TARGET'; actionType?: 'MAIN' | 'BONUS'; isAoE?: boolean; aoeRadius?: number } = {};
     if (itemTemplate.description) {
       try {
         const parsed = JSON.parse(itemTemplate.description);
         meta = {
           targetType: parsed.targetType,
-          actionType: parsed.actionType
+          actionType: parsed.actionType,
+          isAoE: parsed.isAoE,
+          aoeRadius: parsed.aoeRadius
         };
       } catch {
         // * Description is plain text, ignore
@@ -1368,6 +1869,50 @@ export const useConsumable = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Scroll requires a separate target' });
       }
 
+      // * Check for equipped magic stabilizer (staff/wand)
+      let equippedStabilizer: any = null;
+      let stabilizerEssence = 0;
+      
+      const equippedItems = items.filter((i: any) => i.isEquipped);
+      for (const item of equippedItems) {
+        const template = await (prisma as any).itemTemplate.findUnique({ where: { id: item.templateId } });
+        if (template && template.category === 'MAGIC_STABILIZER') {
+          equippedStabilizer = item;
+          stabilizerEssence = item.currentEssence || 0;
+          
+          // * Check spell slots
+          if (!equippedStabilizer.spellSlots) {
+            // * Initialize spell slots if not present
+            const maxSlots = template.slotCount || 0;
+            equippedStabilizer.spellSlots = { used: 0, max: maxSlots };
+          }
+          
+          // * Check if there are free spell slots
+          if (equippedStabilizer.spellSlots.used >= equippedStabilizer.spellSlots.max) {
+            return res.status(400).json({ error: 'Нет свободных ячеек заклинаний в магическом стабилизаторе' });
+          }
+          
+          // * Use a spell slot
+          equippedStabilizer.spellSlots.used += 1;
+          
+          // * Persist spell slot usage
+          const itemInInv = items.find((i: any) => i.id === equippedStabilizer.id);
+          if (itemInInv) {
+            itemInInv.spellSlots = equippedStabilizer.spellSlots;
+            await (prisma as any).inventory.update({
+              where: { id: inventory.id },
+              data: { items: JSON.stringify(items) }
+            });
+          }
+          
+          break;
+        }
+      }
+      
+      if (!equippedStabilizer) {
+        return res.status(400).json({ error: 'Для использования свитка требуется экипированный магический стабилизатор (посох/жезл)' });
+      }
+
       // * Parse range from itemTemplate.distance
       let scrollRange: { minRange: number; maxRange: number } | undefined;
       if (itemTemplate.distance) {
@@ -1397,41 +1942,154 @@ export const useConsumable = async (req: Request, res: Response) => {
       const attackerCopy = { ...updatedParticipant } as unknown as BattleParticipant;
       const defenderCopy = { ...updatedTarget } as unknown as BattleParticipant;
 
-      const scrollEssence = itemTemplate.baseEssence || 10;
+      // * Scroll damage formula: (scroll essence + stabilizer essence)
+      const scrollEssence = (itemTemplate.baseEssence || 10) + stabilizerEssence;
       const scrollPen = (itemTemplate.penetration as PenetrationType) || PenetrationType.NONE;
 
-      const result = CombatEngine.resolveAttack(
-        attackerCopy,
-        scrollEssence,
-        scrollPen,
-        scrollRange,
-        defenderCopy,
-        0,
-        undefined,
-        1,
-        1,
-        0,
-        0
-      );
-
-      // * If target is out of range, do not consume action or item
-      if (!result.hit && result.damageDealt === 0 && result.log && result.log.includes('вне досягаемости')) {
-        return res.status(400).json({
-          error: result.log,
-          battle: formatBattle(battle)
+      // * Check for AoE scroll
+      const isAoE = meta.isAoE === true;
+      const aoeRadius = meta.aoeRadius || 0;
+      
+      let result: any;
+      if (isAoE && aoeRadius > 0) {
+        // * Find all targets in AoE radius
+        const primaryTargetDistance = updatedTarget.distance;
+        const aoeTargets = battle.participants.filter((p: any) => {
+          if (p.id === updatedParticipant.id || p.currentHp <= 0) return false;
+          if (p.isPlayer === updatedParticipant.isPlayer) return false; // Exclude allies
+          const distance = Math.abs(primaryTargetDistance - p.distance);
+          return distance <= aoeRadius;
         });
+        
+        if (aoeTargets.length === 0) {
+          return res.status(400).json({ error: 'Нет целей в радиусе AoE свитка' });
+        }
+        
+        // * Prepare armor data for all targets
+        const targetArmorIgnores: number[] = [];
+        const targetArmorCats: (ArmorCategory | undefined)[] = [];
+        const targetEvasionPenalties: number[] = [];
+        
+        for (const aoeTarget of aoeTargets) {
+          let targetArmorIgnore = 0;
+          let targetArmorCat: ArmorCategory | undefined;
+          let targetEvasionPenalty = 0;
+          
+          if (aoeTarget.characterId) {
+            const targetChar = await (prisma as any).character.findUnique({
+              where: { id: aoeTarget.characterId },
+              include: { inventory: true }
+            });
+            if (targetChar && targetChar.inventory) {
+              const targetItems = JSON.parse(targetChar.inventory.items);
+              const targetArmor = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('armor'));
+              if (targetArmor) {
+                const targetArmorTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetArmor.templateId } });
+                targetArmorIgnore = targetArmorTemplate?.ignoreDamage || 0;
+                targetArmorCat = targetArmorTemplate?.category as ArmorCategory;
+                targetEvasionPenalty = targetArmorTemplate?.evasionPenalty || 0;
+              }
+              
+              const targetShield = targetItems.find((i: any) => i.isEquipped && i.templateId.includes('shield'));
+              if (targetShield) {
+                const targetShieldTemplate = await (prisma as any).itemTemplate.findUnique({ where: { id: targetShield.templateId } });
+                targetEvasionPenalty += targetShieldTemplate?.shieldEvasionPenalty || 0;
+              }
+            }
+          }
+          
+          targetArmorIgnores.push(targetArmorIgnore);
+          targetArmorCats.push(targetArmorCat);
+          targetEvasionPenalties.push(targetEvasionPenalty);
+        }
+        
+        // * Execute AoE attack for scroll
+        const aoeResult = CombatEngine.resolveAoEAttack(
+          attackerCopy,
+          scrollEssence,
+          scrollPen,
+          scrollRange,
+          aoeTargets.map((p: any) => ({ ...p, currentHp: p.currentHp, currentProtection: p.currentProtection })) as unknown as BattleParticipant[],
+          targetArmorIgnores,
+          targetArmorCats,
+          1, // defender min roll
+          1, // attacker min roll
+          0, // hit penalty
+          targetEvasionPenalties
+        );
+        
+        diceLogs.push(...aoeResult.diceLogs);
+        logs.push(...aoeResult.logs);
+        logs.push(`${updatedParticipant.name} использует AoE свиток ${itemTemplate.name}`);
+        
+        // * Apply damage to all hit targets
+        for (let i = 0; i < aoeResult.results.length; i++) {
+          const aoeTargetResult = aoeResult.results[i];
+          if (aoeTargetResult.hit) {
+            const aoeTarget = aoeTargets[i];
+            aoeTarget.currentHp = Math.max(0, aoeTarget.currentHp - aoeTargetResult.damageDealt);
+            
+            // * Update target in DB
+            await (prisma as any).battleParticipant.update({
+              where: { id: aoeTarget.id },
+              data: {
+                currentHp: aoeTarget.currentHp,
+                currentProtection: aoeTarget.currentProtection
+              }
+            });
+            
+            if (aoeTarget.characterId) {
+              await syncParticipantToCharacter(aoeTarget as unknown as BattleParticipant);
+            }
+          }
+        }
+        
+        // * Convert to standard result format
+        result = {
+          hit: aoeResult.totalDamage > 0,
+          damageDealt: aoeResult.totalDamage,
+          log: aoeResult.logs.join(' '),
+          diceLogs: aoeResult.diceLogs,
+          rolls: aoeResult.rolls
+        };
+        
+        updatedParticipant.currentHp = attackerCopy.currentHp;
+        updatedParticipant.currentProtection = attackerCopy.currentProtection;
+      } else {
+        // * Single target scroll
+        result = CombatEngine.resolveAttack(
+          attackerCopy,
+          scrollEssence,
+          scrollPen,
+          scrollRange,
+          defenderCopy,
+          0,
+          undefined,
+          1,
+          1,
+          0,
+          0
+        );
+
+        // * If target is out of range, do not consume action or item
+        if (!result.hit && result.damageDealt === 0 && result.log && result.log.includes('вне досягаемости')) {
+          return res.status(400).json({
+            error: result.log,
+            battle: formatBattle(battle)
+          });
+        }
+
+        applyActionCost();
+
+        updatedParticipant.currentHp = attackerCopy.currentHp;
+        updatedParticipant.currentProtection = attackerCopy.currentProtection;
+
+        updatedTarget.currentHp = defenderCopy.currentHp;
+        updatedTarget.currentProtection = defenderCopy.currentProtection;
+
+        diceLogs.push(...result.diceLogs);
+        logs.push(`${updatedParticipant.name} использует свиток ${itemTemplate.name}: ${result.log}`);
       }
-
-      applyActionCost();
-
-      updatedParticipant.currentHp = attackerCopy.currentHp;
-      updatedParticipant.currentProtection = attackerCopy.currentProtection;
-
-      updatedTarget.currentHp = defenderCopy.currentHp;
-      updatedTarget.currentProtection = defenderCopy.currentProtection;
-
-      diceLogs.push(...result.diceLogs);
-      logs.push(`${updatedParticipant.name} использует свиток ${itemTemplate.name}: ${result.log}`);
     } else {
       // * Fallback for other consumables: just consume action with a log
       applyActionCost();
@@ -1604,6 +2262,106 @@ export const endBattle = async (req: Request, res: Response) => {
         console.error('End battle error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
+};
+
+export const blockWithShield = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    const { battleId, participantId, actionType } = req.body; // actionType: 'MAIN' | 'BONUS'
+
+    const battle = await (prisma as any).battle.findUnique({
+      where: { id: battleId },
+      include: { participants: true }
+    });
+
+    if (!battle || battle.status === BattleStatus.FINISHED) {
+      return res.status(404).json({ error: 'Battle not found or finished' });
+    }
+
+    const participant = battle.participants.find((p: any) => p.id === participantId);
+    if (!participant) {
+      return res.status(404).json({ error: 'Participant not found' });
+    }
+
+    // * Check if it's the participant's turn
+    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+      return res.status(400).json({ error: "It's not your turn" });
+    }
+
+    if (!participant.characterId) {
+      return res.status(400).json({ error: 'Only player characters can block with shield' });
+    }
+
+    // * Check for equipped shield
+    const char = await (prisma as any).character.findUnique({
+      where: { id: participant.characterId, userId },
+      include: { inventory: true }
+    });
+
+    if (!char || !char.inventory) {
+      return res.status(404).json({ error: 'Character or inventory not found' });
+    }
+
+    const items = JSON.parse(char.inventory.items);
+    const equippedShield = items.find((i: any) => i.isEquipped && i.templateId.includes('shield'));
+    
+    if (!equippedShield) {
+      return res.status(400).json({ error: 'No shield equipped' });
+    }
+
+    // * Check shield durability
+    if ((equippedShield.currentDurability || 0) <= 0) {
+      return res.status(400).json({ error: 'Shield has no durability left' });
+    }
+
+    // * Check available actions
+    if (actionType === 'MAIN') {
+      if (participant.mainActions <= 0) {
+        return res.status(400).json({ error: 'No main actions left' });
+      }
+    } else {
+      if (participant.bonusActions <= 0) {
+        return res.status(400).json({ error: 'No bonus actions left' });
+      }
+    }
+
+    // * Set blocking flag and consume action
+    const updatedMainActions = actionType === 'MAIN' ? Math.max(0, participant.mainActions - 1) : participant.mainActions;
+    const updatedBonusActions = actionType === 'BONUS' ? Math.max(0, participant.bonusActions - 1) : participant.bonusActions;
+
+    const updatedParticipant = await (prisma as any).battleParticipant.update({
+      where: { id: participant.id },
+      data: {
+        isBlocking: true,
+        mainActions: updatedMainActions,
+        bonusActions: updatedBonusActions
+      }
+    });
+
+    // * Update battle log
+    const currentLog = JSON.parse(battle.log);
+    currentLog.push(`${participant.name} готовится блокировать щитом!`);
+
+    await (prisma as any).battle.update({
+      where: { id: battle.id },
+      data: { log: JSON.stringify(currentLog) }
+    });
+
+    // * Fetch updated battle
+    const updatedBattle = await (prisma as any).battle.findUnique({
+      where: { id: battle.id },
+      include: { participants: true }
+    });
+
+    res.json({
+      battle: formatBattle(updatedBattle),
+      message: 'Shield block activated'
+    });
+  } catch (error) {
+    console.error('Block with shield error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 export const getActiveBattle = async (req: Request, res: Response) => {

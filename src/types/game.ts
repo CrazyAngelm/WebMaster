@@ -365,6 +365,7 @@ export interface ExistingItem {
   currentDurability: number;
   isEquipped: boolean;
   buffs: UUID[];
+  spellSlots?: { used: number; max: number }; // For magic stabilizers
 }
 
 export interface Skill {
@@ -417,6 +418,7 @@ export interface BattleParticipant {
   isPlayer: boolean;
   distance: number;
   activeEffects?: ActiveEffect[];
+  isBlocking?: boolean;
 }
 
 export interface Effect {
@@ -441,4 +443,3 @@ export interface Recipe {
   }[];
   stationRequired?: string;
 }
-

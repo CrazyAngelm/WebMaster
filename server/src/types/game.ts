@@ -58,6 +58,13 @@ export enum PenetrationType {
   VERY_HEAVY = 'VERY_HEAVY',
 }
 
+export enum ShieldType {
+  LIGHT = 'LIGHT',
+  MEDIUM = 'MEDIUM',
+  HEAVY = 'HEAVY',
+  SUPER_HEAVY = 'SUPER_HEAVY',
+}
+
 export interface CharacterStats {
   essence: { current: number; max: number };
   energy: { current: number; max: number };
@@ -110,6 +117,7 @@ export interface BattleParticipant {
   distance: number;
   bonuses: string | null | undefined;
   activeEffects: string; // JSON string of ActiveEffect[]
+  isBlocking?: boolean; // Active shield block flag
 }
 
 export interface SkillTemplate {

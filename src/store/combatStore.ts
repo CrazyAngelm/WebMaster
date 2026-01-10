@@ -24,9 +24,10 @@ interface CombatState {
     attackerId: string,
     targetId: string,
     weaponId: string | null
-  ) => Promise<void>;
-  useSkill: (participantId: string, skillId: string, targetId?: string) => Promise<void>;
-  useConsumable: (participantId: string, itemId: string, targetId?: string) => Promise<void>;
+  ) => Promise<any>;
+  useSkill: (participantId: string, skillId: string, targetId?: string) => Promise<any>;
+  useConsumable: (participantId: string, itemId: string, targetId?: string) => Promise<any>;
+  blockWithShield: (participantId: string, actionType: 'MAIN' | 'BONUS') => Promise<any>;
   move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
@@ -60,7 +61,9 @@ export const useCombatStore = create<CombatState>((set, get) => ({
 
   initiateBattle: async (enemyId, isMonster) => {
     const { token, character } = useGameStore.getState();
-    if (!token || !character) return;
+    if (!token || !character) {
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/battle/start`, {
@@ -179,8 +182,54 @@ export const useCombatStore = create<CombatState>((set, get) => ({
         // Fallback: sync battle state after attack
         await get().syncBattle(battle.id);
       }
+      return result;
     } catch (error) {
       console.error('Attack failed:', error);
+    }
+  },
+
+  blockWithShield: async (participantId, actionType) => {
+    const { battle } = get();
+    const { token } = useGameStore.getState();
+    if (!battle || !token) throw new Error('No battle or token');
+
+    try {
+      const res = await fetch(`${API_BASE}/battle/block`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          battleId: battle.id,
+          participantId,
+          actionType
+        })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) {
+        if (result.battle) {
+          set({ battle: result.battle });
+        }
+        throw new Error(result.error || 'Не удалось блокировать щитом');
+      }
+
+      if (result.rolls && Array.isArray(result.rolls)) {
+        const { triggerRoll } = useDiceStore.getState();
+        await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
+      }
+
+      if (result.battle) {
+        set({ battle: result.battle });
+      } else {
+        await get().syncBattle(battle.id);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Block failed:', error);
+      throw error;
     }
   },
 
@@ -229,6 +278,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
           await useGameStore.getState().refreshCharacter();
         }
       }
+      return result;
     } catch (error) {
       console.error('Use skill failed:', error);
       throw error; // * Re-throw to allow component to handle it
@@ -284,6 +334,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
           await useGameStore.getState().refreshCharacter();
         }
       }
+      return result;
     } catch (error) {
       console.error('Use consumable failed:', error);
       throw error;
@@ -372,11 +423,10 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
     
     set({ battle: null, player: null, enemy: null });
-    
+
     // * Refresh character stats after battle
     await useGameStore.getState().refreshCharacter();
   }
 }));
-
 
 

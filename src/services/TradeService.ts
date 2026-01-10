@@ -150,7 +150,7 @@ export const TradeService = {
    */
   createNewItem(templateId: UUID, quantity: number = 1): ExistingItem {
     const template = StaticDataService.getItemTemplate(templateId);
-    return {
+    const item: ExistingItem = {
       id: crypto.randomUUID(),
       templateId,
       quantity,
@@ -159,6 +159,16 @@ export const TradeService = {
       isEquipped: false,
       buffs: []
     };
+    
+    // * Initialize spell slots for magic stabilizers
+    if (template?.category === 'MAGIC_STABILIZER' && template.slotCount) {
+      item.spellSlots = {
+        used: 0,
+        max: template.slotCount
+      };
+    }
+    
+    return item;
   }
 };
 
