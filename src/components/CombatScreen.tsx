@@ -4,7 +4,7 @@ import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair, X } from 'lucide-react';
 import { clsx } from 'clsx';
-import { BattleStatus, CharacterSkill } from '../types/game';
+import { BattleStatus, CharacterSkill, ParticipantStatus } from '../types/game';
 
 const UserIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -1063,7 +1063,7 @@ export const CombatScreen: React.FC = () => {
         ) : (
           <div className="text-center">
             <h4 className="text-fantasy-accent font-serif text-xl mb-4 uppercase">
-              {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вы проиграли' : 'Победа!'}
+              {playerParticipant && playerParticipant.status === ParticipantStatus.DEAD ? 'Вы проиграли' : 'Победа!'}
             </h4>
             <button 
               onClick={() => {
@@ -1071,7 +1071,7 @@ export const CombatScreen: React.FC = () => {
               }} 
               className="fantasy-button"
             >
-              {playerParticipant && playerParticipant.currentHp <= 0 ? 'Вернуться в город' : 'Завершить бой'}
+              {playerParticipant && playerParticipant.status === ParticipantStatus.DEAD ? 'Вернуться в город' : 'Завершить бой'}
             </button>
           </div>
         )}

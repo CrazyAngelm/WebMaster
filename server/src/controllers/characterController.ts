@@ -205,6 +205,8 @@ export const updateCharacter = async (req: Request, res: Response) => {
 
     // * Validate and prepare update data
     const updateData: any = {};
+    // * Store modified items array from character inventory for spell slot restoration merge
+    let modifiedItemsFromCharacter: any[] | null = null;
 
     if (lastTrainTime !== undefined && lastTrainTime !== null) {
       if (typeof lastTrainTime !== 'number' || lastTrainTime < 0) {
@@ -237,19 +239,17 @@ export const updateCharacter = async (req: Request, res: Response) => {
           }
         }
         
+        // * Store modified items array for potential merge with request body inventory
         if (updatedItems) {
-          // * Update inventory with restored spell slots
-          if (!updateData.inventory) {
+          modifiedItemsFromCharacter = items;
+          // * Update inventory with restored spell slots only if no request body inventory will overwrite it
+          if (!updateData.inventory && (inventory === undefined || !inventory || !inventory.items)) {
             updateData.inventory = {
               update: {
                 items: JSON.stringify(items),
                 baseSlots: character.inventory.baseSlots || 10
               }
             };
-          } else {
-            // * Merge with existing inventory update
-            const existingItems = inventory ? inventory.items : items;
-            updateData.inventory.update.items = JSON.stringify(existingItems);
           }
         }
       }
@@ -325,7 +325,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
       updateData.bonuses = JSON.stringify(bonuses);
     }
 
-    if (inventory !== undefined) {
+    if (inventory !== undefined && inventory !== null) {
       if (typeof inventory === 'object' && Array.isArray(inventory.items)) {
         // * Validate each item structure
         for (const item of inventory.items) {
@@ -334,9 +334,38 @@ export const updateCharacter = async (req: Request, res: Response) => {
           }
         }
         
+        // * Start with request body inventory items
+        const itemsToSave = [...inventory.items];
+        
+        // * Merge spell slot modifications from character inventory if available
+        // * This preserves spell slot restoration made to locally-parsed items array
+        if (modifiedItemsFromCharacter) {
+          const modifiedItemsMap = new Map(modifiedItemsFromCharacter.map(item => [item.id, item]));
+          for (const item of itemsToSave) {
+            const modifiedItem = modifiedItemsMap.get(item.id);
+            // * Merge spell slot modifications if item exists in modified character inventory
+            if (modifiedItem && item.isEquipped && item.spellSlots && modifiedItem.spellSlots) {
+              item.spellSlots = { ...modifiedItem.spellSlots };
+            }
+          }
+        }
+        
+        // * Apply spell slot restoration if resting (lastRestTime was set) and not already merged
+        if (lastRestTime !== undefined && lastRestTime !== null && !modifiedItemsFromCharacter) {
+          for (const item of itemsToSave) {
+            if (item.isEquipped && item.spellSlots) {
+              const template = await (prisma as any).itemTemplate.findUnique({ where: { id: item.templateId } });
+              if (template && template.category === 'MAGIC_STABILIZER') {
+                // * Restore all spell slots
+                item.spellSlots.used = 0;
+              }
+            }
+          }
+        }
+        
         updateData.inventory = {
           update: {
-            items: JSON.stringify(inventory.items),
+            items: JSON.stringify(itemsToSave),
             baseSlots: inventory.baseSlots || 10
           }
         };

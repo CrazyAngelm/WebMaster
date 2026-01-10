@@ -675,7 +675,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
         // * Find all targets in AoE radius from primary target
         const primaryTargetDistance = target.distance;
         const aoeTargets = battle.participants.filter((p: any) => {
-          if (p.id === attacker.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false; // Exclude attacker and downed/dead participants
+          if (p.id === attacker.id || p.id === target.id || getParticipantStatus(p) !== ParticipantStatus.ALIVE) return false; // Exclude attacker, primary target, and downed/dead participants
           if (p.isPlayer === attacker.isPlayer) return false; // Exclude allies
           const distance = Math.abs(primaryTargetDistance - p.distance);
           return distance <= aoeRadius;
@@ -1191,9 +1191,9 @@ export const nextTurn = async (req: Request, res: Response) => {
         const finalMainActions = isDowned || isStunned ? 0 : 1;
         const finalBonusActions = isDowned || isStunned ? 0 : 1;
 
-        // * 3. Reset blocking flags for all participants at start of turn
+        // * 3. Reset blocking flags for all participants at start of turn (except nextParticipant, which will be updated below)
         for (const p of battle.participants) {
-          if ((p as any).isBlocking) {
+          if (p.id !== nextParticipant.id && (p as any).isBlocking) {
             await (prisma as any).battleParticipant.update({
               where: { id: p.id },
               data: { isBlocking: false }
@@ -1201,7 +1201,7 @@ export const nextTurn = async (req: Request, res: Response) => {
           }
         }
         
-        // * 3. Update participant in DB
+        // * 3. Update participant in DB (reset blocking flag here to avoid duplicate update)
         const updatedInDb = await (prisma as any).battleParticipant.update({
             where: { id: nextParticipant.id },
             data: {
@@ -1281,14 +1281,6 @@ export const useSkill = async (req: Request, res: Response) => {
     const participant = battle.participants.find((p: any) => p.id === participantId);
     if (!participant) {
       return res.status(404).json({ error: 'Participant not found' });
-    }
-
-    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
-      return res.status(400).json({ error: 'Cannot block while downed or dead' });
-    }
-
-    if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
-      return res.status(400).json({ error: 'Cannot use items while downed or dead' });
     }
 
     if (getParticipantStatus(participant) !== ParticipantStatus.ALIVE) {
