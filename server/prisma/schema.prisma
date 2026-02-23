@@ -45,6 +45,8 @@ model Character {
   lastTrainTime Float?    // * Track last training time (in server time hours, float for sub-hour precision)
   lastRestTime  Float?    // * Track last rest time (in server time hours, float for sub-hour precision)
   skills        String    @default("[]") // UUID[] (JSON string) - CharacterSkill IDs for quick access
+  npcDialogHistory String @default("{}") // NPC dialog history (JSON string)
+  npcReputation    String @default("{}") // NPC reputation data (JSON string)
   
   inventory     Inventory?
   characterSkills CharacterSkill[]

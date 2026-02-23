@@ -33,6 +33,8 @@ export const getCharacters = async (req: Request, res: Response) => {
         location: JSON.parse(charData.location),
         activeQuests: JSON.parse(charData.activeQuests || '[]'),
         skills: JSON.parse(charData.skills || '[]'),
+        npcDialogHistory: JSON.parse(charData.npcDialogHistory || '{}'),
+        npcReputation: JSON.parse(charData.npcReputation || '{}'),
         inventory: charData.inventory ? {
           ...charData.inventory,
           items: JSON.parse(charData.inventory.items)
@@ -152,6 +154,8 @@ export const createCharacter = async (req: Request, res: Response) => {
       location: JSON.parse(newCharacter.location),
       activeQuests: JSON.parse((newCharacter as any).activeQuests || '[]'),
       skills: JSON.parse((newCharacter as any).skills || '[]'),
+      npcDialogHistory: JSON.parse((newCharacter as any).npcDialogHistory || '{}'),
+      npcReputation: JSON.parse((newCharacter as any).npcReputation || '{}'),
       inventory: (newCharacter as any).inventory ? {
         ...(newCharacter as any).inventory,
         items: JSON.parse((newCharacter as any).inventory.items)
@@ -190,7 +194,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, lastRestTime, inventory } = req.body;
+    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, lastRestTime, inventory, npcDialogHistory, npcReputation } = req.body;
 
     console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
@@ -325,6 +329,20 @@ export const updateCharacter = async (req: Request, res: Response) => {
       updateData.bonuses = JSON.stringify(bonuses);
     }
 
+    if (npcDialogHistory !== undefined) {
+      if (typeof npcDialogHistory !== 'object') {
+        return res.status(400).json({ error: 'npcDialogHistory must be an object' });
+      }
+      updateData.npcDialogHistory = JSON.stringify(npcDialogHistory);
+    }
+
+    if (npcReputation !== undefined) {
+      if (typeof npcReputation !== 'object') {
+        return res.status(400).json({ error: 'npcReputation must be an object' });
+      }
+      updateData.npcReputation = JSON.stringify(npcReputation);
+    }
+
     if (inventory !== undefined && inventory !== null) {
       if (typeof inventory === 'object' && Array.isArray(inventory.items)) {
         // * Validate each item structure
@@ -398,6 +416,8 @@ export const updateCharacter = async (req: Request, res: Response) => {
       location: JSON.parse(updatedCharacter.location),
       activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
       skills: JSON.parse((updatedCharacter as any).skills || '[]'),
+      npcDialogHistory: JSON.parse((updatedCharacter as any).npcDialogHistory || '{}'),
+      npcReputation: JSON.parse((updatedCharacter as any).npcReputation || '{}'),
       inventory: (updatedCharacter as any).inventory ? {
         ...(updatedCharacter as any).inventory,
         items: JSON.parse((updatedCharacter as any).inventory.items)
@@ -457,6 +477,8 @@ export const tickSkillCooldowns = async (req: Request, res: Response) => {
       location: JSON.parse(updatedCharacter!.location),
       activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
       skills: JSON.parse((updatedCharacter as any).skills || '[]'),
+      npcDialogHistory: JSON.parse((updatedCharacter as any).npcDialogHistory || '{}'),
+      npcReputation: JSON.parse((updatedCharacter as any).npcReputation || '{}'),
       inventory: (updatedCharacter as any).inventory ? {
         ...(updatedCharacter as any).inventory,
         items: JSON.parse((updatedCharacter as any).inventory.items)

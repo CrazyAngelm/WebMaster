@@ -141,7 +141,10 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
           case 'flee':
             // NPC runs away
             changeNPCReputation(npc.id, -10);
-            addNPCMessage(npc.name + ' убегает от вас!');
+            const fleeMessage = npc.name + ' убегает от вас!';
+            addNPCMessage(fleeMessage);
+            addNPCDialogMessage(npc.id, 'npc', fleeMessage);
+            setLocalMessages(prev => [...prev, { role: 'npc', content: fleeMessage }]);
             setTimeout(() => onClose(), 2000);
             break;
             
@@ -202,14 +205,20 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
       rewards: pendingQuest.rewards || {}
     });
     
-    addNPCMessage('Отлично! Возвращайся, когда выполнишь задание.');
+    const acceptMessage = 'Отлично! Возвращайся, когда выполнишь задание.';
+    addNPCMessage(acceptMessage);
+    addNPCDialogMessage(npc.id, 'npc', acceptMessage);
+    setLocalMessages(prev => [...prev, { role: 'npc', content: acceptMessage }]);
     setShowQuestOffer(false);
     setPendingQuest(null);
   };
 
   const declineQuest = () => {
+    const declineMessage = 'Жаль. Возможно, в другой раз.';
+    addNPCMessage(declineMessage);
+    addNPCDialogMessage(npc.id, 'npc', declineMessage);
+    setLocalMessages(prev => [...prev, { role: 'npc', content: declineMessage }]);
     setShowQuestOffer(false);
-    addNPCMessage('Жаль. Возможно, в другой раз.');
     setPendingQuest(null);
   };
 
