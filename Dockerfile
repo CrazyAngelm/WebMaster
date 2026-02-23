@@ -19,27 +19,17 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Production stage - use Node.js instead of Nginx
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Install serve package globally
-RUN npm install -g serve
+# Production stage - use nginx
+FROM nginx:alpine
 
 # Copy built assets from builder stage
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Change ownership
-RUN chown -R nodejs:nodejs /app
-USER nodejs
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Expose port 3000
 EXPOSE 3000
 
-# Start the application with serve
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

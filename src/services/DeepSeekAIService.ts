@@ -200,7 +200,15 @@ export class DeepSeekAIService implements AIService {
   }
 
   isAvailable(): boolean {
-    return true;
+    // Check if API is configured by testing a minimal request
+    // For now, we'll check if we can access the environment
+    // This is a client-side check - the real validation happens server-side
+    try {
+      // Simple check: if we have auth token and can make basic requests
+      return !!this.authToken;
+    } catch {
+      return false;
+    }
   }
 
   private parseNPCResponse(content: string): NPCResponse {

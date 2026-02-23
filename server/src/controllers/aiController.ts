@@ -214,7 +214,7 @@ export const generateNPC = async (req: Request, res: Response): Promise<void> =>
     const typeDescription = {
       merchant: 'торговец, который продает и покупает предметы',
       guard: 'охранник или страж, следящий за порядком',
-      questgiver: ' NPC, который дает задания путешественникам',
+      questgiver: 'NPC, который дает задания путешественникам',
       villager: 'обычный житель деревни или города',
       mysterious: 'таинственный незнакомец с скрытыми мотивами'
     };

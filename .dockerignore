@@ -71,7 +71,7 @@ coverage
 # Storybook
 storybook-static
 
-# Lock files (already copied separately)
-package-lock.json
+# Lock files (handled separately in Dockerfile)
+# package-lock.json - REMOVED to allow frontend build
 yarn.lock
 pnpm-lock.yaml
