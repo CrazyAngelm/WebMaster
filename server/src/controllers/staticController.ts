@@ -34,7 +34,7 @@ export const getStaticBundle = async (req: Request, res: Response) => {
       prisma.itemTemplate.findMany(),
       prisma.recipe.findMany(),
       prisma.monsterTemplate.findMany(),
-      prisma.npcTemplate.findMany(),
+      prisma.nPCTemplate.findMany(),
       prisma.quest.findMany(),
       prisma.location.findMany(),
       prisma.building.findMany(),
@@ -49,55 +49,55 @@ export const getStaticBundle = async (req: Request, res: Response) => {
 
     // Parse JSON strings back to objects
     const result = {
-      races: races.map(r => ({
+      races: races.map((r: any) => ({
         ...r,
         innateSkills: JSON.parse(r.innateSkills),
         passiveEffects: JSON.parse(r.passiveEffects)
       })),
-      ranks: ranks.map(r => ({
+      ranks: ranks.map((r: any) => ({
         ...r,
         breakthroughConditions: JSON.parse(r.breakthroughConditions)
       })),
-      itemTemplates: itemTemplates.map(t => ({
+      itemTemplates: itemTemplates.map((t: any) => ({
         ...t,
         effects: t.effects ? JSON.parse(t.effects) : undefined
       })),
-      recipes: recipes.map(r => ({
+      recipes: recipes.map((r: any) => ({
         ...r,
         ingredients: JSON.parse(r.ingredients)
       })),
-      monsterTemplates: monsterTemplates.map(m => ({
+      monsterTemplates: monsterTemplates.map((m: any) => ({
         ...m,
         skills: JSON.parse(m.skills),
         lootTable: JSON.parse(m.lootTable)
       })),
-      npcTemplates: npcTemplates.map(n => ({
+      npcTemplates: npcTemplates.map((n: any) => ({
         ...n,
         skills: JSON.parse(n.skills),
         lootTable: JSON.parse(n.lootTable)
       })),
-      quests: quests.map(q => ({
+      quests: quests.map((q: any) => ({
         ...q,
         objectives: JSON.parse(q.objectives),
         rewards: JSON.parse(q.rewards)
       })),
-      locations: locations.map(l => ({
+      locations: locations.map((l: any) => ({
         ...l,
         buildings: JSON.parse(l.buildings)
       })),
-      buildings: buildings.map(b => ({
+      buildings: buildings.map((b: any) => ({
         ...b,
         workstations: JSON.parse(b.workstations)
       })),
       connections,
       professionThresholds,
       speeds,
-      events: events.map(e => ({
+      events: events.map((e: any) => ({
         ...e,
         choices: e.choices ? JSON.parse(e.choices) : undefined
       })),
       effectTemplates,
-      skillTemplates: skillTemplates.map(s => ({
+      skillTemplates: skillTemplates.map((s: any) => ({
         ...s,
         effects: s.effects ? JSON.parse(s.effects) : undefined,
         distance: s.distance ? (() => {
