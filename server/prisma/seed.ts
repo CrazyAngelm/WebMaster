@@ -899,6 +899,64 @@ async function main() {
     });
   }
 
+  // --- NPCs ---
+  const npcs = [
+    {
+      id: 'npc-barkeep',
+      name: 'Марвин',
+      description: 'Хозяин таверны, толстый мужчина с усами и добрым взглядом.',
+      personality: 'Дружелюбный, болтливый, любит сплетни',
+      greeting: 'Эй, путник! Добро пожаловать в "Ржавый якорь"! Что будешь пить?',
+      buildingId: 'build-rusty-anchor',
+      npcType: 'merchant'
+    },
+    {
+      id: 'npc-blacksmith',
+      name: 'Гордин',
+      description: 'Мускулистый кузнец с шрамами на руках и молотом на поясе.',
+      personality: 'Прямой, грубоватый, но справедливый',
+      greeting: 'Что тебе, путник? Оружие починить или новое ковать?',
+      buildingId: 'build-blacksmith-shop',
+      npcType: 'merchant'
+    },
+    {
+      id: 'npc-alchemist',
+      name: 'Элизия',
+      description: 'Худая женщина с седыми волосами и внимательным взглядом.',
+      personality: 'Загадочная, мудрая, немного странная',
+      greeting: 'А... новый посетитель. Интересно, какие травы тебя привели?',
+      buildingId: 'build-alchemy-lab',
+      npcType: 'merchant'
+    },
+    {
+      id: 'npc-guard',
+      name: 'Стражник Альрик',
+      description: 'Элитный страж в блестящих доспехах, с серьёзным выражением лица.',
+      personality: 'Дисциплинированный, бдительный, немного высокомерный',
+      greeting: 'Стой! Предъяви документы или цель визита.',
+      buildingId: 'build-guard-post',
+      npcType: 'guard'
+    },
+    {
+      id: 'npc-merchant',
+      name: 'Торговец Брам',
+      description: 'Хитрый торговец с подсчитывающим взглядом.',
+      personality: 'Хитрый, расчётливый, всегда торгуется',
+      greeting: 'Ассортимент к твоим услугам, путник. Что ищешь?',
+      buildingId: 'build-district-market',
+      npcType: 'merchant'
+    }
+  ];
+
+  for (const npc of npcs) {
+    await prisma.nPC.upsert({
+      where: { id: npc.id },
+      update: npc,
+      create: npc,
+    });
+  }
+  console.log(`Seeded ${npcs.length} NPCs`);
+
   // --- Connections ---
   const connections = [
     { id: 'conn-1', fromLocationId: 'loc-outskirts', toLocationId: 'loc-city-gates' },

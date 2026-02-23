@@ -11,6 +11,8 @@ import characterRoutes from './routes/characterRoutes';
 import adminRoutes from './routes/adminRoutes';
 import staticRoutes from './routes/staticRoutes';
 import battleRoutes from './routes/battleRoutes';
+import aiRoutes from './routes/aiRoutes';
+import npcRoutes from './routes/npcRoutes';
 import { TimeService } from './utils/timeService';
 
 dotenv.config();
@@ -26,6 +28,8 @@ app.use('/api/characters', characterRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/static', staticRoutes);
 app.use('/api/battle', battleRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/npcs', npcRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

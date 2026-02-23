@@ -1,48 +1,115 @@
 // 📁 src/services/MockAIService.ts - Mock AI Service
 // 🎯 Core function: Mock implementation for development/testing
-// 🔗 Key dependencies: src/types/game.ts, src/services/AIService.ts
-// 💡 Usage: Used as a placeholder for real AI services
+// 🔗 Key dependencies: AIService interface, types/ai
+// 💡 Usage: Used as fallback when real AI is unavailable
 
 import { AIService, GameContext } from './AIService';
+import { ConversationMessage, NPCResponse, NPCData, QuestSuggestion } from '../types/ai';
+import { Location } from '../types/game';
 
 export class MockAIService implements AIService {
-  /**
-   * Mock NPC response generation
-   */
+  private npcResponses = [
+    'Приветствую, путник. Добро пожаловать в наши земли.',
+    'Хм, интересно... Расскажи мне больше о себе.',
+    'Осторожнее будь в этих краях. Не все здесь дружелюбны.',
+    'А, новый искатель приключений? Удачи тебе, она понадобится.',
+    'Видел много таких, как ты. Большинство не вернулось.',
+    'Могу рассказать о здешних местах, если хочешь.',
+    'Золото? Золото всем нужно...',
+    'Слышал, в лесу появилось что-то странное.'
+  ];
+
+  private questTitles = [
+    'Проклятое болото',
+    'Пропавший торговец',
+    'Очищение святилища',
+    'Тайна старой шахты',
+    'Драконья пещера'
+  ];
+
+  private npcNames = [
+    { name: 'Эдвард', desc: 'Стражник в блестящих доспехах', personality: 'Серьёзный, дисциплинированный' },
+    { name: 'Мирабелла', desc: 'Хозяйка таверны с добрым лицом', personality: 'Дружелюбная, заботливая' },
+    { name: 'Гортен', desc: 'Мрачный торовец с подозрительным взглядом', personality: 'Хитрый, расчётливый' },
+    { name: 'Себастьян', desc: 'Старый мудрец с длинной бородой', personality: 'Мудрый, загадочный' },
+    { name: 'Агнесса', desc: 'Целительница с мягкими руками', personality: 'Добрая, отзывчивая' }
+  ];
+
   async generateResponse(
     npcName: string,
+    npcDescription: string,
+    personality: string,
     playerMessage: string,
-    context: GameContext
-  ): Promise<string> {
-    console.log(`[MockAI] Generating response for ${npcName}...`);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    context: GameContext,
+    conversationHistory: ConversationMessage[]
+  ): Promise<NPCResponse> {
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    const responses = [
-      `Traveler ${context.character.name}, your words in ${context.location.name} carry weight.`,
-      `I have heard of your exploits, ${npcName} is at your service.`,
-      `Hmm... "${playerMessage}"? An interesting thought for these parts.`,
-      `The air in ${context.location.name} is heavy today. Be careful, ${context.character.name}.`
-    ];
+    const responseText = this.npcResponses[Math.floor(Math.random() * this.npcResponses.length)];
+    const shouldOfferQuest = Math.random() > 0.7;
 
-    return responses[Math.floor(Math.random() * responses.length)];
+    const response: NPCResponse = {
+      text: responseText,
+      emotion: 'neutral',
+      action: shouldOfferQuest ? 'offer_quest' : 'talk'
+    };
+
+    if (shouldOfferQuest) {
+      response.questSuggestion = {
+        title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],
+        description: 'Нужна помощь с одним делом. Отправишься?',
+        objectives: [
+          { type: 'KILL', target: 'монстр', amount: 3 },
+          { type: 'VISIT', target: 'локация', amount: 1 }
+        ],
+        rewards: { money: 100, essence: 50 }
+      };
+    }
+
+    return response;
   }
 
-  /**
-   * Mock situation description
-   */
   async describeSituation(context: GameContext): Promise<string> {
-    return `You are in ${context.location.name}. ${context.location.description}. You feel the essence of the world flowing around you.`;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return `Вы находитесь в ${context.location.name}. ${context.location.description}`;
   }
 
-  /**
-   * Mock quest generation
-   */
-  async generateQuestIdea(context: GameContext): Promise<{ title: string; description: string }> {
+  async generateQuest(context: GameContext): Promise<QuestSuggestion | null> {
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     return {
-      title: "The Mystery of the Essence",
-      description: `Help the inhabitants of ${context.location.name} deal with an anomaly that is draining the protection of travelers.`
+      title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],
+      description: 'Пришло время нового приключения. Справишься?',
+      objectives: [
+        { type: 'KILL', target: 'враг', amount: 5 },
+        { type: 'COLLECT', target: 'ресурс', amount: 10 }
+      ],
+      rewards: { money: 200, essence: 100 }
     };
   }
+
+  async generateNPC(
+    location: Location,
+    npcType?: NPCData['npcType']
+  ): Promise<NPCData> {
+    await new Promise(resolve => setTimeout(resolve, 400));
+
+    const npc = this.npcNames[Math.floor(Math.random() * this.npcNames.length)];
+    
+    return {
+      id: `npc-mock-${Date.now()}`,
+      name: npc.name,
+      description: npc.desc,
+      personality: npc.personality,
+      dialogueGreeting: `Приветствую в ${location.name}!`,
+      locationId: location.id,
+      npcType: npcType || 'villager'
+    };
+  }
+
+  isAvailable(): boolean {
+    return false;
+  }
 }
+
+export const mockAIService = new MockAIService();

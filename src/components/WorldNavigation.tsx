@@ -3,15 +3,38 @@
 // 🔗 Key dependencies: src/store/gameStore.ts, src/services/StaticDataService.ts
 // 💡 Usage: Main view for world exploration
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { WorldService } from '../services/WorldService';
+import { NPCService } from '../services/NPCService';
 import { ShopView } from './ShopView';
+import { NPCDialog } from './NPCDialog';
 import { clsx } from 'clsx';
+import { MessageCircle, Loader2 } from 'lucide-react';
+import { NPCData } from '../types/ai';
 
 export const WorldNavigation: React.FC = () => {
   const { character, moveToLocation, enterBuilding, exitBuilding } = useGameStore();
+  const [showDialog, setShowDialog] = useState(false);
+  const [currentNPC, setCurrentNPC] = useState<NPCData | null>(null);
+  const [isLoadingNPC, setIsLoadingNPC] = useState(false);
+
+  const handleTalkToNPC = async (building: any) => {
+    const currentLoc = StaticDataService.getLocation(character?.location.locationId);
+    if (!currentLoc || isLoadingNPC) return;
+    
+    setIsLoadingNPC(true);
+    try {
+      const npc = await NPCService.getNPCForBuilding(building, currentLoc);
+      setCurrentNPC(npc);
+      setShowDialog(true);
+    } catch (error) {
+      console.error('Error loading NPC:', error);
+    } finally {
+      setIsLoadingNPC(false);
+    }
+  };
 
   if (!character) return null;
 
@@ -98,14 +121,27 @@ export const WorldNavigation: React.FC = () => {
               <div className="text-[10px] text-gray-600 italic px-2">Нет доступных зданий.</div>
             ) : (
               buildings.map(b => (
-                <button
-                  key={b.id}
-                  onClick={() => enterBuilding(b.id)}
-                  className="fantasy-panel p-4 text-left hover:border-fantasy-accent/50 transition-all group"
-                >
-                  <div className="text-sm font-bold group-hover:text-fantasy-accent">{b.name}</div>
-                  <div className="text-[10px] text-gray-500 uppercase mt-1">{b.hasShop ? 'Магазин' : 'Точка интереса'}</div>
-                </button>
+                <div key={b.id} className="flex gap-2">
+                  <button
+                    onClick={() => enterBuilding(b.id)}
+                    className="fantasy-panel p-4 text-left hover:border-fantasy-accent/50 transition-all group flex-1"
+                  >
+                    <div className="text-sm font-bold group-hover:text-fantasy-accent">{b.name}</div>
+                    <div className="text-[10px] text-gray-500 uppercase mt-1">{b.hasShop ? 'Магазин' : 'Точка интереса'}</div>
+                  </button>
+                  <button
+                    onClick={() => handleTalkToNPC(b)}
+                    disabled={isLoadingNPC}
+                    className="fantasy-panel p-4 hover:border-fantasy-accent/50 transition-all group flex-shrink-0"
+                    title="Поговорить с NPC"
+                  >
+                    {isLoadingNPC ? (
+                      <Loader2 className="animate-spin text-gray-500" size={20} />
+                    ) : (
+                      <MessageCircle className="text-fantasy-accent" size={20} />
+                    )}
+                  </button>
+                </div>
               ))
             )}
           </div>
@@ -162,6 +198,17 @@ export const WorldNavigation: React.FC = () => {
           <div className="text-[10px] text-gray-500 mt-2">НЕ РЕАЛИЗОВАНО</div>
         </div>
       </div>
+
+      {/* NPC Dialog */}
+      {showDialog && currentNPC && (
+        <NPCDialog 
+          npc={currentNPC} 
+          onClose={() => {
+            setShowDialog(false);
+            setCurrentNPC(null);
+          }} 
+        />
+      )}
     </div>
   );
 };

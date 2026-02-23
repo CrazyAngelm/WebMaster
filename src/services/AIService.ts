@@ -1,9 +1,16 @@
 // 📁 src/services/AIService.ts - AI Service Interface
 // 🎯 Core function: Define the contract for LLM (AI) integration
-// 🔗 Key dependencies: src/types/game.ts
-// 💡 Usage: Implemented by MockAIService or real LLM providers
+// 🔗 Key dependencies: src/types/ai.ts
+// 💡 Usage: Implemented by MockAIService or DeepSeekAIService
 
 import { Character, Location, UUID } from '../types/game';
+import { 
+  ConversationMessage, 
+  NPCResponse, 
+  QuestSuggestion, 
+  NPCData, 
+  GeneratedQuest 
+} from '../types/ai';
 
 export interface GameContext {
   character: Character;
@@ -18,9 +25,12 @@ export interface AIService {
    */
   generateResponse(
     npcName: string,
+    npcDescription: string,
+    personality: string,
     playerMessage: string,
-    context: GameContext
-  ): Promise<string>;
+    context: GameContext,
+    conversationHistory: ConversationMessage[]
+  ): Promise<NPCResponse>;
 
   /**
    * Generates a descriptive narrative for a situation or location.
@@ -30,9 +40,27 @@ export interface AIService {
   ): Promise<string>;
 
   /**
-   * Generates a random quest idea based on current context.
+   * Generates a quest based on current context.
    */
-  generateQuestIdea(
+  generateQuest(
     context: GameContext
-  ): Promise<{ title: string; description: string }>;
+  ): Promise<QuestSuggestion | null>;
+
+  /**
+   * Generates NPC data for a location.
+   */
+  generateNPC(
+    location: Location,
+    npcType?: NPCData['npcType']
+  ): Promise<NPCData>;
+
+  /**
+   * Check if the service is available (real API vs mock)
+   */
+  isAvailable(): boolean;
+
+  /**
+   * Set authentication token for API calls
+   */
+  setAuthToken(token: string): void;
 }

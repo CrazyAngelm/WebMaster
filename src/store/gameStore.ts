@@ -26,6 +26,9 @@ import { QuestService } from '../services/QuestService';
 import { EventService } from '../services/EventService';
 import { CraftingService } from '../services/CraftingService';
 import { ProfessionService } from '../services/ProfessionService';
+import type { AIService } from '../services/AIService';
+import { aiService } from '../services/DeepSeekAIService';
+import { mockAIService } from '../services/MockAIService';
 
 const API_BASE = '/api'; // * Use relative path for better compatibility
 
@@ -72,6 +75,9 @@ interface GameState {
   };
   cooldownTickInterval: number | null;
   
+  // AI Service
+  aiService: AIService;
+  
   // Notifications
   notification: GameNotification | null;
   setNotification: (notification: GameNotification) => void;
@@ -110,6 +116,7 @@ interface GameState {
   buyItem: (templateId: UUID, quantity?: number) => void;
   sellItem: (itemId: UUID, quantity?: number) => void;
   acceptQuest: (questId: UUID) => void;
+  addQuestFromNPC: (quest: { title: string; description: string; objectives: any[]; rewards: any }) => void;
   completeQuest: (questId: UUID) => void;
   setActiveEvent: (event: GameEvent | null) => void;
   handleEventChoice: (choiceId: UUID) => void;
@@ -145,6 +152,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     sync: null
   },
   cooldownTickInterval: null,
+  aiService: mockAIService, // Default to mock, will be replaced with real service after auth
   notification: null,
 
   // * Notifications
@@ -252,6 +260,14 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       if (res.ok) {
         set({ user: data.user, authStatus: 'authenticated' });
+        
+        // Initialize AI service with auth token
+        const { token } = get();
+        if (token) {
+          aiService.setAuthToken(token);
+          set({ aiService });
+        }
+        
         await get().initializeData();
         await get().fetchCharacters();
       } else {
@@ -975,6 +991,33 @@ export const useGameStore = create<GameState>((set, get) => ({
     const quest = activeQuests.find(q => q.id === questId);
     if (!quest || quest.status !== QuestStatus.NOT_STARTED) return;
     const updatedQuests = activeQuests.map(q => q.id === questId ? { ...q, status: QuestStatus.IN_PROGRESS } : q);
+    set({ activeQuests: updatedQuests });
+    await get().saveGame();
+  },
+
+  addQuestFromNPC: async (questData) => {
+    const { character, activeQuests } = get();
+    if (!character) return;
+    
+    const newQuest: Quest = {
+      id: `quest-npc-${Date.now()}`,
+      title: questData.title,
+      description: questData.description,
+      objectives: questData.objectives.map((obj: any, idx: number) => ({
+        id: `obj-${Date.now()}-${idx}`,
+        type: obj.type,
+        targetId: obj.target || `target-${idx}`,
+        description: obj.target || 'Цель',
+        requiredAmount: obj.amount || 1,
+        currentAmount: 0,
+        isCompleted: false
+      })),
+      rewards: questData.rewards || {},
+      status: QuestStatus.IN_PROGRESS,
+      rankRequired: character.rankId ? parseInt(character.rankId) : 1
+    };
+    
+    const updatedQuests = [...activeQuests, newQuest];
     set({ activeQuests: updatedQuests });
     await get().saveGame();
   },
