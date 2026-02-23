@@ -11,6 +11,7 @@ import {
   NPCData, 
   QuestSuggestion 
 } from '../types/ai';
+import { NPC_PROMPTS } from './prompts/npcPrompts';
 
 const API_BASE = '/api/ai';
 
@@ -42,59 +43,24 @@ export class DeepSeekAIService implements AIService {
   private buildNPCSystemPrompt(
     npcName: string,
     npcDescription: string,
-    personality: string
+    personality: string,
+    reputation: number = 0
   ): string {
-    return `Ты — ${npcName}. ${npcDescription}
-
-Твой характер: ${personality}.
-
-Правила:
-1. Отвечай от первого лица, сохраняя характер персонажа
-2. Не раскрывай игровую механику напрямую (HP, опыт и т.д.)
-3. Если игрок пытается обмануть/убить тебя — реагируй соответственно
-4. Можешь предлагать квесты, если это уместно
-5. Отвечай на русском языке
-
-Верни JSON:
-{
-  "text": "твой ответ игроку",
-  "emotion": "happy|sad|angry|neutral|surprised|scared|excited",
-  "action": "talk|trade|offer_quest|idle",
-  "questSuggestion": { ... } // опционально
-}`;
+    return NPC_PROMPTS.systemPrompt({
+      name: npcName,
+      description: npcDescription,
+      personality
+    }, reputation);
   }
 
   private buildNPCUserPrompt(
     playerMessage: string,
-    context: GameContext,
+    context: GameContext & { reputation?: number },
     conversationHistory: ConversationMessage[]
   ): string {
-    let prompt = `Текущая локация: ${context.location.name}\n`;
-    prompt += `Описание: ${context.location.description}\n\n`;
-
-    if (context.character) {
-      prompt += `Игрок: ${context.character.name}\n`;
-    }
-
-    const activeQuests = context.character?.activeQuests || [];
-    if (activeQuests.length > 0) {
-      prompt += `\nАктивные квесты:\n`;
-      activeQuests.forEach(q => {
-        prompt += `- ${q.title}: ${q.objectives.map(o => o.description).join(', ')}\n`;
-      });
-    }
-
-    if (conversationHistory.length > 0) {
-      prompt += `\nИстория разговора:\n`;
-      conversationHistory.forEach(msg => {
-        prompt += `${msg.role === 'player' ? 'Игрок' : 'Ты'}: ${msg.content}\n`;
-      });
-    }
-
-    prompt += `\nИгрок говорит: "${playerMessage}"\n`;
-    prompt += `\nОтветь от лица персонажа в JSON формате.`;
-
-    return prompt;
+    return NPC_PROMPTS.contextPrompt(context) + 
+           NPC_PROMPTS.historyPrompt(conversationHistory) +
+           NPC_PROMPTS.userMessagePrompt(playerMessage);
   }
 
   async generateResponse(
@@ -102,10 +68,11 @@ export class DeepSeekAIService implements AIService {
     npcDescription: string,
     personality: string,
     playerMessage: string,
-    context: GameContext,
+    context: GameContext & { reputation?: number },
     conversationHistory: ConversationMessage[]
   ): Promise<NPCResponse> {
-    const systemPrompt = this.buildNPCSystemPrompt(npcName, npcDescription, personality);
+    const reputation = context.reputation || 0;
+    const systemPrompt = this.buildNPCSystemPrompt(npcName, npcDescription, personality, reputation);
     const userPrompt = this.buildNPCUserPrompt(playerMessage, context, conversationHistory);
 
     try {

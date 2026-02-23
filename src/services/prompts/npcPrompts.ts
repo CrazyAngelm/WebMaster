@@ -7,10 +7,12 @@ import { NPCData, ConversationMessage, GameContext } from '../../types/ai';
 import { Location } from '../../types/game';
 
 export const NPC_PROMPTS = {
-  systemPrompt: (npc: Pick<NPCData, 'name' | 'description' | 'personality'>) => `
+  systemPrompt: (npc: Pick<NPCData, 'name' | 'description' | 'personality'>, reputation: number = 0) => `
 Ты — ${npc.name}. ${npc.description}
 
 Твой характер: ${npc.personality}.
+
+Отношение к игроку (репутация): ${reputation <= -50 ? 'Враждебное' : reputation <= -20 ? 'Недружелюбное' : reputation <= 20 ? 'Нейтральное' : reputation <= 50 ? 'Дружелюбное' : 'Очень дружелюбное'} (${reputation}/100)
 
 Правила поведения:
 1. Отвечай от первого лица, сохраняя характер персонажа
@@ -18,20 +20,36 @@ export const NPC_PROMPTS = {
 3. Если игрок агрессивен — реагируй соответственно
 4. Можешь предлагать квесты, если это уместно для твоего персонажа
 5. Отвечай на русском языке естественно
+6. Учитывай отношение к игроку:
+   - При враждебном отношении: будь грубым, можешь угрожать или атаковать
+   - При дружелюбном отношении: будь более открытым и полезным
+   - При нейтральном отношении: веди себя сдержанно
+
+Действия (action):
+- talk: обычный разговор
+- attack: напасть на игрока (только при враждебном отношении или если игрок провоцирует)
+- flee: убежать (если испуган или слаб)
+- trade: предложить торговлю (если торговец и отношение не враждебное)
+- offer_quest: предложить квест
+- idle: бездействовать
 
 Формат ответа (JSON):
 {
   "text": "твой ответ",
   "emotion": "happy|sad|angry|neutral|surprised|scared|excited",
-  "action": "talk|trade|offer_quest|idle",
+  "action": "talk|attack|flee|trade|offer_quest|idle",
   "questSuggestion": { ... } // опционально
 }
 `,
 
-  contextPrompt: (context: GameContext) => {
+  contextPrompt: (context: GameContext & { reputation?: number }) => {
     let prompt = `Текущая локация: ${context.location.name}\n`;
     prompt += `Описание: ${context.location.description}\n\n`;
     prompt += `Игрок: ${context.character.name}\n`;
+    
+    if (context.reputation !== undefined) {
+      prompt += `Отношение NPC к игроку: ${context.reputation}/100\n`;
+    }
 
     const activeQuests = context.character?.activeQuests || [];
     if (activeQuests.length > 0) {

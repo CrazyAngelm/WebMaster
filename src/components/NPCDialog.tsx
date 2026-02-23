@@ -18,20 +18,42 @@ interface NPCDialogProps {
 
 export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
   const { messages, isLoading, error, addPlayerMessage, addNPCMessage, setLoading, setError, clearMessages } = useDialogStore();
-  const { aiService, character, addQuestFromNPC } = useGameStore();
+  const { 
+    aiService, 
+    character, 
+    addQuestFromNPC,
+    getNPCDialogHistory,
+    addNPCDialogMessage,
+    getNPCReputation,
+    changeNPCReputation,
+    initiateCombatFromDialog
+  } = useGameStore();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showQuestOffer, setShowQuestOffer] = useState(false);
   const [pendingQuest, setPendingQuest] = useState<NPCResponse['questSuggestion'] | null>(null);
   const [localMessages, setLocalMessages] = useState<{role: 'player' | 'npc'; content: string}[]>([]);
 
-  // Initialize with greeting on mount
+  // Initialize with greeting on mount - load from history if exists
   useEffect(() => {
-    clearMessages();
-    setLocalMessages([{
-      role: 'npc',
-      content: npc.dialogueGreeting || `Приветствую, путник. Я ${npc.name}.`
-    }]);
+    const savedHistory = getNPCDialogHistory(npc.id);
+    const reputation = getNPCReputation(npc.id);
+    
+    if (savedHistory.length > 0) {
+      // Load existing history
+      setLocalMessages(savedHistory.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })));
+    } else {
+      // Start with greeting
+      const greeting = npc.dialogueGreeting || `Приветствую, путник. Я ${npc.name}.`;
+      setLocalMessages([{
+        role: 'npc',
+        content: greeting
+      }]);
+      addNPCDialogMessage(npc.id, 'npc', greeting);
+    }
     
     return () => {
       clearMessages();
@@ -52,6 +74,7 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
     const playerMessage = input.trim();
     setInput('');
     addPlayerMessage(playerMessage);
+    addNPCDialogMessage(npc.id, 'player', playerMessage);
     setLocalMessages(prev => [...prev, { role: 'player', content: playerMessage }]);
     setLoading(true);
     setError(null);
@@ -59,7 +82,7 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
     try {
       const service = aiService?.isAvailable() ? aiService : mockAIService;
       
-      const history = localMessages.map(m => ({
+      const history = getNPCDialogHistory(npc.id).map(m => ({
         role: m.role as 'player' | 'npc',
         content: m.content
       }));
@@ -74,7 +97,8 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
 
       const context = {
         character,
-        location
+        location,
+        reputation: getNPCReputation(npc.id)
       };
 
       const response = await service.generateResponse(
@@ -87,7 +111,58 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
       );
 
       addNPCMessage(response.text);
+      addNPCDialogMessage(npc.id, 'npc', response.text);
       setLocalMessages(prev => [...prev, { role: 'npc', content: response.text }]);
+
+      // Handle NPC actions
+      if (response.action) {
+        switch (response.action) {
+          case 'attack':
+            // Change reputation negatively for aggression
+            changeNPCReputation(npc.id, -20);
+            // Initiate combat
+            initiateCombatFromDialog(npc.id);
+            onClose(); // Close dialog when combat starts
+            break;
+            
+          case 'trade':
+            // Could open trade interface here
+            console.log('NPC wants to trade');
+            break;
+            
+          case 'flee':
+            // NPC runs away
+            changeNPCReputation(npc.id, -10);
+            addNPCMessage(npc.name + ' убегает от вас!');
+            setTimeout(() => onClose(), 2000);
+            break;
+            
+          case 'offer_quest':
+            // Already handled by questSuggestion
+            break;
+            
+          default:
+            // 'talk' or 'idle' - no special action needed
+            break;
+        }
+      }
+
+      // Handle reputation changes based on emotion
+      if (response.emotion) {
+        switch (response.emotion) {
+          case 'angry':
+            changeNPCReputation(npc.id, -5);
+            break;
+          case 'happy':
+            changeNPCReputation(npc.id, 5);
+            break;
+          case 'scared':
+            changeNPCReputation(npc.id, -3);
+            break;
+          default:
+            break;
+        }
+      }
 
       if (response.questSuggestion) {
         setPendingQuest(response.questSuggestion);

@@ -40,21 +40,64 @@ export class MockAIService implements AIService {
     npcDescription: string,
     personality: string,
     playerMessage: string,
-    context: GameContext,
+    context: GameContext & { reputation?: number },
     conversationHistory: ConversationMessage[]
   ): Promise<NPCResponse> {
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const responseText = this.npcResponses[Math.floor(Math.random() * this.npcResponses.length)];
+    const reputation = context.reputation || 0;
+    
+    // Determine response based on reputation
+    let responseText: string;
+    let emotion: any = 'neutral';
+    let action: any = 'talk';
+
+    if (reputation <= -50) {
+      // Hostile responses
+      const hostileResponses = [
+        'Убирайся прочь, пока я не вызвал стражу!',
+        'Ты мне не нравишься. Исчезни.',
+        'Следующее слово будет твоим последним.',
+        'Хватит меня донимать, негодяй!'
+      ];
+      responseText = hostileResponses[Math.floor(Math.random() * hostileResponses.length)];
+      emotion = 'angry';
+      
+      // High chance to attack if reputation is very low
+      if (Math.random() > 0.6) {
+        action = 'attack';
+      }
+    } else if (reputation >= 50) {
+      // Friendly responses
+      const friendlyResponses = [
+        'Рад тебя видеть, мой друг! Чем могу помочь?',
+        'Ах, это ты! Всегда рад поговорить с тобой.',
+        'Добрый день! Надеюсь, у тебя всё хорошо?',
+        'Приветствую! Хочешь услышать последние новости?'
+      ];
+      responseText = friendlyResponses[Math.floor(Math.random() * friendlyResponses.length)];
+      emotion = 'happy';
+    } else {
+      // Neutral responses
+      const neutralResponses = [
+        'Приветствую, путник. Добро пожаловать в наши земли.',
+        'Хм, интересно... Расскажи мне больше о себе.',
+        'Осторожнее будь в этих краях. Не все здесь дружелюбны.',
+        'А, новый искатель приключений? Удачи тебе, она понадобится.'
+      ];
+      responseText = neutralResponses[Math.floor(Math.random() * neutralResponses.length)];
+    }
+
     const shouldOfferQuest = Math.random() > 0.7;
 
     const response: NPCResponse = {
       text: responseText,
-      emotion: 'neutral',
-      action: shouldOfferQuest ? 'offer_quest' : 'talk'
+      emotion: emotion,
+      action: action
     };
 
-    if (shouldOfferQuest) {
+    if (shouldOfferQuest && action !== 'attack') {
+      response.action = 'offer_quest';
       response.questSuggestion = {
         title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],
         description: 'Нужна помощь с одним делом. Отправишься?',

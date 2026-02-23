@@ -70,7 +70,7 @@ export const GEQSurvey: React.FC<GEQSurveyProps> = ({ onComplete, onSkip }) => {
                 {showNPCCategory ? 'Оценка NPC' : getCategoryName(currentCategory, 'ru')}
               </h2>
               <p className="text-xs text-gray-400">
-                Вопрос {showNPCCategory ? currentCategoryIndex + 1 : currentCategoryIndex + 1} из {categories.length + 1}
+                Вопрос {showNPCCategory ? categories.length + 1 : currentCategoryIndex + 1} из {categories.length + 1}
               </p>
             </div>
           </div>

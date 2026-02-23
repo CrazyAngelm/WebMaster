@@ -32,6 +32,27 @@ import { mockAIService } from '../services/MockAIService';
 
 const API_BASE = '/api'; // * Use relative path for better compatibility
 
+// Helper functions for localStorage backup
+const loadDialogsFromStorage = (characterId: string) => {
+  try {
+    const key = `hornygrad_dialogs_${characterId}`;
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch (e) {
+    console.warn('Failed to load dialogs from localStorage:', e);
+    return {};
+  }
+};
+
+const loadReputationFromStorage = (characterId: string) => {
+  try {
+    const key = `hornygrad_reputation_${characterId}`;
+    return JSON.parse(localStorage.getItem(key) || '{}');
+  } catch (e) {
+    console.warn('Failed to load reputation from localStorage:', e);
+    return {};
+  }
+};
+
 interface User {
   id: string;
   login: string;
@@ -62,6 +83,11 @@ interface GameState {
   recipes: Recipe[];
   isLoading: boolean;
   isSaving: boolean;
+  
+  // NPC Dialog System
+  npcDialogHistory: Record<string, {role: 'player' | 'npc'; content: string; timestamp: number}[]>;
+  npcReputation: Record<string, number>; // -100 to +100 reputation score
+  
   serverTime: number; 
   serverTimeData: {
     multiplier: number;
@@ -121,6 +147,14 @@ interface GameState {
   setActiveEvent: (event: GameEvent | null) => void;
   handleEventChoice: (choiceId: UUID) => void;
   
+  // NPC Dialog Actions
+  getNPCDialogHistory: (npcId: string) => {role: 'player' | 'npc'; content: string; timestamp: number}[];
+  addNPCDialogMessage: (npcId: string, role: 'player' | 'npc', content: string) => void;
+  clearNPCDialogHistory: (npcId: string) => void;
+  getNPCReputation: (npcId: string) => number;
+  changeNPCReputation: (npcId: string, amount: number) => void;
+  initiateCombatFromDialog: (npcId: string) => void;
+  
   // Admin Actions
   adminAddGold: (amount: number) => Promise<void>;
   adminSkipTime: (hours: number) => Promise<void>;
@@ -144,6 +178,11 @@ export const useGameStore = create<GameState>((set, get) => ({
   recipes: [],
   isLoading: true,
   isSaving: false,
+  
+  // NPC Dialog System
+  npcDialogHistory: {},
+  npcReputation: {},
+  
   serverTime: 0,
   serverTimeData: null,
   serverConfigs: [],
@@ -369,6 +408,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         }, 
         inventory: charWithSkills.inventory,
         activeQuests: character.activeQuests || [],
+        npcDialogHistory: character.npcDialogHistory || loadDialogsFromStorage(character.id),
+        npcReputation: character.npcReputation || loadReputationFromStorage(character.id),
         isLoading: true 
       });
       
@@ -649,14 +690,16 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   saveGame: async () => {
-    const { character, inventory, activeQuests, token } = get();
+    const { character, inventory, activeQuests, npcDialogHistory, npcReputation, token } = get();
     if (!character || !token) return;
 
     set({ isSaving: true });
     try {
       console.log('Saving game...', { 
         money: character.money, 
-        itemsCount: inventory?.items?.length 
+        itemsCount: inventory?.items?.length,
+        npcHistoryCount: Object.keys(npcDialogHistory).length,
+        npcReputationCount: Object.keys(npcReputation).length
       });
 
       // * Sync everything in a single atomic request to avoid race conditions
@@ -675,6 +718,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           activeQuests,
           lastTrainTime: typeof character.lastTrainTime === 'number' ? character.lastTrainTime : null,
           lastRestTime: typeof character.lastRestTime === 'number' ? character.lastRestTime : null,
+          npcDialogHistory,
+          npcReputation,
           inventory: inventory ? {
             items: inventory.items,
             baseSlots: inventory.baseSlots
@@ -1044,5 +1089,95 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { character: updatedCharacter, message } = EventService.processChoice(characterToProcess, choiceId);
     set({ character: updatedCharacter, activeEvent: null });
     await get().saveGame();
+  },
+
+  // NPC Dialog System Implementation
+  getNPCDialogHistory: (npcId) => {
+    const { npcDialogHistory } = get();
+    return npcDialogHistory[npcId] || [];
+  },
+
+  addNPCDialogMessage: (npcId, role, content) => {
+    const { npcDialogHistory } = get();
+    const currentHistory = npcDialogHistory[npcId] || [];
+    const newMessage = { role, content, timestamp: Date.now() };
+    
+    set({
+      npcDialogHistory: {
+        ...npcDialogHistory,
+        [npcId]: [...currentHistory, newMessage]
+      }
+    });
+    
+    // Also save to localStorage as backup
+    try {
+      const key = `hornygrad_dialogs_${get().character?.id}`;
+      const allDialogs = JSON.parse(localStorage.getItem(key) || '{}');
+      allDialogs[npcId] = [...currentHistory, newMessage];
+      localStorage.setItem(key, JSON.stringify(allDialogs));
+    } catch (e) {
+      console.warn('Failed to save dialog to localStorage:', e);
+    }
+  },
+
+  clearNPCDialogHistory: (npcId) => {
+    const { npcDialogHistory } = get();
+    const updatedHistory = { ...npcDialogHistory };
+    delete updatedHistory[npcId];
+    set({ npcDialogHistory: updatedHistory });
+    
+    // Also clear from localStorage
+    try {
+      const key = `hornygrad_dialogs_${get().character?.id}`;
+      const allDialogs = JSON.parse(localStorage.getItem(key) || '{}');
+      delete allDialogs[npcId];
+      localStorage.setItem(key, JSON.stringify(allDialogs));
+    } catch (e) {
+      console.warn('Failed to clear dialog from localStorage:', e);
+    }
+  },
+
+  getNPCReputation: (npcId) => {
+    const { npcReputation } = get();
+    return npcReputation[npcId] || 0; // Default to neutral (0)
+  },
+
+  changeNPCReputation: (npcId, amount) => {
+    const { npcReputation } = get();
+    const currentReputation = npcReputation[npcId] || 0;
+    const newReputation = Math.max(-100, Math.min(100, currentReputation + amount)); // Clamp between -100 and +100
+    
+    set({
+      npcReputation: {
+        ...npcReputation,
+        [npcId]: newReputation
+      }
+    });
+    
+    // Also save to localStorage as backup
+    try {
+      const key = `hornygrad_reputation_${get().character?.id}`;
+      const allReputation = JSON.parse(localStorage.getItem(key) || '{}');
+      allReputation[npcId] = newReputation;
+      localStorage.setItem(key, JSON.stringify(allReputation));
+    } catch (e) {
+      console.warn('Failed to save reputation to localStorage:', e);
+    }
+  },
+
+  initiateCombatFromDialog: async (npcId) => {
+    const { character } = get();
+    if (!character) return;
+
+    try {
+      // Import combatStore dynamically to avoid circular dependencies
+      const { useCombatStore } = await import('./combatStore');
+      const { initiateBattle } = useCombatStore.getState();
+      
+      // Start battle with NPC
+      await initiateBattle(npcId, false); // false means it's not a monster
+    } catch (error) {
+      console.error('Failed to initiate combat from dialog:', error);
+    }
   }
 }));

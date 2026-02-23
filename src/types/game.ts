@@ -197,6 +197,8 @@ export interface Character {
   lastTrainTime?: number; // * Added to track training cooldown (in server time hours)
   lastRestTime?: number;  // * Added to track rest cooldown (in server time hours)
   activeSkills?: CharacterSkill[];
+  npcDialogHistory?: Record<string, {role: 'player' | 'npc'; content: string; timestamp: number}[]>;
+  npcReputation?: Record<string, number>;
 }
 
 export interface Location {
