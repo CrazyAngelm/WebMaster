@@ -4,6 +4,7 @@
 // 💡 Usage: Production implementation that calls backend API
 
 import { AIService, GameContext } from './AIService';
+import { Location } from '../types/game';
 import { 
   ConversationMessage, 
   NPCResponse, 

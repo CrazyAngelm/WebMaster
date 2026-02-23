@@ -77,7 +77,7 @@ export const getQuestionsByCategory = (category: GEQCategory): GEQQuestion[] => 
 };
 
 export const getCategories = (): GEQCategory[] => {
-  return ['immersion', 'tension', 'challenge', 'negative', 'positive', 'engagement', 'npc_specific'];
+  return ['immersion', 'tension', 'challenge', 'negative', 'positive', 'engagement'];
 };
 
 export const getCategoryName = (category: GEQCategory, lang: 'ru' | 'en' = 'ru'): string => {

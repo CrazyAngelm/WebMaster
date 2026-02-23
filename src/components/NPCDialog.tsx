@@ -166,8 +166,6 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
                 className={`max-w-[75%] p-3 rounded-lg ${
                   msg.role === 'player'
                     ? 'bg-fantasy-accent/20 text-white border border-fantasy-accent/30'
-                    : msg.role === 'system'
-                    ? 'bg-red-500/10 text-red-300 text-center w-full text-sm'
                     : 'bg-fantasy-surface/80 text-gray-200 border border-fantasy-accent/20'
                 }`}
               >

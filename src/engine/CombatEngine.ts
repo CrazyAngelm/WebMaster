@@ -5,7 +5,7 @@
 
 import { 
   Battle, 
-  Participant, 
+  BattleParticipant,
   Character, 
   BattleStatus, 
   ItemTemplate,
@@ -21,7 +21,7 @@ export class CombatEngine {
   /**
    * * Initializes a new battle, rolling initiative for all participants.
    */
-  public static startBattle(participants: Participant[], characterNames?: Map<string, string>): Battle {
+  public static startBattle(participants: BattleParticipant[], characterNames?: Map<string, string>): Battle {
     const log: string[] = ['Бой начался!'];
     
     // * Roll initiative: 1d100 + bonus
@@ -30,7 +30,7 @@ export class CombatEngine {
       const bonus = p.initiative || 0;
       p.initiative = baseRoll + bonus;
       
-      const name = characterNames?.get(p.characterId) || `Участник ${p.id}`;
+      const name = (p.characterId && characterNames?.get(p.characterId)) || `Участник ${p.id}`;
       if (bonus > 0) {
         log.push(`${name}: Инициатива 1d100 + ${bonus} = ${p.initiative} (${baseRoll} + ${bonus})`);
       } else {
@@ -47,6 +47,7 @@ export class CombatEngine {
       id: crypto.randomUUID(),
       locationId: config?.defaultCombatLocationId || 'combat-zone',
       status: BattleStatus.ACTIVE,
+      participants: sortedOrder,
       turnOrder: sortedOrder,
       currentTurnIndex: 0,
       log
@@ -57,8 +58,9 @@ export class CombatEngine {
    * * Moves to the next participant's turn.
    */
   public static nextTurn(battle: Battle): void {
-    battle.currentTurnIndex = (battle.currentTurnIndex + 1) % battle.turnOrder.length;
-    const active = battle.turnOrder[battle.currentTurnIndex];
+    const order = battle.turnOrder ?? battle.participants;
+    battle.currentTurnIndex = (battle.currentTurnIndex + 1) % order.length;
+    const active = order[battle.currentTurnIndex];
     
     // * Reset actions for the new turn
     active.currentActions = { main: 1, bonus: 1 };

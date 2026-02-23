@@ -21,8 +21,15 @@ export const WorldNavigation: React.FC = () => {
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
 
   const handleTalkToNPC = async (building: any) => {
-    const currentLoc = StaticDataService.getLocation(character?.location.locationId);
-    if (!currentLoc || isLoadingNPC) return;
+    const currentCharacter = character;
+    if (!currentCharacter || isLoadingNPC) {
+      return;
+    }
+
+    const currentLoc = StaticDataService.getLocation(currentCharacter.location.locationId);
+    if (!currentLoc) {
+      return;
+    }
     
     setIsLoadingNPC(true);
     try {

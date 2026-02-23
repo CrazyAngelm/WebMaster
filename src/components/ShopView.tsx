@@ -292,9 +292,10 @@ export const ShopView: React.FC = () => {
                           {(() => {
                             try {
                               if (!item.effects) return null;
-                              const effectsArray = Array.isArray(item.effects) 
-                                ? item.effects 
-                                : (typeof item.effects === 'string' && item.effects.trim() ? JSON.parse(item.effects) : []);
+                              const effectsRaw = item.effects as unknown;
+                              const effectsArray = Array.isArray(effectsRaw) 
+                                ? effectsRaw 
+                                : (typeof effectsRaw === 'string' && (effectsRaw as string).trim() ? JSON.parse(effectsRaw as string) : []);
                               if (!Array.isArray(effectsArray) || effectsArray.length === 0) return null;
                               
                               const validEffects = effectsArray
@@ -303,13 +304,13 @@ export const ShopView: React.FC = () => {
                                   const effect = StaticDataService.getEffectTemplate(effectId);
                                   return effect ? { id: effectId, effect } : null;
                                 })
-                                .filter((e: any) => e !== null);
+                                .filter((e): e is { id: string; effect: any } => e !== null);
                               
                               if (validEffects.length === 0) return null;
                               
                               return (
                                 <div className="mt-2 flex flex-wrap gap-1">
-                                  {validEffects.map(({ id, effect }: { id: string; effect: any }) => (
+                                  {validEffects.map(({ id, effect }) => (
                                     <div 
                                       key={id}
                                       className={clsx(

@@ -1,0 +1,75 @@
+# 📁 docker-compose.dev.yml - Development environment
+# 🎯 Core function: Development setup with hot reload
+# 🔗 Key dependencies: Node.js development tools
+# 💡 Usage: Development environment with live reload
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: webmaster-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: webmaster_dev
+      POSTGRES_USER: webmaster
+      POSTGRES_PASSWORD: webmaster123
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - webmaster-dev-network
+
+  # Backend Development Server
+  backend-dev:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: webmaster-backend-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://webmaster:webmaster123@postgres:5432/webmaster_dev
+      JWT_SECRET: dev-jwt-secret-key
+      PORT: 5000
+      CORS_ORIGIN: http://localhost:5173
+    depends_on:
+      - postgres
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - webmaster-dev-network
+    command: npm run dev
+
+  # Frontend Development Server
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: webmaster-frontend-dev
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend-dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - webmaster-dev-network
+    command: npm run dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  webmaster-dev-network:
+    driver: bridge

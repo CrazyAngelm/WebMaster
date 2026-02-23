@@ -11,6 +11,7 @@ import {
   SpeedCategory,
   CharacterBonuses,
   Inventory,
+  ItemTemplate,
   Rarity
 } from '../types/game';
 import { DiceEngine } from '../engine/DiceEngine';

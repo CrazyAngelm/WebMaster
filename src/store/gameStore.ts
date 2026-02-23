@@ -892,10 +892,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     const updatedInventory = { ...inventory, items: updatedItems };
     const { itemTemplates, character } = get();
     const newBonuses = character && itemTemplates ? CharacterService.calculateEquipmentBonuses(updatedInventory, itemTemplates) : character?.bonuses;
+    const defaultBonuses = { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 };
 
     set({ 
       inventory: updatedInventory,
-      character: character ? { ...character, bonuses: newBonuses } : null
+      character: character ? { ...character, bonuses: newBonuses ?? defaultBonuses } : null
     });
     await get().saveGame();
   },

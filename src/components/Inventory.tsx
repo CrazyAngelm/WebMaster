@@ -460,9 +460,10 @@ export const Inventory: React.FC = () => {
           {(() => {
             try {
               if (!selectedItem.template.effects) return null;
-              const effectsArray = Array.isArray(selectedItem.template.effects) 
-                ? selectedItem.template.effects 
-                : (typeof selectedItem.template.effects === 'string' && selectedItem.template.effects.trim() ? JSON.parse(selectedItem.template.effects) : []);
+              const effectsRaw = selectedItem.template.effects as unknown;
+              const effectsArray = Array.isArray(effectsRaw) 
+                ? effectsRaw 
+                : (typeof effectsRaw === 'string' && (effectsRaw as string).trim() ? JSON.parse(effectsRaw as string) : []);
               if (!Array.isArray(effectsArray) || effectsArray.length === 0) return null;
               
               const validEffects = effectsArray
@@ -471,13 +472,13 @@ export const Inventory: React.FC = () => {
                   const effect = StaticDataService.getEffectTemplate(effectId);
                   return effect ? { id: effectId, effect } : null;
                 })
-                .filter((e: any) => e !== null);
+                .filter((e): e is { id: string; effect: any } => e !== null);
               
               if (validEffects.length === 0) return null;
               
               return (
                 <div className="flex flex-wrap gap-2">
-                  {validEffects.map(({ id, effect }: { id: string; effect: any }) => (
+                  {validEffects.map(({ id, effect }) => (
                     <div 
                       key={id}
                       className={clsx(

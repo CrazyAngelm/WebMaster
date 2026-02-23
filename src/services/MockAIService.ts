@@ -110,6 +110,10 @@ export class MockAIService implements AIService {
   isAvailable(): boolean {
     return false;
   }
+
+  setAuthToken(_token: string): void {
+    // no-op for mock
+  }
 }
 
 export const mockAIService = new MockAIService();

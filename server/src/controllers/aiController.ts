@@ -69,7 +69,7 @@ export const generateResponse = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const userId = req.user?.id || 'anonymous';
+    const userId = req.userId || 'anonymous';
     
     if (!checkRateLimit(userId)) {
       res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
@@ -126,7 +126,7 @@ export const generateQuest = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const userId = req.user?.id || 'anonymous';
+    const userId = req.userId || 'anonymous';
     
     if (!checkRateLimit(userId)) {
       res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
@@ -202,7 +202,7 @@ export const generateNPC = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const userId = req.user?.id || 'anonymous';
+    const userId = req.userId || 'anonymous';
     
     if (!checkRateLimit(userId)) {
       res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
@@ -283,7 +283,7 @@ export const describeLocation = async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    const userId = req.user?.id || 'anonymous';
+    const userId = req.userId || 'anonymous';
     
     if (!checkRateLimit(userId)) {
       res.status(429).json({ error: 'Too many requests. Please wait a moment.' });

@@ -28,6 +28,7 @@ class MetricsServiceClass {
       dialogueActions: 0,
       dialogueCount: 0,
       uniqueDialogues: 0,
+      craftingActions: 0,
       questsStarted: 0,
       questsCompleted: 0,
       npcInteractions: 0,

@@ -404,7 +404,8 @@ export interface Battle {
   id: UUID;
   locationId: UUID;
   status: BattleStatus;
-  participants: BattleParticipant[]; // * Changed from turnOrder
+  participants: BattleParticipant[];
+  turnOrder?: BattleParticipant[]; // * Combat order by initiative (used by CombatEngine)
   currentTurnIndex: number;
   log: string[];
 }
@@ -421,6 +422,7 @@ export interface BattleParticipant {
   maxProtection: number;
   mainActions: number;
   bonusActions: number;
+  currentActions?: { main: number; bonus: number };
   isPlayer: boolean;
   distance: number;
   activeEffects?: ActiveEffect[];
@@ -428,6 +430,9 @@ export interface BattleParticipant {
   status?: ParticipantStatus;
   downedRoundsRemaining?: number;
 }
+
+/** Alias for CombatEngine compatibility */
+export type Participant = BattleParticipant;
 
 export interface Effect {
   id: UUID;

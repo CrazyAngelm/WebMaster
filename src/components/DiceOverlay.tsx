@@ -29,7 +29,7 @@ const DiceComponent: React.FC<{ roll: any }> = ({ roll }) => {
   const [phase, setPhase] = useState<'intro' | 'rolling' | 'result' | 'outro'>('intro');
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     
     // Intro phase
     const introTimer = setTimeout(() => {

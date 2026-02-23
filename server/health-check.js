@@ -1,0 +1,29 @@
+// 📁 server/health-check.js - Health check for Docker
+// 🎯 Core function: Simple health check endpoint
+// 🔗 Key dependencies: http
+// 💡 Usage: Docker health check
+
+const http = require('http');
+
+const options = {
+  host: 'localhost',
+  port: 5000,
+  path: '/api/health',
+  timeout: 2000
+};
+
+const request = http.request(options, (res) => {
+  console.log(`Health check status: ${res.statusCode}`);
+  if (res.statusCode === 200) {
+    process.exit(0);
+  } else {
+    process.exit(1);
+  }
+});
+
+request.on('error', (err) => {
+  console.log('Health check failed:', err.message);
+  process.exit(1);
+});
+
+request.end();

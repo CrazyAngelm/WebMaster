@@ -104,6 +104,7 @@ export interface SessionMetrics {
   dialogueActions: number;
   dialogueCount: number;
   uniqueDialogues: number;
+  craftingActions: number;
   questsStarted: number;
   questsCompleted: number;
   npcInteractions: number;
