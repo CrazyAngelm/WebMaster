@@ -18,13 +18,14 @@ export interface ConversationMessage {
 }
 
 export type NPCEmotion = 'happy' | 'sad' | 'angry' | 'neutral' | 'surprised' | 'scared' | 'excited';
-export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest';
+export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest' | 'gift' | 'inspect' | 'negotiate';
 
 export interface NPCResponse {
   text: string;
   emotion?: NPCEmotion;
   action?: NPCAction;
   questSuggestion?: QuestSuggestion;
+  itemOffer?: { templateId: string; quantity: number };
 }
 
 export interface QuestSuggestion {

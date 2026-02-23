@@ -21,10 +21,14 @@ export const WorldNavigation: React.FC = () => {
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
 
   const handleNavigateToCombat = () => {
-    // Navigate to combat view - this will be handled by parent component
-    // For now, we'll use window.location or trigger state change
     const event = new CustomEvent('navigateToCombat');
     window.dispatchEvent(event);
+  };
+
+  const handleTradeRequest = (buildingId: string) => {
+    enterBuilding(buildingId);
+    setShowDialog(false);
+    setCurrentNPC(null);
   };
 
   const handleTalkToNPC = async (building: any) => {
@@ -215,13 +219,14 @@ export const WorldNavigation: React.FC = () => {
 
       {/* NPC Dialog */}
       {showDialog && currentNPC && (
-        <NPCDialog 
-          npc={currentNPC} 
+        <NPCDialog
+          npc={currentNPC}
           onClose={() => {
             setShowDialog(false);
             setCurrentNPC(null);
           }}
           onNavigateToCombat={handleNavigateToCombat}
+          onTradeRequest={handleTradeRequest}
         />
       )}
     </div>

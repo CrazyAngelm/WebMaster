@@ -15,14 +15,18 @@ interface NPCDialogProps {
   npc: NPCData;
   onClose: () => void;
   onNavigateToCombat?: () => void;
+  onTradeRequest?: (buildingId: string) => void;
 }
 
-export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateToCombat }) => {
+export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateToCombat, onTradeRequest }) => {
   const { messages, isLoading, error, addPlayerMessage, addNPCMessage, setLoading, setError, clearMessages } = useDialogStore();
   const { 
     aiService, 
     character, 
+    inventory,
+    itemTemplates,
     addQuestFromNPC,
+    addItemToInventory,
     getNPCDialogHistory,
     addNPCDialogMessage,
     getNPCReputation,
@@ -99,7 +103,9 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
       const context = {
         character,
         location,
-        reputation: getNPCReputation(npc.id)
+        reputation: getNPCReputation(npc.id),
+        inventory: inventory ?? undefined,
+        itemTemplates: itemTemplates ?? undefined
       };
 
       const response = await service.generateResponse(
@@ -133,11 +139,26 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
             }
             break;
             
-          case 'trade':
-            // Could open trade interface here
-            console.log('NPC wants to trade');
+          case 'trade': {
+            const building = npc.buildingId ? StaticDataService.getBuilding(npc.buildingId) : null;
+            if (building?.hasShop && onTradeRequest && npc.buildingId) {
+              onTradeRequest(npc.buildingId);
+            } else {
+              const noShopMsg = 'Здесь нет магазина.';
+              addNPCMessage(noShopMsg);
+              addNPCDialogMessage(npc.id, 'npc', noShopMsg);
+              setLocalMessages(prev => [...prev, { role: 'npc', content: noShopMsg }]);
+            }
             break;
-            
+          }
+
+          case 'gift':
+            break;
+
+          case 'negotiate':
+            changeNPCReputation(npc.id, 15);
+            break;
+
           case 'flee':
             // NPC runs away
             changeNPCReputation(npc.id, -10);
@@ -178,6 +199,20 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
       if (response.questSuggestion) {
         setPendingQuest(response.questSuggestion);
         setShowQuestOffer(true);
+      }
+
+      if (response.itemOffer && response.action === 'gift') {
+        const { templateId, quantity } = response.itemOffer;
+        const success = addItemToInventory(templateId, quantity);
+        if (success && itemTemplates) {
+          const template = itemTemplates.get(templateId);
+          const itemName = template?.name || templateId;
+          const giftMsg = `${npc.name} дарит вам ${itemName} x${quantity}`;
+          addNPCMessage(giftMsg);
+          addNPCDialogMessage(npc.id, 'npc', giftMsg);
+          setLocalMessages(prev => [...prev, { role: 'npc', content: giftMsg }]);
+          changeNPCReputation(npc.id, 5);
+        }
       }
     } catch (err: any) {
       console.error('Dialog error:', err);

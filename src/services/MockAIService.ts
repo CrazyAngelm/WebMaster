@@ -5,7 +5,8 @@
 
 import { AIService, GameContext } from './AIService';
 import { ConversationMessage, NPCResponse, NPCData, QuestSuggestion } from '../types/ai';
-import { Location } from '../types/game';
+import { Location, ItemType } from '../types/game';
+import { StaticDataService } from './StaticDataService';
 
 export class MockAIService implements AIService {
   private npcResponses = [
@@ -89,6 +90,7 @@ export class MockAIService implements AIService {
     }
 
     const shouldOfferQuest = Math.random() > 0.7;
+    const roll = Math.random();
 
     const response: NPCResponse = {
       text: responseText,
@@ -107,6 +109,25 @@ export class MockAIService implements AIService {
         ],
         rewards: { money: 100, essence: 50 }
       };
+    } else if (reputation >= 50 && roll > 0.75 && action === 'talk') {
+      const consumables = StaticDataService.getAllItemTemplates()
+        .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined);
+      if (consumables.length > 0) {
+        const gift = consumables[Math.floor(Math.random() * consumables.length)];
+        response.action = 'gift';
+        response.itemOffer = { templateId: gift.id, quantity: 1 };
+        response.text = `Возьми это, пригодится. Дарю тебе ${gift.name}.`;
+      }
+    } else if (reputation >= 0 && reputation < 50 && roll > 0.8 && action === 'talk') {
+      response.action = 'trade';
+      response.text = 'Хочешь что-нибудь купить? Заходи в магазин.';
+    } else if (reputation <= -20 && reputation > -50 && roll > 0.5 && action === 'attack') {
+      response.action = 'negotiate';
+      response.text = 'Подожди! Может, договоримся без крови?';
+      response.emotion = 'scared';
+    } else if (reputation >= 0 && roll > 0.85 && action === 'talk') {
+      response.action = 'inspect';
+      response.text = 'Вижу твоё снаряжение. Неплохо подобрано, но есть над чем поработать.';
     }
 
     return response;

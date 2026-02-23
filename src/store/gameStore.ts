@@ -141,6 +141,7 @@ interface GameState {
   exitBuilding: () => void;
   buyItem: (templateId: UUID, quantity?: number) => void;
   sellItem: (itemId: UUID, quantity?: number) => void;
+  addItemToInventory: (templateId: UUID, quantity?: number) => boolean;
   acceptQuest: (questId: UUID) => void;
   addQuestFromNPC: (quest: { title: string; description: string; objectives: any[]; rewards: any }) => void;
   completeQuest: (questId: UUID) => void;
@@ -1030,6 +1031,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ character: result.character, inventory: result.inventory });
       await get().saveGame();
     }
+  },
+
+  addItemToInventory: (templateId, quantity = 1) => {
+    const { inventory, itemTemplates } = get();
+    if (!inventory) return false;
+    const result = TradeService.addItemToInventory(inventory, templateId, quantity, itemTemplates);
+    if (result.success && result.inventory) {
+      set({ inventory: result.inventory });
+      get().saveGame();
+      return true;
+    }
+    return false;
   },
 
   acceptQuest: async (questId) => {

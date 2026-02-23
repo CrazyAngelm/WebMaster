@@ -146,6 +146,64 @@ export const TradeService = {
   },
 
   /**
+   * * Adds item to inventory without cost (e.g. NPC gift).
+   * * Returns updated inventory or failure reason.
+   */
+  addItemToInventory(
+    inventory: Inventory,
+    templateId: UUID,
+    quantity: number = 1,
+    itemTemplates?: Map<string, ItemTemplate>
+  ): { success: boolean; inventory?: Inventory; reason?: string } {
+    const template = StaticDataService.getItemTemplate(templateId);
+    if (!template) return { success: false, reason: "Item not found." };
+
+    if (itemTemplates) {
+      const currentUsedSlots = InventoryService.getUsedSlots(inventory);
+      const maxSlots = InventoryService.getMaxSlots(inventory, inventory.items, itemTemplates);
+
+      const existingItem = inventory.items.find(
+        i => i.templateId === templateId && i.quantity < template.stackSize
+      );
+      const needsNewSlot = !existingItem || (existingItem.quantity + quantity > template.stackSize);
+
+      if (needsNewSlot && currentUsedSlots + 1 > maxSlots) {
+        return {
+          success: false,
+          reason: `Инвентарь переполнен. Слоты: ${currentUsedSlots} / ${maxSlots}.`
+        };
+      }
+    }
+
+    const updatedInventory = {
+      ...inventory,
+      items: [...inventory.items]
+    };
+
+    const existingItemIndex = updatedInventory.items.findIndex(
+      i => i.templateId === templateId && i.quantity < template.stackSize
+    );
+
+    if (existingItemIndex !== -1 && template.stackSize > 1) {
+      const existingItem = updatedInventory.items[existingItemIndex];
+      const newQuantity = existingItem.quantity + quantity;
+
+      if (newQuantity <= template.stackSize) {
+        updatedInventory.items[existingItemIndex] = {
+          ...existingItem,
+          quantity: newQuantity
+        };
+      } else {
+        updatedInventory.items.push(this.createNewItem(templateId, quantity));
+      }
+    } else {
+      updatedInventory.items.push(this.createNewItem(templateId, quantity));
+    }
+
+    return { success: true, inventory: updatedInventory };
+  },
+
+  /**
    * * Creates a new instance of an item from template
    */
   createNewItem(templateId: UUID, quantity: number = 1): ExistingItem {

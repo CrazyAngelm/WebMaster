@@ -187,7 +187,10 @@ export class DeepSeekAIService implements AIService {
           text: parsed.text || content,
           emotion: parsed.emotion || 'neutral',
           action: parsed.action || 'talk',
-          questSuggestion: parsed.questSuggestion || undefined
+          questSuggestion: parsed.questSuggestion || undefined,
+          itemOffer: parsed.itemOffer && parsed.itemOffer.templateId
+            ? { templateId: parsed.itemOffer.templateId, quantity: parsed.itemOffer.quantity || 1 }
+            : undefined
         };
       }
     } catch (error) {

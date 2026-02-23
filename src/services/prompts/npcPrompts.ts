@@ -4,7 +4,8 @@
 // 💡 Usage: Used by DeepSeekAIService to build prompts
 
 import { NPCData, ConversationMessage, GameContext } from '../../types/ai';
-import { Location } from '../../types/game';
+import { Location, Inventory, ItemTemplate, ItemType } from '../../types/game';
+import { StaticDataService } from '../StaticDataService';
 
 export const NPC_PROMPTS = {
   systemPrompt: (npc: Pick<NPCData, 'name' | 'description' | 'personality'>, reputation: number = 0) => `
@@ -31,24 +32,51 @@ export const NPC_PROMPTS = {
 - flee: убежать (если испуган или слаб)
 - trade: предложить торговлю (если торговец и отношение не враждебное)
 - offer_quest: предложить квест
+- gift: подарить предмет игроку (при дружелюбном отношении, только расходники)
+- inspect: изучить экипировку игрока и дать советы
+- negotiate: вести переговоры при враждебности, попытаться избежать боя
 - idle: бездействовать
+
+Предметы для подарка (gift): только из списка ID расходников: ${((): string => {
+    const consumables = StaticDataService.getAllItemTemplates()
+      .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined)
+      .slice(0, 10);
+    return consumables.map(t => `${t.id} (${t.name})`).join(', ') || 'нет доступных';
+  })()}
 
 Формат ответа (JSON):
 {
   "text": "твой ответ",
   "emotion": "happy|sad|angry|neutral|surprised|scared|excited",
-  "action": "talk|attack|flee|trade|offer_quest|idle",
-  "questSuggestion": { ... } // опционально
+  "action": "talk|attack|flee|trade|offer_quest|gift|inspect|negotiate|idle",
+  "questSuggestion": { ... },
+  "itemOffer": { "templateId": "id-предмета", "quantity": 1 }
 }
+questSuggestion и itemOffer — опционально, только при action offer_quest или gift
 `,
 
-  contextPrompt: (context: GameContext & { reputation?: number }) => {
+  contextPrompt: (context: GameContext & {
+    reputation?: number;
+    inventory?: Inventory | null;
+    itemTemplates?: Map<string, ItemTemplate>;
+  }) => {
     let prompt = `Текущая локация: ${context.location.name}\n`;
     prompt += `Описание: ${context.location.description}\n\n`;
     prompt += `Игрок: ${context.character.name}\n`;
-    
+
     if (context.reputation !== undefined) {
       prompt += `Отношение NPC к игроку: ${context.reputation}/100\n`;
+    }
+
+    if (context.inventory && context.itemTemplates) {
+      const equipped = context.inventory.items.filter(i => i.isEquipped);
+      if (equipped.length > 0) {
+        prompt += `\nЭкипировка игрока:\n`;
+        equipped.forEach(item => {
+          const t = context.itemTemplates!.get(item.templateId);
+          prompt += `- ${t?.name || item.templateId}\n`;
+        });
+      }
     }
 
     const activeQuests = context.character?.activeQuests || [];
