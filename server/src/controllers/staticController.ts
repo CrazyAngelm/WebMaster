@@ -17,6 +17,7 @@ export const getStaticBundle = async (req: Request, res: Response) => {
       itemTemplates,
       recipes,
       monsterTemplates,
+      npcTemplates,
       quests,
       locations,
       buildings,
@@ -33,6 +34,7 @@ export const getStaticBundle = async (req: Request, res: Response) => {
       prisma.itemTemplate.findMany(),
       prisma.recipe.findMany(),
       prisma.monsterTemplate.findMany(),
+      prisma.npcTemplate.findMany(),
       prisma.quest.findMany(),
       prisma.location.findMany(),
       prisma.building.findMany(),
@@ -68,6 +70,11 @@ export const getStaticBundle = async (req: Request, res: Response) => {
         ...m,
         skills: JSON.parse(m.skills),
         lootTable: JSON.parse(m.lootTable)
+      })),
+      npcTemplates: npcTemplates.map(n => ({
+        ...n,
+        skills: JSON.parse(n.skills),
+        lootTable: JSON.parse(n.lootTable)
       })),
       quests: quests.map(q => ({
         ...q,

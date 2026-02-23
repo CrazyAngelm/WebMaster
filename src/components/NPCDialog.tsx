@@ -14,9 +14,10 @@ import { mockAIService } from '../services/MockAIService';
 interface NPCDialogProps {
   npc: NPCData;
   onClose: () => void;
+  onNavigateToCombat?: () => void;
 }
 
-export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
+export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateToCombat }) => {
   const { messages, isLoading, error, addPlayerMessage, addNPCMessage, setLoading, setError, clearMessages } = useDialogStore();
   const { 
     aiService, 
@@ -120,9 +121,16 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose }) => {
           case 'attack':
             // Change reputation negatively for aggression
             changeNPCReputation(npc.id, -20);
-            // Initiate combat
-            initiateCombatFromDialog(npc.id);
-            onClose(); // Close dialog when combat starts
+            // Initiate combat and wait for it to start
+            try {
+              await initiateCombatFromDialog(npc.id);
+              // Close dialog and navigate to combat after battle starts
+              onClose();
+              onNavigateToCombat?.();
+            } catch (error) {
+              console.error('Failed to initiate combat:', error);
+              addNPCMessage('Не удалось начать бой. Попробуйте ещё раз.');
+            }
             break;
             
           case 'trade':

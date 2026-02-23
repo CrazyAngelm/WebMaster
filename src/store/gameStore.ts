@@ -1174,10 +1174,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       const { useCombatStore } = await import('./combatStore');
       const { initiateBattle } = useCombatStore.getState();
       
-      // Start battle with NPC
-      await initiateBattle(npcId, false); // false means it's not a monster
+      // Start battle with NPC as character
+      console.log('NPC combat initiated - creating NPC character for battle');
+      
+      // Start battle with NPC as character (not monster)
+      await initiateBattle(npcId, false, true); // false = not monster, true = isNPC
     } catch (error) {
-      console.error('Failed to initiate combat from dialog:', error);
+      console.error('Failed to initiate combat:', error);
+      throw error;
     }
   }
 }));

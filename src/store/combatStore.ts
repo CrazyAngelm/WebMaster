@@ -18,7 +18,7 @@ interface CombatState {
   enemy: Character | null;
   
   // Actions
-  initiateBattle: (enemyId: string, isMonster: boolean) => Promise<void>;
+  initiateBattle: (enemyId: string, isMonster: boolean, isNPC?: boolean) => Promise<void>;
   nextTurn: () => Promise<void>;
   executeAttack: (
     attackerId: string,
@@ -60,7 +60,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
   },
 
-  initiateBattle: async (enemyId, isMonster) => {
+  initiateBattle: async (enemyId, isMonster, isNPC = false) => {
     const { token, character } = useGameStore.getState();
     if (!token || !character) {
       return;
@@ -76,7 +76,8 @@ export const useCombatStore = create<CombatState>((set, get) => ({
         body: JSON.stringify({ 
           playerCharacterId: character.id, 
           enemyId, 
-          isMonster 
+          isMonster,
+          isNPC
         })
       });
       

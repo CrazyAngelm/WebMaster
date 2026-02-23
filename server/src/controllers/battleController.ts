@@ -92,11 +92,62 @@ const ensureDownedStatus = (participant: any, logs?: string[]): void => {
   }
 };
 
+// Helper function to create NPC character for battle
+const createNPCCharacterForBattle = async (npcId: string) => {
+  // For now, create a basic NPC character based on ID
+  // In future, this should fetch actual NPC data from database
+  const npcCharacterId = `npc-battle-${npcId}-${Date.now()}`;
+  
+  const baseStats = {
+    essence: { current: 60, max: 60 },
+    energy: { current: 50, max: 50 },
+    protection: { current: 40, max: 40 },
+    speedId: 'speed-ordinary'
+  };
+
+  const baseBonuses = {
+    evasion: 5,
+    accuracy: 5,
+    damageResistance: 0,
+    initiative: 0
+  };
+
+  // Create temporary NPC character
+  const npcCharacter = await (prisma as any).character.create({
+    data: {
+      id: npcCharacterId,
+      userId: 'system-npc', // Special user ID for NPCs
+      name: `NPC_${npcId}`,
+      raceId: 'race-human',
+      rankId: 'rank-1',
+      description: 'NPC противник',
+      bio: 'Создан для боя с игроком',
+      stats: JSON.stringify(baseStats),
+      inventoryId: null,
+      location: {
+        locationId: 'combat-zone',
+        position: 'battle'
+      },
+      isDead: false,
+      money: 0,
+      bonuses: JSON.stringify(baseBonuses),
+      professions: JSON.stringify([]),
+      activeQuests: JSON.stringify([])
+    }
+  });
+
+  return {
+    ...npcCharacter,
+    stats: baseStats,
+    bonuses: baseBonuses
+  };
+};
+
 export const startBattle = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
     const userId = req.userId;
-    const { playerCharacterId, enemyId, isMonster } = req.body;
+    const { playerCharacterId, enemyId, isMonster, isNPC } = req.body;
 
     // * Check if an active battle already exists for this character
     const existingBattle = await (prisma as any).battle.findFirst({
@@ -140,7 +191,58 @@ export const startBattle = async (req: Request, res: Response) => {
     let enemyMonsterId: string | null = null;
     let enemyCharacterId: string | null = null;
 
-    if (isMonster) {
+    if (isNPC) {
+      // Create NPC from template for battle
+      const npcTemplate = await (prisma as any).npcTemplate.findUnique({
+        where: { id: enemyId }
+      });
+      if (!npcTemplate) return res.status(404).json({ error: 'NPC template not found' });
+      
+      enemyName = npcTemplate.name;
+      enemyHp = npcTemplate.baseEssence;
+      enemyProtection = npcTemplate.baseEssence; // Use same as essence for now
+      
+      // Create NPC character based on template
+      const npcCharacterId = `npc-battle-${enemyId}-${Date.now()}`;
+      const baseStats = {
+        essence: { current: npcTemplate.baseEssence, max: npcTemplate.baseEssence },
+        energy: { current: 50, max: 50 },
+        protection: { current: npcTemplate.baseEssence, max: npcTemplate.baseEssence },
+        speedId: npcTemplate.speedId
+      };
+
+      const baseBonuses = {
+        evasion: 5,
+        accuracy: 5,
+        damageResistance: 0,
+        initiative: 0
+      };
+
+      const npcCharacter = await (prisma as any).character.create({
+        data: {
+          id: npcCharacterId,
+          userId: 'system-npc',
+          name: npcTemplate.name,
+          raceId: 'race-human',
+          rankId: 'rank-1',
+          description: npcTemplate.description || 'NPC противник',
+          bio: `Создан для боя на основе шаблона ${npcTemplate.id}`,
+          stats: JSON.stringify(baseStats),
+          inventoryId: null,
+          location: {
+            locationId: 'combat-zone',
+            position: 'battle'
+          },
+          isDead: false,
+          money: 0,
+          bonuses: JSON.stringify(baseBonuses),
+          professions: JSON.stringify([]),
+          activeQuests: JSON.stringify([])
+        }
+      });
+
+      enemyCharacterId = npcCharacter.id;
+    } else if (isMonster) {
       const monsterTemplate = await (prisma as any).monsterTemplate.findUnique({
         where: { id: enemyId }
       });

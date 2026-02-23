@@ -131,6 +131,20 @@ model MonsterTemplate {
   lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
 }
 
+model NPCTemplate {
+  id           String  @id
+  name         String
+  npcType      String  // merchant, guard, questgiver, villager, mysterious
+  rankOrder    Int
+  baseEssence  Int
+  speedId      String  @default("speed-ordinary")
+  description  String?
+  personality  String
+  greeting     String?
+  skills       String  // UUID[] (JSON string)
+  lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
+}
+
 model Quest {
   id           String @id
   title        String
@@ -161,16 +175,17 @@ model Building {
 }
 
 model NPC {
-  id          String   @id @default(uuid())
-  name        String
-  description String
-  personality String
-  greeting    String?
-  buildingId  String?
-  locationId  String?
-  npcType     String   // merchant, guard, questgiver, villager, mysterious
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  description   String
+  personality   String
+  greeting      String?
+  buildingId    String?
+  locationId    String?
+  npcType       String   // merchant, guard, questgiver, villager, mysterious
+  templateId    String?  // Reference to NPCTemplate
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model LocationConnection {

@@ -20,6 +20,13 @@ export const WorldNavigation: React.FC = () => {
   const [currentNPC, setCurrentNPC] = useState<NPCData | null>(null);
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
 
+  const handleNavigateToCombat = () => {
+    // Navigate to combat view - this will be handled by parent component
+    // For now, we'll use window.location or trigger state change
+    const event = new CustomEvent('navigateToCombat');
+    window.dispatchEvent(event);
+  };
+
   const handleTalkToNPC = async (building: any) => {
     const currentCharacter = character;
     if (!currentCharacter || isLoadingNPC) {
@@ -213,7 +220,8 @@ export const WorldNavigation: React.FC = () => {
           onClose={() => {
             setShowDialog(false);
             setCurrentNPC(null);
-          }} 
+          }}
+          onNavigateToCombat={handleNavigateToCombat}
         />
       )}
     </div>

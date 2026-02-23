@@ -59,6 +59,19 @@ function App() {
     });
   }, [triggerRoll]);
 
+  // * Listen for combat navigation events
+  useEffect(() => {
+    const handleNavigateToCombat = () => {
+      setView('combat');
+    };
+
+    window.addEventListener('navigateToCombat', handleNavigateToCombat);
+    
+    return () => {
+      window.removeEventListener('navigateToCombat', handleNavigateToCombat);
+    };
+  }, []);
+
   // * Map header navigation to internal view state
   const handleHeaderNavigate = (navView: 'character' | 'inventory' | 'world' | 'combat' | 'crafting') => {
     switch (navView) {

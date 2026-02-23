@@ -746,6 +746,93 @@ async function main() {
     });
   }
 
+  // --- NPC Templates ---
+  const npcTemplates = [
+    {
+      id: 'npc-guard',
+      name: 'Стражник',
+      npcType: 'guard',
+      rankOrder: 2,
+      baseEssence: 150,
+      speedId: 'speed-ordinary',
+      description: 'Городской стражник, следящий за порядком',
+      personality: 'Серьёзный, дисциплинированный, справедливый',
+      greeting: 'Стой! Кто идёт?',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-iron-ore', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'npc-merchant',
+      name: 'Торговец',
+      npcType: 'merchant',
+      rankOrder: 1,
+      baseEssence: 80,
+      speedId: 'speed-slow',
+      description: 'Торговец, путешествующий между городами',
+      personality: 'Дружелюбный, расчётливый, разговорчивый',
+      greeting: 'Добро пожаловать, путник! Что прикажешь?',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-gold-coin', chance: 0.5, minQuantity: 10, maxQuantity: 30 }
+      ])
+    },
+    {
+      id: 'npc-questgiver',
+      name: 'Старик',
+      npcType: 'questgiver',
+      rankOrder: 3,
+      baseEssence: 200,
+      speedId: 'speed-ordinary',
+      description: 'Мудрый старик, знающий много тайн',
+      personality: 'Мудрый, загадочный, доброжелательный',
+      greeting: 'Приветствую тебя, молодой искатель приключений',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-mana-crystal', chance: 0.3, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'npc-villager',
+      name: 'Крестьянин',
+      npcType: 'villager',
+      rankOrder: 1,
+      baseEssence: 60,
+      speedId: 'speed-ordinary',
+      description: 'Простой крестьянин, работающий на полях',
+      personality: 'Простой, трудолюбивый, немного боязливый',
+      greeting: 'Здравствуй, странник',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-bread', chance: 0.4, minQuantity: 1, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'npc-mysterious',
+      name: 'Таинственный незнакомец',
+      npcType: 'mysterious',
+      rankOrder: 4,
+      baseEssence: 300,
+      speedId: 'speed-very-fast',
+      description: 'Загадочная фигура в тёмном плаще',
+      personality: 'Таинственный, осторожный, непредсказуемый',
+      greeting: '...',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-shadow-essence', chance: 0.6, minQuantity: 1, maxQuantity: 2 }
+      ])
+    }
+  ];
+
+  for (const n of npcTemplates) {
+    await prisma.npcTemplate.upsert({
+      where: { id: n.id },
+      update: n,
+      create: n,
+    });
+  }
+
   // --- Quests ---
   const quests = [
     {
