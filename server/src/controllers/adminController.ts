@@ -120,9 +120,7 @@ export const updateConfig = async (req: Request, res: Response) => {
       where: { key },
       update: { value: typeof value === 'string' ? value : JSON.stringify(value) },
       create: { key, value: typeof value === 'string' ? value : JSON.stringify(value) }
-    });
-
-    res.json({ message: `Config ${key} updated`, config });
+    });    res.json({ message: `Config ${key} updated`, config });
   } catch (error) {
     console.error('Update config error:', error);
     res.status(500).json({ error: 'Internal server error' });
