@@ -63,8 +63,11 @@ export const useCombatStore = create<CombatState>((set, get) => ({
   initiateBattle: async (enemyId, isMonster, isNPC = false) => {
     const { token, character } = useGameStore.getState();
     if (!token || !character) {
-      return;
+      console.error('[CombatStore] Cannot initiate battle: missing token or character');
+      throw new Error('Не авторизован или персонаж не выбран');
     }
+
+    console.log('[CombatStore] Initiating battle:', { playerId: character.id, enemyId, isMonster, isNPC });
 
     try {
       const res = await fetch(`${API_BASE}/battle/start`, {
@@ -82,7 +85,12 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       });
       
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      console.log('[CombatStore] Battle start response:', { status: res.status, ok: res.ok, result });
+      
+      if (!res.ok) {
+        console.error('[CombatStore] Battle start failed:', result.error);
+        throw new Error(result.error || 'Не удалось начать бой');
+      }
       
       // * Trigger initiative rolls
       if (result.rolls && Array.isArray(result.rolls)) {
@@ -448,8 +456,51 @@ export const useCombatStore = create<CombatState>((set, get) => ({
 
   endBattle: async (battleId?: string) => {
     const { battle } = get();
-    const { token } = useGameStore.getState();
+    const { token, activeQuests, setNotification } = useGameStore.getState();
     const battleIdToEnd = battleId || battle?.id;
+    
+    // * Check for monster kills before ending battle
+    if (battle) {
+      const killedMonsters = battle.participants.filter(p => 
+        !p.isPlayer && 
+        p.monsterTemplateId && 
+        (p.status === 'DEAD' || p.currentHp <= 0)
+      );
+      
+      if (killedMonsters.length > 0) {
+        // Import QuestService dynamically to avoid circular dependencies
+        const { QuestService } = await import('../services/QuestService');
+        const { updateProgress } = QuestService;
+        
+        // Update quest progress for each killed monster
+        for (const monster of killedMonsters) {
+          if (monster.monsterTemplateId) {
+            const { updatedQuests, newlyReadyCount, completedQuestTitles } = updateProgress(
+              activeQuests,
+              'KILL',
+              monster.monsterTemplateId,
+              1
+            );
+            
+            // Update active quests in game store
+            const { setCharacter, character } = useGameStore.getState();
+            if (character) {
+              setCharacter({ ...character, activeQuests: updatedQuests });
+            }
+            
+            // Notify about ready quests
+            if (newlyReadyCount > 0) {
+              completedQuestTitles.forEach(title => {
+                setNotification({
+                  type: 'success',
+                  message: `Квест "${title}" выполнен! Вернитесь к NPC для получения награды.`
+                });
+              });
+            }
+          }
+        }
+      }
+    }
     
     // * Mark battle as finished on server if ID provided
     if (battleIdToEnd && token) {

@@ -18,7 +18,7 @@ export interface ConversationMessage {
 }
 
 export type NPCEmotion = 'happy' | 'sad' | 'angry' | 'neutral' | 'surprised' | 'scared' | 'excited';
-export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest' | 'gift' | 'inspect' | 'negotiate';
+export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest' | 'complete_quest' | 'gift' | 'inspect' | 'negotiate';
 
 export interface NPCResponse {
   text: string;
@@ -37,6 +37,7 @@ export interface QuestSuggestion {
     essence?: number;
     items?: { templateId: string; quantity: number }[];
   };
+  completionNPCId?: string; // NPC ID to turn in the quest to (if different from giver)
 }
 
 export interface QuestObjectiveSuggestion {
@@ -54,6 +55,7 @@ export interface NPCData {
   locationId: string;
   buildingId?: string;
   shopId?: string;
+  templateId?: string;
   npcType?: 'merchant' | 'guard' | 'questgiver' | 'villager' | 'mysterious';
 }
 

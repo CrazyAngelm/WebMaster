@@ -22,6 +22,7 @@ const translateQuestStatus = (status: QuestStatus): string => {
   switch (status) {
     case QuestStatus.NOT_STARTED: return 'Доступно';
     case QuestStatus.IN_PROGRESS: return 'В процессе';
+    case QuestStatus.READY_TO_COMPLETE: return 'Готов к сдаче';
     case QuestStatus.COMPLETED: return 'Завершено';
     case QuestStatus.FAILED: return 'Провалено';
     default: return status;
@@ -31,7 +32,11 @@ const translateQuestStatus = (status: QuestStatus): string => {
 export const QuestLog: React.FC = () => {
   const { activeQuests, completeQuest, acceptQuest } = useGameStore();
 
-  const inProgress = activeQuests.filter(q => q.status === QuestStatus.IN_PROGRESS || q.status === QuestStatus.COMPLETED);
+  const inProgress = activeQuests.filter(q => 
+    q.status === QuestStatus.IN_PROGRESS || 
+    q.status === QuestStatus.READY_TO_COMPLETE ||
+    q.status === QuestStatus.COMPLETED
+  );
   const available = activeQuests.filter(q => q.status === QuestStatus.NOT_STARTED);
 
   return (
@@ -92,12 +97,12 @@ export const QuestLog: React.FC = () => {
               key={quest.id} 
               className={clsx(
                 "fantasy-panel p-4 border-l-2 transition-all relative overflow-hidden",
-                quest.status === QuestStatus.COMPLETED 
+                quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED
                   ? "border-l-green-500 bg-green-900/5 shadow-[inset_0_0_20px_rgba(34,197,94,0.05)]" 
                   : "border-l-fantasy-accent bg-fantasy-surface/40"
               )}
             >
-              {quest.status === QuestStatus.COMPLETED && (
+              {(quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED) && (
                 <div className="absolute top-0 right-0 p-1 opacity-10">
                   <CheckCircle2 size={48} />
                 </div>
@@ -107,14 +112,14 @@ export const QuestLog: React.FC = () => {
                 <div>
                   <h3 className={clsx(
                     "font-bold text-sm mb-0.5",
-                    quest.status === QuestStatus.COMPLETED ? "text-green-400" : "text-white"
+                    quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED ? "text-green-400" : "text-white"
                   )}>
                     {quest.title}
                   </h3>
                   <div className="flex items-center gap-1.5">
                     <span className={clsx(
                       "text-[8px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter border",
-                      quest.status === QuestStatus.COMPLETED 
+                      quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED
                         ? "bg-green-900/20 text-green-500 border-green-500/30" 
                         : "bg-blue-900/20 text-blue-500 border-blue-500/30"
                     )}>
@@ -154,12 +159,12 @@ export const QuestLog: React.FC = () => {
                 ))}
               </div>
 
-              {quest.status === QuestStatus.COMPLETED && (
+              {quest.status === QuestStatus.READY_TO_COMPLETE && (
                 <button
                   onClick={() => completeQuest(quest.id)}
                   className="w-full py-2 text-[10px] font-bold uppercase tracking-widest bg-green-500 text-white hover:bg-green-600 transition-all rounded shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 animate-pulse"
                 >
-                  <Gift size={14} /> Завершить и забрать награду
+                  <Gift size={14} /> Сдать квест и получить награву
                 </button>
               )}
             </div>

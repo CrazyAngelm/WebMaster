@@ -68,6 +68,12 @@ class NPCServiceClass {
     const cached = this.getCachedNPC(cacheKey);
     if (cached) {
       console.log('[NPCService] Returning cached NPC for building:', building.name);
+      const needsPersist = cached.id.startsWith('npc-') || cached.id.startsWith('npc-mock-') || cached.id.startsWith('generated-');
+      if (needsPersist) {
+        const persisted = await this.persistNPC({ ...cached, locationId: location.id, buildingId: building.id }, building.id);
+        this.cacheNPC(cacheKey, persisted);
+        return persisted;
+      }
       return cached;
     }
 
@@ -93,7 +99,15 @@ class NPCServiceClass {
     
     // Check cache
     const cached = this.getCachedNPC(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      const needsPersist = cached.id.startsWith('npc-') || cached.id.startsWith('npc-mock-') || cached.id.startsWith('generated-');
+      if (needsPersist) {
+        const persisted = await this.persistNPC({ ...cached, locationId: location.id });
+        this.cacheNPC(cacheKey, persisted);
+        return persisted;
+      }
+      return cached;
+    }
 
     // Generate via LLM
     const generatedNPC = await this.generateNPC(location);
@@ -124,11 +138,49 @@ class NPCServiceClass {
         dialogueGreeting: data.greeting,
         locationId: data.locationId,
         buildingId: data.buildingId,
+        templateId: data.templateId || undefined,
         npcType: data.npcType
       };
     } catch (error) {
       console.log('[NPCService] Error fetching static NPC:', error);
       return null;
+    }
+  }
+
+  private async persistNPC(npc: NPCData, buildingId?: string): Promise<NPCData> {
+    const token = localStorage.getItem('token');
+    if (!token) return npc;
+
+    try {
+      const response = await fetch('/api/npcs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: npc.name,
+          description: npc.description,
+          personality: npc.personality,
+          greeting: npc.dialogueGreeting,
+          buildingId,
+          locationId: npc.locationId,
+          npcType: npc.npcType || 'villager'
+        })
+      });
+
+      if (!response.ok) return npc;
+      const data = await response.json();
+
+      if (!data?.id) return npc;
+      return {
+        ...npc,
+        id: data.id,
+        templateId: data.templateId || undefined
+      };
+    } catch (error) {
+      console.warn('[NPCService] Failed to persist NPC:', error);
+      return npc;
     }
   }
 
@@ -141,17 +193,19 @@ class NPCServiceClass {
 
     try {
       const npc = await service.generateNPC(location, npcType);
-      
-      return {
+      const generated: NPCData = {
         ...npc,
         buildingId,
         locationId: location.id
       };
+
+      // Persist so server-side systems (e.g. battle) can reference NPC by id.
+      return await this.persistNPC(generated, buildingId);
     } catch (error) {
       console.error('[NPCService] Error generating NPC:', error);
       
       // Fallback to default NPC
-      return {
+      const fallback: NPCData = {
         id: `generated-${Date.now()}`,
         name: 'Незнакомец',
         description: 'Странник, появившийся из ниоткуда',
@@ -161,6 +215,8 @@ class NPCServiceClass {
         buildingId,
         npcType: 'mysterious'
       };
+
+      return await this.persistNPC(fallback, buildingId);
     }
   }
 

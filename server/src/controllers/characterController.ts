@@ -32,6 +32,8 @@ export const getCharacters = async (req: Request, res: Response) => {
         professions: JSON.parse(charData.professions),
         location: JSON.parse(charData.location),
         activeQuests: JSON.parse(charData.activeQuests || '[]'),
+        completedQuests: JSON.parse(charData.completedQuests || '[]'),
+        lastLocationChange: charData.lastLocationChange ? JSON.parse(charData.lastLocationChange) : undefined,
         skills: JSON.parse(charData.skills || '[]'),
         npcDialogHistory: JSON.parse(charData.npcDialogHistory || '{}'),
         npcReputation: JSON.parse(charData.npcReputation || '{}'),
@@ -153,6 +155,8 @@ export const createCharacter = async (req: Request, res: Response) => {
       professions: JSON.parse(newCharacter.professions),
       location: JSON.parse(newCharacter.location),
       activeQuests: JSON.parse((newCharacter as any).activeQuests || '[]'),
+      completedQuests: JSON.parse((newCharacter as any).completedQuests || '[]'),
+      lastLocationChange: (newCharacter as any).lastLocationChange ? JSON.parse((newCharacter as any).lastLocationChange) : undefined,
       skills: JSON.parse((newCharacter as any).skills || '[]'),
       npcDialogHistory: JSON.parse((newCharacter as any).npcDialogHistory || '{}'),
       npcReputation: JSON.parse((newCharacter as any).npcReputation || '{}'),
@@ -194,7 +198,7 @@ export const updateCharacter = async (req: Request, res: Response) => {
     // @ts-ignore
     const userId = req.userId;
     const { id } = req.params;
-    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, lastRestTime, inventory, npcDialogHistory, npcReputation } = req.body;
+    const { stats, money, professions, location, bonuses, activeQuests, lastTrainTime, lastRestTime, inventory, npcDialogHistory, npcReputation, completedQuests, lastLocationChange } = req.body;
 
     console.log(`Updating character ${id}: Money=${money}, Items Count=${inventory?.items?.length || 0}`);
 
@@ -343,6 +347,20 @@ export const updateCharacter = async (req: Request, res: Response) => {
       updateData.npcReputation = JSON.stringify(npcReputation);
     }
 
+    if (completedQuests !== undefined) {
+      if (!Array.isArray(completedQuests)) {
+        return res.status(400).json({ error: 'completedQuests must be an array' });
+      }
+      updateData.completedQuests = JSON.stringify(completedQuests);
+    }
+
+    if (lastLocationChange !== undefined) {
+      if (lastLocationChange !== null && typeof lastLocationChange !== 'object') {
+        return res.status(400).json({ error: 'lastLocationChange must be an object or null' });
+      }
+      updateData.lastLocationChange = lastLocationChange ? JSON.stringify(lastLocationChange) : null;
+    }
+
     if (inventory !== undefined && inventory !== null) {
       if (typeof inventory === 'object' && Array.isArray(inventory.items)) {
         // * Validate each item structure
@@ -415,6 +433,8 @@ export const updateCharacter = async (req: Request, res: Response) => {
       professions: JSON.parse(updatedCharacter.professions),
       location: JSON.parse(updatedCharacter.location),
       activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
+      completedQuests: JSON.parse((updatedCharacter as any).completedQuests || '[]'),
+      lastLocationChange: (updatedCharacter as any).lastLocationChange ? JSON.parse((updatedCharacter as any).lastLocationChange) : undefined,
       skills: JSON.parse((updatedCharacter as any).skills || '[]'),
       npcDialogHistory: JSON.parse((updatedCharacter as any).npcDialogHistory || '{}'),
       npcReputation: JSON.parse((updatedCharacter as any).npcReputation || '{}'),
@@ -476,6 +496,8 @@ export const tickSkillCooldowns = async (req: Request, res: Response) => {
       professions: JSON.parse(updatedCharacter!.professions),
       location: JSON.parse(updatedCharacter!.location),
       activeQuests: JSON.parse((updatedCharacter as any).activeQuests || '[]'),
+      completedQuests: JSON.parse((updatedCharacter as any).completedQuests || '[]'),
+      lastLocationChange: (updatedCharacter as any).lastLocationChange ? JSON.parse((updatedCharacter as any).lastLocationChange) : undefined,
       skills: JSON.parse((updatedCharacter as any).skills || '[]'),
       npcDialogHistory: JSON.parse((updatedCharacter as any).npcDialogHistory || '{}'),
       npcReputation: JSON.parse((updatedCharacter as any).npcReputation || '{}'),

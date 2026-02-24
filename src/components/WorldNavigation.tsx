@@ -11,14 +11,15 @@ import { NPCService } from '../services/NPCService';
 import { ShopView } from './ShopView';
 import { NPCDialog } from './NPCDialog';
 import { clsx } from 'clsx';
-import { MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2, Sword, Skull, MapPin, Search, Hand } from 'lucide-react';
 import { NPCData } from '../types/ai';
 
 export const WorldNavigation: React.FC = () => {
-  const { character, moveToLocation, enterBuilding, exitBuilding } = useGameStore();
+  const { character, moveToLocation, enterBuilding, exitBuilding, activeQuests } = useGameStore();
   const [showDialog, setShowDialog] = useState(false);
   const [currentNPC, setCurrentNPC] = useState<NPCData | null>(null);
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
+  const [locationAction, setLocationAction] = useState<'search' | 'interact' | 'hunt' | null>(null);
 
   const handleNavigateToCombat = () => {
     const event = new CustomEvent('navigateToCombat');
@@ -52,6 +53,15 @@ export const WorldNavigation: React.FC = () => {
     } finally {
       setIsLoadingNPC(false);
     }
+  };
+
+  const handleLocationAction = (action: 'search' | 'interact' | 'hunt') => {
+    setLocationAction(action);
+    
+    if (action === 'hunt') {
+      handleNavigateToCombat();
+    }
+    // For search/interact, show dialog or update UI
   };
 
   if (!character) return null;
@@ -206,14 +216,82 @@ export const WorldNavigation: React.FC = () => {
         </div>
       </div>
 
-      {/* Exploration / Randomness Sidebar */}
+      {/* Location Actions Sidebar */}
       <div className="hidden md:flex flex-col gap-6 overflow-hidden">
-        <div className="fantasy-panel p-4 flex-1 flex flex-col items-center justify-center text-center opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all cursor-not-allowed">
-          <div className="w-12 h-12 border border-fantasy-border rounded-full flex items-center justify-center mb-4">
-            <span className="text-xl">🔍</span>
+        <div className="fantasy-panel p-4 flex-1 flex flex-col">
+          <div className="text-[10px] text-fantasy-accent uppercase tracking-[0.2em] mb-4">Действия в локации</div>
+          
+          {/* Active Quests in this location */}
+          {activeQuests.filter(q => 
+            q.status === 'IN_PROGRESS' && 
+            q.objectives.some(o => o.type === 'VISIT' && o.targetId === character?.location.locationId)
+          ).length > 0 && (
+            <div className="mb-4 p-3 bg-fantasy-accent/10 border border-fantasy-accent/30 rounded">
+              <div className="text-[10px] text-fantasy-accent uppercase mb-2 flex items-center gap-1">
+                <MapPin size={10} /> Активные задания
+              </div>
+              {activeQuests.filter(q => 
+                q.status === 'IN_PROGRESS' && 
+                q.objectives.some(o => o.type === 'VISIT' && o.targetId === character?.location.locationId)
+              ).map(q => (
+                <div key={q.id} className="text-[10px] text-gray-300 mb-1">
+                  • {q.title}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            <button
+              onClick={() => handleLocationAction('search')}
+              className="w-full fantasy-panel p-3 hover:border-fantasy-accent/50 transition-all flex items-center gap-3 group"
+            >
+              <div className="w-8 h-8 rounded bg-fantasy-accent/20 flex items-center justify-center">
+                <Search size={16} className="text-fantasy-accent" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-gray-200 group-hover:text-fantasy-accent">Исследовать</div>
+                <div className="text-[9px] text-gray-500">Найти скрытое</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleLocationAction('interact')}
+              className="w-full fantasy-panel p-3 hover:border-fantasy-accent/50 transition-all flex items-center gap-3 group"
+            >
+              <div className="w-8 h-8 rounded bg-fantasy-accent/20 flex items-center justify-center">
+                <Hand size={16} className="text-fantasy-accent" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-gray-200 group-hover:text-fantasy-accent">Взаимодействовать</div>
+                <div className="text-[9px] text-gray-500">Осмотреть объекты</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleLocationAction('hunt')}
+              className="w-full fantasy-panel p-3 hover:border-fantasy-accent/50 transition-all flex items-center gap-3 group"
+            >
+              <div className="w-8 h-8 rounded bg-red-900/30 flex items-center justify-center">
+                <Sword size={16} className="text-red-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-sm font-bold text-gray-200 group-hover:text-red-400">Охота</div>
+                <div className="text-[9px] text-gray-500">Вступить в бой</div>
+              </div>
+            </button>
           </div>
-          <div className="text-sm font-serif uppercase tracking-widest">Поиск области</div>
-          <div className="text-[10px] text-gray-500 mt-2">НЕ РЕАЛИЗОВАНО</div>
+
+          {/* Location Info */}
+          <div className="mt-4 pt-4 border-t border-fantasy-border/30">
+            <div className="text-[9px] text-gray-500 uppercase mb-2">Информация о локации</div>
+            <div className="text-[10px] text-gray-400">
+              {currentLoc?.zoneType === 'GREEN' && '🟢 Безопасная зона'}
+              {currentLoc?.zoneType === 'YELLOW' && '🟡 Опасная зона'}
+              {currentLoc?.zoneType === 'RED' && '🔴 Смертельно опасная зона'}
+            </div>
+          </div>
         </div>
       </div>
 

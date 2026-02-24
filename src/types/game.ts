@@ -192,6 +192,7 @@ export interface Character {
   isDead: boolean;
   money: number;
   activeQuests: Quest[];
+  completedQuests: CompletedQuest[]; // History of completed quests
   bonuses: CharacterBonuses;
   professions: CharacterProfession[];
   lastTrainTime?: number; // * Added to track training cooldown (in server time hours)
@@ -199,6 +200,7 @@ export interface Character {
   activeSkills?: CharacterSkill[];
   npcDialogHistory?: Record<string, {role: 'player' | 'npc'; content: string; timestamp: number}[]>;
   npcReputation?: Record<string, number>;
+  lastLocationChange?: LocationHistory; // Track where player came from
 }
 
 export interface Location {
@@ -300,6 +302,7 @@ export interface ItemTemplate {
 export enum QuestStatus {
   NOT_STARTED = 'NOT_STARTED',
   IN_PROGRESS = 'IN_PROGRESS',
+  READY_TO_COMPLETE = 'READY_TO_COMPLETE', // All objectives done, waiting for turn-in
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
 }
@@ -323,9 +326,27 @@ export interface Quest {
     money?: number;
     essence?: number;
     items?: { templateId: UUID; quantity: number }[];
+    uniqueRewardIds?: UUID[]; // IDs of unique items from DB that NPC can give
   };
   status: QuestStatus;
   rankRequired: number;
+  giverNPCId: UUID; // Who gave the quest
+  completionNPCId?: UUID; // Who to turn in to (if different from giver)
+  givenAt: number; // Timestamp when quest was given
+}
+
+export interface CompletedQuest {
+  questId: UUID;
+  title: string;
+  giverNPCId: UUID;
+  completedAt: number;
+  rewardsReceived: boolean;
+}
+
+export interface LocationHistory {
+  fromLocationId: UUID;
+  toLocationId: UUID;
+  arrivedAt: number;
 }
 
 export interface GameEventChoice {
@@ -337,6 +358,7 @@ export interface GameEventChoice {
     type: 'ESSENCE' | 'MONEY' | 'ITEM';
     value: number | UUID;
   };
+  successChance?: number; // 0-100, chance of success for this choice
 }
 
 export interface GameEvent {

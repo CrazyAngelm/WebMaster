@@ -25,6 +25,7 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
     character, 
     inventory,
     itemTemplates,
+    activeQuests,
     addQuestFromNPC,
     addItemToInventory,
     getNPCDialogHistory,
@@ -105,7 +106,8 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
         location,
         reputation: getNPCReputation(npc.id),
         inventory: inventory ?? undefined,
-        itemTemplates: itemTemplates ?? undefined
+        itemTemplates: itemTemplates ?? undefined,
+        npcId: npc.id
       };
 
       const response = await service.generateResponse(
@@ -129,13 +131,40 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
             changeNPCReputation(npc.id, -20);
             // Initiate combat and wait for it to start
             try {
-              await initiateCombatFromDialog(npc.id);
+              // Check if NPC has a valid server ID (not a temporary one)
+              const isTemporaryId = npc.id.startsWith('npc-') || npc.id.startsWith('npc-mock-') || npc.id.startsWith('generated-');
+              if (isTemporaryId) {
+                console.warn('[NPCDialog] NPC has temporary ID, attempting to persist first...');
+                // Re-fetch NPC to ensure it's persisted
+                const { NPCService } = await import('../services/NPCService');
+                const buildingId = npc.buildingId;
+                if (buildingId && character?.location.locationId) {
+                  const location = (await import('../services/StaticDataService')).StaticDataService.getLocation(character.location.locationId);
+                  const building = (await import('../services/StaticDataService')).StaticDataService.getBuilding(buildingId);
+                  if (location && building) {
+                    const persistedNPC = await NPCService.getNPCForBuilding(building, location);
+                    if (!persistedNPC.id.startsWith('npc-') && !persistedNPC.id.startsWith('npc-mock-') && !persistedNPC.id.startsWith('generated-')) {
+                      console.log('[NPCDialog] NPC persisted with new ID:', persistedNPC.id);
+                      await initiateCombatFromDialog(persistedNPC.id);
+                    } else {
+                      throw new Error('NPC could not be persisted with valid server ID');
+                    }
+                  } else {
+                    throw new Error('Could not find location or building for NPC persistence');
+                  }
+                } else {
+                  throw new Error('NPC is missing buildingId or location');
+                }
+              } else {
+                await initiateCombatFromDialog(npc.id);
+              }
               // Close dialog and navigate to combat after battle starts
               onClose();
               onNavigateToCombat?.();
             } catch (error) {
               console.error('Failed to initiate combat:', error);
-              addNPCMessage('Не удалось начать бой. Попробуйте ещё раз.');
+              const errorMessage = error instanceof Error ? error.message : 'Не удалось начать бой';
+              addNPCMessage(`Ошибка: ${errorMessage}. Попробуйте ещё раз.`);
             }
             break;
             
@@ -172,6 +201,28 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
           case 'offer_quest':
             // Already handled by questSuggestion
             break;
+
+          case 'complete_quest': {
+            // Find quests ready to complete from this NPC
+            const readyQuests = activeQuests?.filter(q => 
+              q.giverNPCId === npc.id && q.status === 'READY_TO_COMPLETE'
+            );
+            
+            if (readyQuests && readyQuests.length > 0) {
+              // Complete the first ready quest
+              const questToComplete = readyQuests[0];
+              const { turnInQuest } = useGameStore.getState();
+              const success = await turnInQuest(questToComplete.id, npc.id);
+              
+              if (success) {
+                const completeMsg = `Квест "${questToComplete.title}" завершен! Награды выданы.`;
+                addNPCMessage(completeMsg);
+                addNPCDialogMessage(npc.id, 'npc', completeMsg);
+                setLocalMessages(prev => [...prev, { role: 'npc', content: completeMsg }]);
+              }
+            }
+            break;
+          }
             
           default:
             // 'talk' or 'idle' - no special action needed
@@ -230,15 +281,16 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
   };
 
   const acceptQuest = () => {
-    if (!pendingQuest) return;
+    if (!pendingQuest || !npc) return;
     
-    // Add the quest to game state
+    // Add the quest to game state with NPC as giver
     addQuestFromNPC({
       title: pendingQuest.title,
       description: pendingQuest.description,
       objectives: pendingQuest.objectives || [],
-      rewards: pendingQuest.rewards || {}
-    });
+      rewards: pendingQuest.rewards || {},
+      completionNPCId: pendingQuest.completionNPCId
+    }, npc.id);
     
     const acceptMessage = 'Отлично! Возвращайся, когда выполнишь задание.';
     addNPCMessage(acceptMessage);
@@ -323,51 +375,56 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quest Offer Modal */}
+        {/* Quest Offer - Inline in chat */}
         {showQuestOffer && pendingQuest && (
-          <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 z-10">
-            <div className="bg-fantasy-surface border-2 border-yellow-500/50 rounded-lg p-6 max-w-md w-full shadow-xl">
-              <h3 className="text-xl font-serif text-yellow-500 mb-4 flex items-center gap-2">
-                <Sparkles size={20} />
-                Новый квест!
-              </h3>
-              <div className="space-y-2 mb-4">
-                <h4 className="text-lg text-white font-bold">{pendingQuest.title}</h4>
-                <p className="text-gray-300 text-sm">{pendingQuest.description}</p>
-                {pendingQuest.objectives && (
-                  <div className="text-sm text-gray-400 mt-2">
-                    <p className="font-semibold text-gray-300">Цели:</p>
-                    <ul className="list-disc list-inside">
-                      {pendingQuest.objectives.map((obj, idx) => (
-                        <li key={idx}>{obj.target} x{obj.amount}</li>
-                      ))}
-                    </ul>
+          <div className="mx-4 mb-4 p-4 bg-fantasy-surface border border-yellow-500/50 rounded-lg shadow-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={18} className="text-yellow-500" />
+              <h3 className="text-lg font-serif text-yellow-500">📜 Предложение квеста</h3>
+            </div>
+            <div className="space-y-2 mb-4">
+              <h4 className="text-white font-bold">{pendingQuest.title}</h4>
+              <p className="text-gray-300 text-sm">{pendingQuest.description}</p>
+              {pendingQuest.objectives && pendingQuest.objectives.length > 0 && (
+                <div className="text-sm text-gray-400 mt-2">
+                  <p className="font-semibold text-gray-300">Цели:</p>
+                  <ul className="list-disc list-inside">
+                    {pendingQuest.objectives.map((obj, idx) => (
+                      <li key={idx}>{obj.target} x{obj.amount}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {pendingQuest.rewards && (
+                <div className="text-sm text-gray-400 mt-2">
+                  <p className="font-semibold text-gray-300">Награды:</p>
+                  <div className="flex gap-3">
+                    {pendingQuest.rewards.money && (
+                      <span className="text-yellow-400">{pendingQuest.rewards.money} золота</span>
+                    )}
+                    {pendingQuest.rewards.essence && (
+                      <span className="text-blue-400">{pendingQuest.rewards.essence} сущности</span>
+                    )}
+                    {pendingQuest.rewards.items && pendingQuest.rewards.items.length > 0 && (
+                      <span className="text-green-400">{pendingQuest.rewards.items.length} предметов</span>
+                    )}
                   </div>
-                )}
-                {pendingQuest.rewards && (
-                  <div className="text-sm text-gray-400 mt-2">
-                    <p className="font-semibold text-gray-300">Награды:</p>
-                    <p>
-                      {pendingQuest.rewards.money && `${pendingQuest.rewards.money} золота `}
-                      {pendingQuest.rewards.essence && `${pendingQuest.rewards.essence} сущности`}
-                    </p>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={acceptQuest}
-                  className="flex-1 fantasy-button bg-green-600 hover:bg-green-700"
-                >
-                  Принять
-                </button>
-                <button 
-                  onClick={declineQuest}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
-                >
-                  Отказаться
-                </button>
-              </div>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={acceptQuest}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition-colors text-sm font-bold"
+              >
+                ✅ Принять
+              </button>
+              <button 
+                onClick={declineQuest}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors text-sm"
+              >
+                ❌ Отказаться
+              </button>
             </div>
           </div>
         )}

@@ -47,7 +47,9 @@ model Character {
   skills        String    @default("[]") // UUID[] (JSON string) - CharacterSkill IDs for quick access
   npcDialogHistory String @default("{}") // NPC dialog history (JSON string)
   npcReputation    String @default("{}") // NPC reputation data (JSON string)
-  
+  completedQuests  String @default("[]") // CompletedQuest[] (JSON string)
+  lastLocationChange String? // LocationHistory (JSON string) - tracks last location change
+   
   inventory     Inventory?
   characterSkills CharacterSkill[]
   createdAt     DateTime  @default(now())

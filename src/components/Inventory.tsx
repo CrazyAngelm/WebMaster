@@ -410,7 +410,7 @@ export const Inventory: React.FC = () => {
               <div className="flex items-center justify-between text-[11px] text-gray-200 mb-2">
                 <div className="flex items-center gap-1">
                   <Hammer size={12} className="text-gray-400" />
-                  {template.baseDurability !== undefined ? `${item.currentDurability}/${template.baseDurability}` : '∞'}
+                  {template.baseDurability ? `${item.currentDurability || 0}/${template.baseDurability}` : '∞'}
                 </div>
                 <div className="flex items-center gap-1 text-green-300">
                   <Coins size={12} /> {sellPrice}
@@ -503,8 +503,8 @@ export const Inventory: React.FC = () => {
             {selectedItem.template.type === ItemType.BAG && selectedItem.template.slotCount && (
               <InfoRow label="Доп. слоты" value={`+${selectedItem.template.slotCount}`} accent="text-fantasy-accent" />
             )}
-            {selectedItem.template.baseEssence && selectedItem.template.type !== ItemType.BAG && (
-              <InfoRow label="Сущность" value={`${selectedItem.item.currentEssence} / ${selectedItem.template.maxEssence}`} accent="text-fantasy-essence" />
+            {selectedItem.template.type !== ItemType.BAG && (selectedItem.template.baseEssence || selectedItem.template.maxEssence) && (
+              <InfoRow label="Сущность" value={`${selectedItem.item.currentEssence || 0} / ${selectedItem.template.maxEssence || selectedItem.template.baseEssence || 0}`} accent="text-fantasy-essence" />
             )}
             
             {/* Бонусы и штрафы */}
@@ -536,7 +536,7 @@ export const Inventory: React.FC = () => {
                 accent="text-fantasy-protection" 
               />
             )}
-            {selectedItem.template.speedPenalty !== undefined && selectedItem.template.speedPenalty !== 0 && (
+            {selectedItem.template.speedPenalty && selectedItem.template.speedPenalty > 0 && (
               <InfoRow 
                 label="Штраф к скорости" 
                 value={`-${selectedItem.template.speedPenalty}`} 

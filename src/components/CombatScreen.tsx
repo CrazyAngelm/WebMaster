@@ -275,6 +275,7 @@ export const CombatScreen: React.FC = () => {
     if (!currentParticipant || !isPlayerTurn) return;
 
     await move(currentParticipant.id, direction, targetDistance);
+    await nextTurn();
   };
 
   // * Get available targets for a skill
@@ -368,6 +369,11 @@ export const CombatScreen: React.FC = () => {
         type: 'success',
         message: `Способность применена: ${skillTemplate.name}`,
       });
+      
+      // * Only advance turn if skill was executed immediately (not casting)
+      if (result && !result.isCasting) {
+        await nextTurn();
+      }
     } catch (error) {
       // * Show error to user - action was not consumed
       setSkillError(error instanceof Error ? error.message : 'Не удалось применить способность');
@@ -491,6 +497,9 @@ export const CombatScreen: React.FC = () => {
         type: 'success',
         message: `Предмет использован: ${template.name}`,
       });
+      
+      // * Consumables always consume an action, so advance turn
+      await nextTurn();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось использовать предмет';
       setConsumableError(message);

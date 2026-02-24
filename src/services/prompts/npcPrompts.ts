@@ -32,10 +32,25 @@ export const NPC_PROMPTS = {
 - flee: убежать (если испуган или слаб)
 - trade: предложить торговлю (если торговец и отношение не враждебное)
 - offer_quest: предложить квест
+- complete_quest: принять выполненный квест и выдать награду (когда игрок сдает квест)
 - gift: подарить предмет игроку (при дружелюбном отношении, только расходники)
 - inspect: изучить экипировку игрока и дать советы
 - negotiate: вести переговоры при враждебности, попытаться избежать боя
 - idle: бездействовать
+
+Квестовая система:
+- Если у тебя есть готовые к сдаче квесты и игрок говорит о выполнении - используй action: complete_quest
+- При complete_quest обязательно упомяни награду в тексте и поздравь игрока
+- Можешь давать уникальные предметы из списка если они указаны в квесте
+- Не давай квесты если у игрока уже 5 активных квестов
+
+ВАЖНО: Анализируй ТОН и НАМЕРЕНИЯ игрока, а не отдельные слова. Если игрок:
+- Угрожает насилием (убить, взорвать, уничтожить) - это угроза
+- Провоцирует на бой ("ну и что?", "боишься?", "атакуешь?") - это провокация  
+- Выражает враждебные намерения к людям или месту - это враждебность
+
+При ЛЮБОЙ угрозе насилием или провокации на бой - НЕМЕДЛЕННО возвращай action: "attack".
+Стражники и охранники должны реагировать на провокации мгновенно.
 
 Предметы для подарка (gift): только из списка ID расходников: ${((): string => {
     const consumables = StaticDataService.getAllItemTemplates()
@@ -43,6 +58,12 @@ export const NPC_PROMPTS = {
       .slice(0, 10);
     return consumables.map(t => `${t.id} (${t.name})`).join(', ') || 'нет доступных';
   })()}
+
+Примеры реакций на агрессию:
+- Игрок: "Я пришел убить всех!" -> action: "attack", эмоция: "angry"
+- Игрок: "ну и что? атакуешь?" -> action: "attack", эмоция: "angry" (провокация)
+- Игрок: "взорву этот город" -> action: "attack", эмоция: "angry" (террористическая угроза)
+- Игрок: "ты боишься меня?" -> action: "attack", эмоция: "angry" (провокация на бой)
 
 Формат ответа (JSON):
 {
@@ -59,10 +80,21 @@ questSuggestion и itemOffer — опционально, только при act
     reputation?: number;
     inventory?: Inventory | null;
     itemTemplates?: Map<string, ItemTemplate>;
+    npcId?: string;
   }) => {
     let prompt = `Текущая локация: ${context.location.name}\n`;
     prompt += `Описание: ${context.location.description}\n\n`;
     prompt += `Игрок: ${context.character.name}\n`;
+    prompt += `Ранг: ${context.character.rankId}\n`;
+    prompt += `Золото: ${context.character.money || 0}\n`;
+
+    // Location history - where player came from
+    if (context.character.lastLocationChange) {
+      const fromLocation = StaticDataService.getLocation(context.character.lastLocationChange.fromLocationId);
+      if (fromLocation) {
+        prompt += `Пришел из: ${fromLocation.name}\n`;
+      }
+    }
 
     if (context.reputation !== undefined) {
       prompt += `Отношение NPC к игроку: ${context.reputation}/100\n`;
@@ -80,11 +112,55 @@ questSuggestion и itemOffer — опционально, только при act
     }
 
     const activeQuests = context.character?.activeQuests || [];
-    if (activeQuests.length > 0) {
-      prompt += `\nАктивные квесты:\n`;
-      activeQuests.forEach(q => {
-        prompt += `- ${q.title}: ${q.objectives.map(o => o.description).join(', ')}\n`;
+    const completedQuests = context.character?.completedQuests || [];
+    const npcId = context.npcId;
+
+    // Quests from this NPC
+    if (npcId) {
+      const questsFromThisNPC = activeQuests.filter(q => q.giverNPCId === npcId);
+      const readyToComplete = questsFromThisNPC.filter(q => q.status === 'READY_TO_COMPLETE');
+      const inProgress = questsFromThisNPC.filter(q => q.status === 'IN_PROGRESS');
+      const completedFromThisNPC = completedQuests.filter(q => q.giverNPCId === npcId);
+
+      if (readyToComplete.length > 0) {
+        prompt += `\nКвесты готовые к сдаче:\n`;
+        readyToComplete.forEach(q => {
+          prompt += `- ${q.title} (можно получить награду)\n`;
+        });
+      }
+
+      if (inProgress.length > 0) {
+        prompt += `\nАктивные квесты от тебя:\n`;
+        inProgress.forEach(q => {
+          const progress = q.objectives.map(o => `${o.currentAmount}/${o.requiredAmount}`).join(', ');
+          prompt += `- ${q.title}: ${progress}\n`;
+        });
+      }
+
+      if (completedFromThisNPC.length > 0) {
+        prompt += `\nВыполненные квесты: ${completedFromThisNPC.length}\n`;
+      }
+    }
+
+    // Other active quests (not from this NPC)
+    const otherQuests = npcId ? activeQuests.filter(q => q.giverNPCId !== npcId && q.status === 'IN_PROGRESS') : [];
+    if (otherQuests.length > 0) {
+      prompt += `\nДругие квесты:\n`;
+      otherQuests.forEach(q => {
+        prompt += `- ${q.title}\n`;
       });
+    }
+
+    // Available locations
+    const connections = StaticDataService.getConnections(context.location.id);
+    if (connections.length > 0) {
+      const connectedLocs = connections.map(c => {
+        const loc = StaticDataService.getLocation(c.toLocationId);
+        return loc?.name;
+      }).filter(Boolean);
+      if (connectedLocs.length > 0) {
+        prompt += `\nОтсюда можно попасть: ${connectedLocs.join(', ')}\n`;
+      }
     }
 
     return prompt;

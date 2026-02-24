@@ -48,24 +48,57 @@ export class MockAIService implements AIService {
 
     const reputation = context.reputation || 0;
     
-    // Determine response based on reputation
+    // Context-aware aggression detection (analyzing intent, not keywords)
+    const lowerMessage = playerMessage.toLowerCase();
+    
+    // Detect violent threats with targets
+    const violentWords = ['убить', 'убью', 'взорвать', 'уничтожить', 'смерть', 'погубить'];
+    const targetWords = ['всех', 'все', 'вас', 'город', 'здесь', 'нас', 'людей'];
+    
+    const hasViolence = violentWords.some(w => lowerMessage.includes(w));
+    const hasTarget = targetWords.some(w => lowerMessage.includes(w));
+    const isDirectThreat = hasViolence && hasTarget;
+    
+    // Detect provocations and challenges
+    const isProvocation = (
+      // Challenger tone
+      (lowerMessage.includes('атакуешь') || lowerMessage.includes('нападаешь')) &&
+      // Dismissive context
+      (lowerMessage.includes('ну и что') || lowerMessage.includes('что') || 
+       lowerMessage.includes('да') || lowerMessage.includes('ну'))
+    ) || (
+      // Questioning courage (classic provocation)
+      lowerMessage.includes('боишься') || lowerMessage.includes('трус') ||
+      lowerMessage.includes('не смеешь')
+    ) || (
+      // Defiant/dismissive aggression
+      (lowerMessage.includes('ну') || lowerMessage.includes('что')) &&
+      lowerMessage.length < 30 && // Short dismissive messages
+      (lowerMessage.includes('?') || lowerMessage.includes('!'))
+    );
+    
+    // Overall aggression assessment
+    const isAggressive = isDirectThreat || isProvocation || reputation <= -50;
+    
+    // Determine response based on reputation and message content
     let responseText: string;
     let emotion: any = 'neutral';
     let action: any = 'talk';
 
-    if (reputation <= -50) {
+    if (isAggressive || reputation <= -50) {
       // Hostile responses
       const hostileResponses = [
         'Убирайся прочь, пока я не вызвал стражу!',
         'Ты мне не нравишься. Исчезни.',
         'Следующее слово будет твоим последним.',
-        'Хватит меня донимать, негодяй!'
+        'Хватит меня донимать, негодяй!',
+        'Как пожелаешь! Защищайся, негодяй!'
       ];
       responseText = hostileResponses[Math.floor(Math.random() * hostileResponses.length)];
       emotion = 'angry';
       
-      // High chance to attack if reputation is very low
-      if (Math.random() > 0.6) {
+      // High chance to attack if reputation is very low OR player is being aggressive
+      if (isAggressive || Math.random() > 0.6) {
         action = 'attack';
       }
     } else if (reputation >= 50) {
@@ -98,7 +131,8 @@ export class MockAIService implements AIService {
       action: action
     };
 
-    if (shouldOfferQuest && action !== 'attack') {
+    // Don't offer quests or gifts if we're attacking
+    if (action !== 'attack' && shouldOfferQuest) {
       response.action = 'offer_quest';
       response.questSuggestion = {
         title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],

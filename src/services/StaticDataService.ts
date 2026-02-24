@@ -15,8 +15,143 @@ import {
   Quest,
   GameEvent,
   UUID,
-  Recipe
+  Recipe,
+  Rarity
 } from '../types/game';
+
+// Default test events
+function getDefaultEvents(): GameEvent[] {
+  return [
+    {
+      id: 'event-wounded-traveler',
+      title: 'Раненый путник',
+      description: 'У дороги вы замечаете раненого путника. Он просит о помощи.',
+      rarity: Rarity.COMMON,
+      choices: [
+        {
+          id: 'choice-help-traveler',
+          text: 'Помочь путнику (исцелить)',
+          outcome: () => {},
+          successChance: 70
+        },
+        {
+          id: 'choice-rob-traveler',
+          text: 'Ограбить беспомощного',
+          outcome: () => {},
+          successChance: 50
+        },
+        {
+          id: 'choice-leave-traveler',
+          text: 'Пройти мимо',
+          outcome: () => {}
+        }
+      ]
+    },
+    {
+      id: 'event-abandoned-chest',
+      title: 'Заброшенный сундук',
+      description: 'Вы наткнулись на старый сундук, стоящий посреди тропы. Он выглядит заброшенным, но может быть заперт.',
+      rarity: Rarity.RARE,
+      choices: [
+        {
+          id: 'choice-open-chest',
+          text: 'Открыть сундук',
+          outcome: () => {},
+          successChance: 60
+        },
+        {
+          id: 'choice-check-trap',
+          text: 'Проверить на ловушки первым',
+          outcome: () => {},
+          successChance: 80
+        },
+        {
+          id: 'choice-leave-chest',
+          text: 'Не трогать (может быть ловушка)',
+          outcome: () => {}
+        }
+      ]
+    },
+    {
+      id: 'event-mysterious-merchant',
+      title: 'Таинственный торговец',
+      description: 'Из тумана появляется странный торговец с необычными товарами. Он предлагает сделку.',
+      rarity: Rarity.EPIC,
+      choices: [
+        {
+          id: 'choice-buy-rare',
+          text: 'Купить редкий товар (50 золота)',
+          outcome: () => {},
+          requirement: { type: 'MONEY', value: 50 },
+          successChance: 75
+        },
+        {
+          id: 'choice-trade-info',
+          text: 'Обменяться информацией',
+          outcome: () => {},
+          successChance: 90
+        },
+        {
+          id: 'choice-leave-merchant',
+          text: 'Отказаться и уйти',
+          outcome: () => {}
+        }
+      ]
+    },
+    {
+      id: 'event-ambush',
+      title: 'Засада!',
+      description: 'Из кустов выскакивают бандиты! Они требуют ваши деньги и ценности.',
+      rarity: Rarity.COMMON,
+      choices: [
+        {
+          id: 'choice-fight',
+          text: 'Сразиться!',
+          outcome: () => {},
+          successChance: 40
+        },
+        {
+          id: 'choice-pay-off',
+          text: 'Заплатить выкуп (30 золота)',
+          outcome: () => {},
+          requirement: { type: 'MONEY', value: 30 },
+          successChance: 100
+        },
+        {
+          id: 'choice-run',
+          text: 'Попытаться убежать',
+          outcome: () => {},
+          successChance: 60
+        }
+      ]
+    },
+    {
+      id: 'event-strange-altar',
+      title: 'Странный алтарь',
+      description: 'Вы нашли древний алтарь, покрытый рунами. От него исходит странное свечение.',
+      rarity: Rarity.MYTHIC,
+      choices: [
+        {
+          id: 'choice-pray',
+          text: 'Помолиться у алтаря',
+          outcome: () => {},
+          successChance: 50
+        },
+        {
+          id: 'choice-touch',
+          text: 'Прикоснуться к рунам',
+          outcome: () => {},
+          successChance: 30
+        },
+        {
+          id: 'choice-leave-altar',
+          text: 'Уйти подальше',
+          outcome: () => {}
+        }
+      ]
+    }
+  ];
+}
 
 interface StaticDataBundle {
   races: Race[];
@@ -62,9 +197,17 @@ export const StaticDataService = {
       const res = await fetch(`${API_BASE}/static/bundle`);
       if (!res.ok) throw new Error('Failed to fetch static data');
       data = await res.json();
+      
+      // Add test events if none exist
+      if (!data.events || data.events.length === 0) {
+        data.events = getDefaultEvents();
+      }
+      
       console.log('Static data initialized successfully');
     } catch (error) {
       console.error('Failed to initialize static data:', error);
+      // Load default events even if API fails
+      data.events = getDefaultEvents();
       throw error;
     }
   },

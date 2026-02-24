@@ -192,23 +192,35 @@ export const startBattle = async (req: Request, res: Response) => {
     let enemyCharacterId: string | null = null;
 
     if (isNPC) {
-      // Create NPC from template for battle
-      const npcTemplate = await (prisma as any).npcTemplate.findUnique({
+      // Create NPC enemy for battle.
+      // enemyId can be either NPC.id (static NPC) or NPCTemplate.id (direct template reference).
+      // Prefer NPC record (to preserve name/description), fallback to template, then defaults.
+      const npc = await prisma.nPC.findUnique({
         where: { id: enemyId }
-      });
-      if (!npcTemplate) return res.status(404).json({ error: 'NPC template not found' });
-      
-      enemyName = npcTemplate.name;
-      enemyHp = npcTemplate.baseEssence;
-      enemyProtection = npcTemplate.baseEssence; // Use same as essence for now
-      
-      // Create NPC character based on template
+      }).catch(() => null);
+
+      const npcTemplate = npc?.templateId
+        ? await prisma.nPCTemplate.findUnique({ where: { id: npc.templateId } }).catch(() => null)
+        : await prisma.nPCTemplate.findUnique({ where: { id: enemyId } }).catch(() => null);
+
+      if (!npc && !npcTemplate) {
+        return res.status(404).json({ error: 'NPC not found' });
+      }
+
+      const baseEssence = npcTemplate?.baseEssence ?? 80;
+      const speedId = npcTemplate?.speedId ?? 'speed-ordinary';
+
+      enemyName = npc?.name || npcTemplate?.name || 'NPC';
+      enemyHp = baseEssence;
+      enemyProtection = baseEssence; // Use same as essence for now
+
+      // Create NPC character based on resolved data
       const npcCharacterId = `npc-battle-${enemyId}-${Date.now()}`;
       const baseStats = {
-        essence: { current: npcTemplate.baseEssence, max: npcTemplate.baseEssence },
+        essence: { current: baseEssence, max: baseEssence },
         energy: { current: 50, max: 50 },
-        protection: { current: npcTemplate.baseEssence, max: npcTemplate.baseEssence },
-        speedId: npcTemplate.speedId
+        protection: { current: baseEssence, max: baseEssence },
+        speedId
       };
 
       const baseBonuses = {
@@ -218,21 +230,22 @@ export const startBattle = async (req: Request, res: Response) => {
         initiative: 0
       };
 
-      const npcCharacter = await (prisma as any).character.create({
+      const npcCharacter = await prisma.character.create({
         data: {
           id: npcCharacterId,
           userId: 'system-npc',
-          name: npcTemplate.name,
+          name: enemyName,
           raceId: 'race-human',
           rankId: 'rank-1',
-          description: npcTemplate.description || 'NPC противник',
-          bio: `Создан для боя на основе шаблона ${npcTemplate.id}`,
+          description: npc?.description || npcTemplate?.description || 'NPC противник',
+          bio: npcTemplate
+            ? `Создан для боя на основе шаблона ${npcTemplate.id}`
+            : `Создан для боя на основе NPC ${npc?.id || enemyId}`,
           stats: JSON.stringify(baseStats),
-          inventoryId: null,
-          location: {
+          location: JSON.stringify({
             locationId: 'combat-zone',
             position: 'battle'
-          },
+          }) as string,
           isDead: false,
           money: 0,
           bonuses: JSON.stringify(baseBonuses),

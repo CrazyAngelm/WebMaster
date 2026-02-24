@@ -143,8 +143,9 @@ interface GameState {
   sellItem: (itemId: UUID, quantity?: number) => void;
   addItemToInventory: (templateId: UUID, quantity?: number) => boolean;
   acceptQuest: (questId: UUID) => void;
-  addQuestFromNPC: (quest: { title: string; description: string; objectives: any[]; rewards: any }) => void;
+  addQuestFromNPC: (quest: { title: string; description: string; objectives: any[]; rewards: any; completionNPCId?: UUID }, giverNPCId: UUID) => void;
   completeQuest: (questId: UUID) => void;
+  turnInQuest: (questId: UUID, npcId: UUID) => Promise<boolean>;
   setActiveEvent: (event: GameEvent | null) => void;
   handleEventChoice: (choiceId: UUID) => void;
   
@@ -405,7 +406,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       set({ 
         character: {
           ...character,
-          activeSkills: charWithSkills.activeSkills || []
+          activeSkills: charWithSkills.activeSkills || [],
+          completedQuests: character.completedQuests || [],
+          lastLocationChange: character.lastLocationChange || undefined
         }, 
         inventory: charWithSkills.inventory,
         activeQuests: character.activeQuests || [],
@@ -717,6 +720,8 @@ export const useGameStore = create<GameState>((set, get) => ({
           location: character.location,
           bonuses: character.bonuses,
           activeQuests,
+          completedQuests: character.completedQuests || [],
+          lastLocationChange: character.lastLocationChange || null,
           lastTrainTime: typeof character.lastTrainTime === 'number' ? character.lastTrainTime : null,
           lastRestTime: typeof character.lastRestTime === 'number' ? character.lastRestTime : null,
           npcDialogHistory,
@@ -758,11 +763,18 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   trainCharacter: async () => {
-    const { character, serverTime } = get();
-    if (!character) return;
+    const { character, serverTime, setNotification } = get();
+    if (!character) {
+      setNotification({ type: 'error', message: 'Персонаж не выбран' });
+      return;
+    }
     const config = StaticDataService.getConfig<{ cooldownHours: number }>('TRAINING_CONFIG');
     const TRAIN_COOLDOWN = config?.cooldownHours || 12;
-    if (character.lastTrainTime !== undefined && (serverTime - character.lastTrainTime) < TRAIN_COOLDOWN) return;
+    if (character.lastTrainTime !== undefined && (serverTime - character.lastTrainTime) < TRAIN_COOLDOWN) {
+      const remainingHours = Math.ceil(TRAIN_COOLDOWN - (serverTime - character.lastTrainTime));
+      setNotification({ type: 'error', message: `Медитация на перезарядке. Осталось ${remainingHours}ч` });
+      return;
+    }
 
     const updatedCharacter = { 
       ...character,
@@ -773,26 +785,43 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (result) {
       updatedCharacter.lastTrainTime = serverTime;
       set({ character: updatedCharacter });
+      setNotification({ type: 'success', message: 'Медитация завершена! Эссенция увеличена' });
       await get().saveGame();
+    } else {
+      setNotification({ type: 'error', message: 'Не удалось медитировать' });
     }
   },
 
   rest: async () => {
-    const { character, serverTime, inventory, itemTemplates } = get();
-    if (!character) return;
-    if (!character.location.buildingId) return;
+    const { character, serverTime, inventory, itemTemplates, setNotification } = get();
+    if (!character) {
+      setNotification({ type: 'error', message: 'Персонаж не выбран' });
+      return;
+    }
+    if (!character.location.buildingId) {
+      setNotification({ type: 'error', message: 'Можно отдыхать только в зданиях' });
+      return;
+    }
     const building = StaticDataService.getBuilding(character.location.buildingId);
-    if (!building || !building.canRest) return;
+    if (!building || !building.canRest) {
+      setNotification({ type: 'error', message: 'Здесь нельзя отдохнуть' });
+      return;
+    }
     
     const config = StaticDataService.getConfig<{ moneyCost: number; hoursDuration: number }>('REST_CONFIG');
     const REST_COST = config?.moneyCost || 10;
     const REST_COOLDOWN = config?.hoursDuration || 8;
     
-    if (character.money < REST_COST) return;
+    if (character.money < REST_COST) {
+      setNotification({ type: 'error', message: `Недостаточно золота. Нужно: ${REST_COST}` });
+      return;
+    }
     
     // * Check cooldown
     if (character.lastRestTime !== undefined && (serverTime - character.lastRestTime) < REST_COOLDOWN) {
-      return; // Rest on cooldown
+      const remainingHours = Math.ceil(REST_COOLDOWN - (serverTime - character.lastRestTime));
+      setNotification({ type: 'error', message: `Отдых на перезарядке. Осталось ${remainingHours}ч` });
+      return;
     }
 
     // * Instant restore stats, deduct money, record time
@@ -819,6 +848,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     } : inventory;
 
     set({ character: updatedCharacter, inventory: updatedInventory });
+    setNotification({ type: 'success', message: `Отдых завершен! Здоровье и энергия восстановлены (-${REST_COST} золота)` });
     await get().saveGame();
   },
 
@@ -972,15 +1002,41 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   moveToLocation: async (locationId) => {
-    const { character, activeQuests } = get();
+    const { character, activeQuests, setNotification } = get();
     if (!character) return;
     const moveResult = WorldService.canMoveTo(character, locationId);
     if (moveResult.allowed) {
+      const previousLocationId = character.location.locationId;
       const updatedCharacter = WorldService.moveCharacter(character, locationId, moveResult.energyCost || 0);
-      const { updatedQuests } = QuestService.updateProgress(activeQuests, 'VISIT', locationId);
+      
+      // Track location history
+      updatedCharacter.lastLocationChange = {
+        fromLocationId: previousLocationId,
+        toLocationId: locationId,
+        arrivedAt: Date.now()
+      };
+      
+      const { updatedQuests, newlyReadyCount, completedQuestTitles } = QuestService.updateProgress(activeQuests, 'VISIT', locationId);
+      
+      // Notify about quests ready to complete
+      if (newlyReadyCount > 0) {
+        completedQuestTitles.forEach(title => {
+          setNotification({
+            type: 'success',
+            message: `Квест "${title}" выполнен! Вернитесь к NPC чтобы получить награду.`
+          });
+        });
+      }
+      
       const event = EventService.rollForTravelEvent();
       set({ character: updatedCharacter, activeQuests: updatedQuests, activeEvent: event });
       await get().saveGame();
+    } else {
+      // Show notification why can't move
+      setNotification({
+        type: 'error',
+        message: moveResult.reason || 'Невозможно переместиться в эту локацию'
+      });
     }
   },
 
@@ -1054,9 +1110,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     await get().saveGame();
   },
 
-  addQuestFromNPC: async (questData) => {
+  addQuestFromNPC: async (questData, giverNPCId) => {
     const { character, activeQuests } = get();
-    if (!character) return;
+    if (!character || !giverNPCId) return;
     
     const newQuest: Quest = {
       id: `quest-npc-${Date.now()}`,
@@ -1073,7 +1129,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       })),
       rewards: questData.rewards || {},
       status: QuestStatus.IN_PROGRESS,
-      rankRequired: character.rankId ? parseInt(character.rankId) : 1
+      rankRequired: character.rankId ? parseInt(character.rankId) : 1,
+      giverNPCId: giverNPCId,
+      completionNPCId: questData.completionNPCId,
+      givenAt: Date.now()
     };
     
     const updatedQuests = [...activeQuests, newQuest];
@@ -1085,11 +1144,54 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { character, inventory, activeQuests } = get();
     if (!character || !inventory) return;
     const quest = activeQuests.find(q => q.id === questId);
-    if (quest && quest.status === QuestStatus.COMPLETED) {
+    if (quest && (quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED)) {
       const { character: updatedCharacter, inventory: updatedInventory } = QuestService.claimRewards(character, inventory, quest);
       const updatedQuests = activeQuests.filter(q => q.id !== questId);
       set({ character: updatedCharacter, inventory: updatedInventory, activeQuests: updatedQuests });
       await get().saveGame();
+    }
+  },
+
+  turnInQuest: async (questId, npcId) => {
+    const { character, inventory, activeQuests, itemTemplates, setNotification } = get();
+    if (!character || !inventory) return false;
+    
+    const quest = activeQuests.find(q => q.id === questId);
+    if (!quest) {
+      setNotification({ type: 'error', message: 'Квест не найден' });
+      return false;
+    }
+    
+    if (!QuestService.canTurnInQuest(quest, npcId)) {
+      setNotification({ type: 'error', message: 'Этот NPC не может принять этот квест' });
+      return false;
+    }
+    
+    const result = QuestService.turnInQuest(character, inventory, quest, itemTemplates);
+    
+    if (result.success && result.character && result.inventory) {
+      set({ 
+        character: result.character, 
+        inventory: result.inventory, 
+        activeQuests: result.character.activeQuests 
+      });
+      
+      // Show reward notification
+      const rewardText = [];
+      if (quest.rewards.money) rewardText.push(`${quest.rewards.money} золота`);
+      if (quest.rewards.essence) rewardText.push(`${quest.rewards.essence} эссенции`);
+      if (quest.rewards.items?.length) rewardText.push(`${quest.rewards.items.length} предметов`);
+      
+      setNotification({ 
+        type: 'success', 
+        message: `Квест "${quest.title}" завершен! Награды: ${rewardText.join(', ')}` 
+      });
+      
+      await get().saveGame();
+      return true;
+    } else {
+      setNotification({ type: 'error', message: result.error || 'Не удалось завершить квест' });
+      return false;
     }
   },
 
@@ -1115,10 +1217,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     const currentHistory = npcDialogHistory[npcId] || [];
     const newMessage = { role, content, timestamp: Date.now() };
     
+    // Keep only last 10 messages for memory management
+    const MAX_HISTORY = 10;
+    const updatedHistory = [...currentHistory, newMessage];
+    const trimmedHistory = updatedHistory.length > MAX_HISTORY 
+      ? updatedHistory.slice(-MAX_HISTORY) 
+      : updatedHistory;
+    
     set({
       npcDialogHistory: {
         ...npcDialogHistory,
-        [npcId]: [...currentHistory, newMessage]
+        [npcId]: trimmedHistory
       }
     });
     
@@ -1126,7 +1235,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     try {
       const key = `hornygrad_dialogs_${get().character?.id}`;
       const allDialogs = JSON.parse(localStorage.getItem(key) || '{}');
-      allDialogs[npcId] = [...currentHistory, newMessage];
+      allDialogs[npcId] = trimmedHistory;
       localStorage.setItem(key, JSON.stringify(allDialogs));
     } catch (e) {
       console.warn('Failed to save dialog to localStorage:', e);
