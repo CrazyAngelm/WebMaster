@@ -204,6 +204,44 @@ export const TradeService = {
   },
 
   /**
+   * * Removes item from inventory (e.g. for quest completion requirements)
+   * * Returns updated inventory or null if item not found/not enough quantity
+   */
+  removeItemFromInventory(
+    inventory: Inventory,
+    templateId: UUID,
+    quantity: number = 1
+  ): Inventory | null {
+    const existingItemIndex = inventory.items.findIndex(
+      i => i.templateId === templateId
+    );
+
+    if (existingItemIndex === -1) {
+      return null;
+    }
+
+    const existingItem = inventory.items[existingItemIndex];
+    if (existingItem.quantity < quantity) {
+      return null;
+    }
+
+    const updatedItems = [...inventory.items];
+    if (existingItem.quantity === quantity) {
+      updatedItems.splice(existingItemIndex, 1);
+    } else {
+      updatedItems[existingItemIndex] = {
+        ...existingItem,
+        quantity: existingItem.quantity - quantity
+      };
+    }
+
+    return {
+      ...inventory,
+      items: updatedItems
+    };
+  },
+
+  /**
    * * Creates a new instance of an item from template
    */
   createNewItem(templateId: UUID, quantity: number = 1): ExistingItem {

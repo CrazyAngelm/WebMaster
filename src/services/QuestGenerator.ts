@@ -6,6 +6,8 @@
 import { AIService } from './AIService';
 import { GameContext, QuestSuggestion, GeneratedQuest } from '../types/ai';
 import { mockAIService } from './MockAIService';
+import { StaticDataService } from './StaticDataService';
+import { ItemType } from '../types/game';
 
 export class QuestGenerator {
   private aiService: AIService;
@@ -41,7 +43,7 @@ export class QuestGenerator {
       objectives: suggestion.objectives.map((obj, idx) => ({
         id: `obj-${Date.now()}-${idx}`,
         type: obj.type,
-        targetId: `target-${idx}`,
+        targetId: obj.target,
         description: obj.target,
         requiredAmount: obj.amount,
         currentAmount: 0,
@@ -60,28 +62,73 @@ export class QuestGenerator {
   private getFallbackQuest(context: GameContext): GeneratedQuest {
     const locationName = context.location.name;
     
+    const monsters = StaticDataService.getAllMonsterTemplates();
+    const connections = StaticDataService.getConnections(context.location.id);
+    const items = StaticDataService.getAllItemTemplates();
+    
+    const connectedLocations = connections
+      .map(c => StaticDataService.getLocation(c.toLocationId))
+      .filter((loc): loc is NonNullable<typeof loc> => loc !== undefined);
+    
+    const consumableItems = items.filter(t => t.type === ItemType.CONSUMABLE);
+    const craftingItems = items.filter(t => t.type === ItemType.MATERIAL);
+    const allCollectibleItems = [...consumableItems, ...craftingItems];
+    
+    const randomMonster = monsters.length > 0 
+      ? monsters[Math.floor(Math.random() * monsters.length)] 
+      : null;
+    
+    const targetLocation = connectedLocations.length > 0 
+      ? connectedLocations[Math.floor(Math.random() * connectedLocations.length)]
+      : null;
+    
+    const randomItem = allCollectibleItems.length > 0
+      ? allCollectibleItems[Math.floor(Math.random() * allCollectibleItems.length)]
+      : null;
+    
     const fallbackQuests = [
       {
-        title: `Проблемы в ${locationName}`,
-        description: 'Местные жители просят помощи с нападением монстров.',
+        title: randomMonster ? `Охота на ${randomMonster.name}` : `Проблемы в ${locationName}`,
+        description: randomMonster 
+          ? `Местные просят помочь с ${randomMonster.name}. Они терзают окрестности.`
+          : 'Местные жители просят помощи с нападением монстров.',
         objectives: [
-          { type: 'KILL' as const, targetId: 'monster', description: 'Уничтожить монстров', requiredAmount: 3 }
+          { 
+            type: 'KILL' as const, 
+            targetId: randomMonster?.id || 'monster-goblin-001', 
+            description: `Уничтожить ${randomMonster?.name || 'монстров'}`, 
+            requiredAmount: 3 
+          }
         ],
         rewards: { money: 100, essence: 50 }
       },
       {
-        title: `Исследование ${locationName}`,
-        description: 'Нужно исследовать окрестности и найти ценные ресурсы.',
+        title: randomItem ? `Сбор ${randomItem.name}` : `Исследование ${locationName}`,
+        description: randomItem
+          ? `Нужно собрать ${randomItem.name}. Очень нужно для дела!`
+          : 'Нужно исследовать окрестности и найти ценные ресурсы.',
         objectives: [
-          { type: 'COLLECT' as const, targetId: 'herb', description: 'Собрать травы', requiredAmount: 5 }
+          { 
+            type: 'COLLECT' as const, 
+            targetId: randomItem?.id || 'herb-medicinal-001', 
+            description: `Собрать ${randomItem?.name || 'травы'}`, 
+            requiredAmount: 5 
+          }
         ],
         rewards: { money: 75, essence: 40 }
       },
       {
-        title: `Тайна ${locationName}`,
-        description: 'Загадочные события происходят в этой местности...',
+        title: targetLocation ? `Путешествие в ${targetLocation.name}` : `Тайна ${locationName}`,
+        description: targetLocation
+          ? `Мне нужно, чтобы ты сходил в ${targetLocation.name} и узнал, что там происходит.`
+          : 'Загадочные события происходят в этой местности...',
         objectives: [
-          { type: 'VISIT' as const, targetId: context.location.id, description: 'Посетить локацию', requiredAmount: 1 }
+          { 
+            type: 'VISIT' as const, 
+            targetId: targetLocation?.id || context.location.id, 
+            description: `Посетить ${targetLocation?.name || 'локацию'}`, 
+            requiredAmount: 1 
+          }
         ],
         rewards: { money: 150, essence: 75 }
       }

@@ -133,16 +133,9 @@ export class MockAIService implements AIService {
 
     // Don't offer quests or gifts if we're attacking
     if (action !== 'attack' && shouldOfferQuest) {
+      const questSuggestion = this.generateRealisticQuest(context);
       response.action = 'offer_quest';
-      response.questSuggestion = {
-        title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],
-        description: 'Нужна помощь с одним делом. Отправишься?',
-        objectives: [
-          { type: 'KILL', target: 'монстр', amount: 3 },
-          { type: 'VISIT', target: 'локация', amount: 1 }
-        ],
-        rewards: { money: 100, essence: 50 }
-      };
+      response.questSuggestion = questSuggestion;
     } else if (reputation >= 50 && roll > 0.75 && action === 'talk') {
       const consumables = StaticDataService.getAllItemTemplates()
         .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined);
@@ -172,18 +165,75 @@ export class MockAIService implements AIService {
     return `Вы находитесь в ${context.location.name}. ${context.location.description}`;
   }
 
-  async generateQuest(context: GameContext): Promise<QuestSuggestion | null> {
-    await new Promise(resolve => setTimeout(resolve, 500));
+  private generateRealisticQuest(context: GameContext): QuestSuggestion {
+    const monsters = StaticDataService.getAllMonsterTemplates();
+    const locations = StaticDataService.getAllLocations();
+    const connections = StaticDataService.getConnections(context.location.id);
+    const items = StaticDataService.getAllItemTemplates();
+
+    const questTypeRoll = Math.random();
+    let objectives: { type: 'KILL' | 'COLLECT' | 'VISIT'; target: string; amount: number }[] = [];
+    let title = '';
+    let description = '';
+
+    if (questTypeRoll < 0.35) {
+      const randomMonster = monsters.length > 0 
+        ? monsters[Math.floor(Math.random() * monsters.length)] 
+        : null;
+      
+      if (randomMonster) {
+        const amount = Math.floor(Math.random() * 3) + 3;
+        objectives = [{ type: 'KILL', target: randomMonster.id, amount }];
+        title = `Охота на ${randomMonster.name}`;
+        description = `Нужно уничтожить ${amount} ${randomMonster.name}. Они терзают окрестности.`;
+      }
+    } else if (questTypeRoll < 0.65) {
+      const connectedLocations = connections
+        .map(c => StaticDataService.getLocation(c.toLocationId))
+        .filter((loc): loc is NonNullable<typeof loc> => loc !== undefined);
+      
+      if (connectedLocations.length > 0) {
+        const targetLocation = connectedLocations[Math.floor(Math.random() * connectedLocations.length)];
+        objectives = [{ type: 'VISIT', target: targetLocation.id, amount: 1 }];
+        title = `Путешествие в ${targetLocation.name}`;
+        description = `Мне нужно, чтобы ты сходил в ${targetLocation.name} и узнал, что там происходит.`;
+      }
+    } else {
+      const consumableItems = items.filter(t => t.type === ItemType.CONSUMABLE);
+      const craftingItems = items.filter(t => t.type === ItemType.MATERIAL);
+      const allCollectibleItems = [...consumableItems, ...craftingItems];
+      
+      if (allCollectibleItems.length > 0) {
+        const randomItem = allCollectibleItems[Math.floor(Math.random() * allCollectibleItems.length)];
+        const amount = Math.floor(Math.random() * 5) + 3;
+        objectives = [{ type: 'COLLECT', target: randomItem.id, amount }];
+        title = `Сбор ${randomItem.name}`;
+        description = `Принеси мне ${amount} штук ${randomItem.name}. Очень нужно!`;
+      }
+    }
+
+    if (objectives.length === 0) {
+      objectives = [{ type: 'KILL', target: 'monster-goblin-001', amount: 3 }];
+      title = 'Простое задание';
+      description = 'Уничтожь нескольких гоблинов.';
+    }
+
+    const rewards = {
+      money: Math.floor(Math.random() * 100) + 50,
+      essence: Math.floor(Math.random() * 50) + 25
+    };
 
     return {
-      title: this.questTitles[Math.floor(Math.random() * this.questTitles.length)],
-      description: 'Пришло время нового приключения. Справишься?',
-      objectives: [
-        { type: 'KILL', target: 'враг', amount: 5 },
-        { type: 'COLLECT', target: 'ресурс', amount: 10 }
-      ],
-      rewards: { money: 200, essence: 100 }
+      title,
+      description,
+      objectives,
+      rewards
     };
+  }
+
+  async generateQuest(context: GameContext): Promise<QuestSuggestion | null> {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return this.generateRealisticQuest(context);
   }
 
   async generateNPC(

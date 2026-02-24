@@ -100,6 +100,26 @@ export const QuestService = {
     const updatedCharacter = { ...character };
     const updatedInventory = { ...inventory, items: [...inventory.items] };
 
+    // For COLLECT quests - remove collected items from inventory
+    for (const obj of quest.objectives) {
+      if (obj.type === 'COLLECT' && obj.currentAmount > 0) {
+        const removeResult = TradeService.removeItemFromInventory(
+          updatedInventory,
+          obj.targetId,
+          obj.currentAmount
+        );
+        if (!removeResult) {
+          const itemTemplate = StaticDataService.getItemTemplate(obj.targetId);
+          const itemName = itemTemplate?.name || 'предмет';
+          return { 
+            success: false, 
+            error: `У вас нет ${itemName} (нужно ${obj.currentAmount} шт.)` 
+          };
+        }
+        updatedInventory.items = removeResult.items;
+      }
+    }
+
     // Give money reward
     if (quest.rewards.money) {
       updatedCharacter.money += quest.rewards.money;
@@ -156,12 +176,18 @@ export const QuestService = {
     character: Character, 
     inventory: Inventory, 
     quest: Quest
-  ): { character: Character; inventory: Inventory } {
-    // Legacy implementation - redirects to turnInQuest
+  ): { character: Character; inventory: Inventory; error?: string } {
     const result = this.turnInQuest(character, inventory, quest, new Map());
+    if (!result.success || !result.character || !result.inventory) {
+      return { 
+        character, 
+        inventory, 
+        error: result.error || 'Не удалось получить награду' 
+      };
+    }
     return { 
-      character: result.character || character, 
-      inventory: result.inventory || inventory 
+      character: result.character, 
+      inventory: result.inventory 
     };
   },
 

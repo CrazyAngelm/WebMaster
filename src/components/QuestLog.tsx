@@ -10,7 +10,6 @@ import {
   BookOpen, 
   CheckCircle2, 
   Circle, 
-  Gift, 
   AlertCircle, 
   ChevronRight,
   Target,
@@ -30,7 +29,7 @@ const translateQuestStatus = (status: QuestStatus): string => {
 };
 
 export const QuestLog: React.FC = () => {
-  const { activeQuests, completeQuest, acceptQuest } = useGameStore();
+  const { activeQuests, acceptQuest } = useGameStore();
 
   const inProgress = activeQuests.filter(q => 
     q.status === QuestStatus.IN_PROGRESS || 
@@ -160,12 +159,9 @@ export const QuestLog: React.FC = () => {
               </div>
 
               {quest.status === QuestStatus.READY_TO_COMPLETE && (
-                <button
-                  onClick={() => completeQuest(quest.id)}
-                  className="w-full py-2 text-[10px] font-bold uppercase tracking-widest bg-green-500 text-white hover:bg-green-600 transition-all rounded shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 animate-pulse"
-                >
-                  <Gift size={14} /> Сдать квест и получить награву
-                </button>
+                <div className="w-full py-2 px-3 text-[10px] font-bold uppercase tracking-widest bg-green-900/50 text-green-400 border border-green-700/50 rounded flex items-center justify-center gap-2">
+                  <CheckCircle2 size={14} /> Поговорите с NPC чтобы получить награду
+                </div>
               )}
             </div>
           ))}

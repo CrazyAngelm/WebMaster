@@ -144,7 +144,7 @@ interface GameState {
   addItemToInventory: (templateId: UUID, quantity?: number) => boolean;
   acceptQuest: (questId: UUID) => void;
   addQuestFromNPC: (quest: { title: string; description: string; objectives: any[]; rewards: any; completionNPCId?: UUID }, giverNPCId: UUID) => void;
-  completeQuest: (questId: UUID) => void;
+  completeQuest: (questId: UUID) => Promise<boolean>;
   turnInQuest: (questId: UUID, npcId: UUID) => Promise<boolean>;
   setActiveEvent: (event: GameEvent | null) => void;
   handleEventChoice: (choiceId: UUID) => void;
@@ -1141,15 +1141,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   completeQuest: async (questId) => {
-    const { character, inventory, activeQuests } = get();
-    if (!character || !inventory) return;
-    const quest = activeQuests.find(q => q.id === questId);
-    if (quest && (quest.status === QuestStatus.READY_TO_COMPLETE || quest.status === QuestStatus.COMPLETED)) {
-      const { character: updatedCharacter, inventory: updatedInventory } = QuestService.claimRewards(character, inventory, quest);
-      const updatedQuests = activeQuests.filter(q => q.id !== questId);
-      set({ character: updatedCharacter, inventory: updatedInventory, activeQuests: updatedQuests });
-      await get().saveGame();
-    }
+    console.warn('completeQuest is deprecated. Use turnInQuest with NPC ID instead.');
+    return false;
   },
 
   turnInQuest: async (questId, npcId) => {
