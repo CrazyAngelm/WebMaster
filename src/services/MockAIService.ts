@@ -132,10 +132,9 @@ export class MockAIService implements AIService {
     };
 
     // Don't offer quests or gifts if we're attacking
+    // Note: Quest generation is now handled by QuestGenerationService in NPCDialog
     if (action !== 'attack' && shouldOfferQuest) {
-      const questSuggestion = this.generateRealisticQuest(context);
       response.action = 'offer_quest';
-      response.questSuggestion = questSuggestion;
     } else if (reputation >= 50 && roll > 0.75 && action === 'talk') {
       const consumables = StaticDataService.getAllItemTemplates()
         .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined);

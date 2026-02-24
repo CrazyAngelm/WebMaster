@@ -5,13 +5,14 @@
 
 import { AIService, GameContext } from './AIService';
 import { Location } from '../types/game';
-import { 
-  ConversationMessage, 
-  NPCResponse, 
-  NPCData, 
-  QuestSuggestion 
+import {
+  ConversationMessage,
+  NPCResponse,
+  NPCData,
+  QuestSuggestion
 } from '../types/ai';
 import { NPC_PROMPTS } from './prompts/npcPrompts';
+import { mockAIService } from './MockAIService';
 
 const API_BASE = '/api/ai';
 
@@ -22,7 +23,7 @@ export class DeepSeekAIService implements AIService {
     this.authToken = token;
   }
 
-  private async fetch<T>(endpoint: string, data: any): Promise<T> {
+  async fetch<T>(endpoint: string, data: any): Promise<T> {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers: {
@@ -112,19 +113,9 @@ export class DeepSeekAIService implements AIService {
   }
 
   async generateQuest(context: GameContext): Promise<QuestSuggestion | null> {
-    try {
-      const result = await this.fetch<QuestSuggestion>('/quest', {
-        locationName: context.location.name,
-        locationDescription: context.location.description,
-        playerName: context.character.name,
-        playerLevel: context.character.rankId ? parseInt(context.character.rankId) : 1
-      });
-
-      return result;
-    } catch (error) {
-      console.error('AI generateQuest error:', error);
-      return null;
-    }
+    // * Always use MockAIService for quests to ensure real IDs from database
+    // * DeepSeek AI may return abstract targets like "rat" which don't exist in DB
+    return mockAIService.generateQuest(context);
   }
 
   async generateNPC(
@@ -187,7 +178,7 @@ export class DeepSeekAIService implements AIService {
           text: parsed.text || content,
           emotion: parsed.emotion || 'neutral',
           action: parsed.action || 'talk',
-          questSuggestion: parsed.questSuggestion || undefined,
+          // Note: questSuggestion is now handled by QuestGenerationService, not LLM response
           itemOffer: parsed.itemOffer && parsed.itemOffer.templateId
             ? { templateId: parsed.itemOffer.templateId, quantity: parsed.itemOffer.quantity || 1 }
             : undefined

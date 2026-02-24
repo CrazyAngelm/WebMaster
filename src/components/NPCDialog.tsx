@@ -10,6 +10,7 @@ import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { NPCData, NPCResponse } from '../types/ai';
 import { mockAIService } from '../services/MockAIService';
+import { QuestGenerationService } from '../services/QuestGenerationService';
 
 interface NPCDialogProps {
   npc: NPCData;
@@ -198,9 +199,29 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
             setTimeout(() => onClose(), 2000);
             break;
             
-          case 'offer_quest':
-            // Already handled by questSuggestion
+          case 'offer_quest': {
+            // Generate quest using QuestGenerationService with real IDs
+            if (character && npc) {
+              const location = StaticDataService.getLocation(character.location.locationId);
+              if (location) {
+                const gameContext = {
+                  character,
+                  location,
+                  inventory: inventory || { items: [], baseSlots: 10 },
+                  activeQuests: activeQuests || [],
+                  npcs: [],
+                  itemTemplates: itemTemplates || new Map()
+                };
+                
+                const generatedQuest = await QuestGenerationService.generateQuestForNPC(npc, gameContext);
+                if (generatedQuest) {
+                  setPendingQuest(generatedQuest);
+                  setShowQuestOffer(true);
+                }
+              }
+            }
             break;
+          }
 
           case 'complete_quest': {
             // Find quests ready to complete from this NPC
@@ -247,10 +268,7 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
         }
       }
 
-      if (response.questSuggestion) {
-        setPendingQuest(response.questSuggestion);
-        setShowQuestOffer(true);
-      }
+      // Note: Quest generation is now handled in case 'offer_quest' using QuestGenerationService
 
       if (response.itemOffer && response.action === 'gift') {
         const { templateId, quantity } = response.itemOffer;

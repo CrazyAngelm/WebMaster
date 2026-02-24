@@ -584,6 +584,348 @@ async function main() {
       isUnique: false,
       slotCount: 20,
       basePrice: 100000
+    },
+    // --- MATERIALS FOR MONSTER LOOT ---
+    // Rank 1 (COMMON)
+    {
+      id: 'mat-goblin-ear',
+      name: 'Ухо гоблина',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 20,
+      isUnique: false,
+      description: 'Ухо гоблина. Можно продать или использовать для зелий.',
+      basePrice: 15
+    },
+    {
+      id: 'mat-rat-tail',
+      name: 'Хвост крысы',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 30,
+      isUnique: false,
+      description: 'Хвост гигантской крысы.',
+      basePrice: 5
+    },
+    {
+      id: 'mat-wolf-pelt',
+      name: 'Шкура волка',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Шкура волка,可用于 крафта.',
+      basePrice: 25
+    },
+    {
+      id: 'mat-boar-tusk',
+      name: 'Клык кабана',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 15,
+      isUnique: false,
+      description: 'Клык кабана. Используется для создания оружия.',
+      basePrice: 20
+    },
+    {
+      id: 'mat-bone-common',
+      name: 'Обычная кость',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 30,
+      isUnique: false,
+      description: 'Простая кость существа. Используется для крафта.',
+      basePrice: 10
+    },
+    {
+      id: 'mat-slime-gel',
+      name: 'Слизь слайма',
+      type: 'MATERIAL',
+      rarity: 'COMMON',
+      stackSize: 30,
+      isUnique: false,
+      description: 'Желеобразная слизь слайма.',
+      basePrice: 8
+    },
+    // Rank 2 (RARE)
+    {
+      id: 'mat-orc-fang',
+      name: 'Клык орка',
+      type: 'MATERIAL',
+      rarity: 'RARE',
+      stackSize: 15,
+      isUnique: false,
+      description: 'Клык орка. Ценный материал для оружия.',
+      basePrice: 40
+    },
+    {
+      id: 'mat-ogre-bone',
+      name: 'Кость огра',
+      type: 'MATERIAL',
+      rarity: 'RARE',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Кость могучего огра.',
+      basePrice: 60
+    },
+    {
+      id: 'mat-ghost-essence',
+      name: 'Эссенция призрака',
+      type: 'MATERIAL',
+      rarity: 'RARE',
+      stackSize: 20,
+      isUnique: false,
+      description: 'Эссенция призрачного существа.',
+      basePrice: 80
+    },
+    {
+      id: 'mat-spider-venom',
+      name: 'Яд паука',
+      type: 'MATERIAL',
+      rarity: 'RARE',
+      stackSize: 20,
+      isUnique: false,
+      description: 'Яд гигантского паука. Используется для отравления оружия.',
+      basePrice: 70
+    },
+    {
+      id: 'mat-troll-blood',
+      name: 'Кровь тролля',
+      type: 'MATERIAL',
+      rarity: 'RARE',
+      stackSize: 15,
+      isUnique: false,
+      description: 'Кровь тролля. Обладает регенерирующими свойствами.',
+      basePrice: 90
+    },
+    // Rank 3 (EPIC)
+    {
+      id: 'mat-vampire-fang',
+      name: 'Клык вампира',
+      type: 'MATERIAL',
+      rarity: 'EPIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Клык вампира. Ценный материал.',
+      basePrice: 200
+    },
+    {
+      id: 'mat-demon-horn',
+      name: 'Рог демона',
+      type: 'MATERIAL',
+      rarity: 'EPIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Рог демона. Используется для создания мощного оружия.',
+      basePrice: 250
+    },
+    {
+      id: 'mat-elemental-core',
+      name: 'Ядро элементаля',
+      type: 'MATERIAL',
+      rarity: 'EPIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Сердцевина элементаля. Содержит чистую стихию.',
+      basePrice: 300
+    },
+    {
+      id: 'mat-werewolf-claw',
+      name: 'Коготь оборотня',
+      type: 'MATERIAL',
+      rarity: 'EPIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Коготь оборотня. Острый и прочный.',
+      basePrice: 220
+    },
+    {
+      id: 'mat-shadow-essence',
+      name: 'Эссенция тени',
+      type: 'MATERIAL',
+      rarity: 'EPIC',
+      stackSize: 15,
+      isUnique: false,
+      description: 'Концентрированная эссенция тьмы.',
+      basePrice: 280
+    },
+    // Rank 4 (MYTHIC)
+    {
+      id: 'mat-lich-phylactery',
+      name: 'Филактерия лича',
+      type: 'MATERIAL',
+      rarity: 'MYTHIC',
+      stackSize: 5,
+      isUnique: false,
+      description: 'Филактерия, содержащая душу лича.',
+      basePrice: 500
+    },
+    {
+      id: 'mat-dragon-scale',
+      name: 'Чешуя дракона',
+      type: 'MATERIAL',
+      rarity: 'MYTHIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Чешуя дракона. Невероятно прочная.',
+      basePrice: 600
+    },
+    {
+      id: 'mat-phoenix-feather',
+      name: 'Перо феникса',
+      type: 'MATERIAL',
+      rarity: 'MYTHIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Перо феника. Светится вечным пламенем.',
+      basePrice: 550
+    },
+    {
+      id: 'mat-golem-core',
+      name: 'Ядро голема',
+      type: 'MATERIAL',
+      rarity: 'MYTHIC',
+      stackSize: 5,
+      isUnique: false,
+      description: 'Сердце голема. Источник его силы.',
+      basePrice: 450
+    },
+    {
+      id: 'mat-void-crystal',
+      name: 'Кристалл пустоты',
+      type: 'MATERIAL',
+      rarity: 'MYTHIC',
+      stackSize: 10,
+      isUnique: false,
+      description: 'Кристалл, содержащий силу Бездны.',
+      basePrice: 700
+    },
+    // Rank 5 (LEGENDARY/DIVINE)
+    {
+      id: 'mat-death-knight-soul',
+      name: 'Душа рыцаря смерти',
+      type: 'MATERIAL',
+      rarity: 'LEGENDARY',
+      stackSize: 5,
+      isUnique: false,
+      description: 'Душа павшего рыцаря смерти.',
+      basePrice: 1500
+    },
+    {
+      id: 'mat-elder-dragon-heart',
+      name: 'Сердце древнего дракона',
+      type: 'MATERIAL',
+      rarity: 'LEGENDARY',
+      stackSize: 3,
+      isUnique: false,
+      description: 'Сердце древнего дракона. Пульсирует невероятной силой.',
+      basePrice: 2000
+    },
+    {
+      id: 'mat-abyssal-essence',
+      name: 'Эссенция бездны',
+      type: 'MATERIAL',
+      rarity: 'DIVINE',
+      stackSize: 5,
+      isUnique: false,
+      description: 'Чистая эссенция Бездны.',
+      basePrice: 3000
+    },
+    {
+      id: 'mat-world-eater-fragment',
+      name: 'Фрагмент Пожирателя Миров',
+      type: 'MATERIAL',
+      rarity: 'DIVINE',
+      stackSize: 3,
+      isUnique: false,
+      description: 'Фрагмент сущности Пожирателя Миров.',
+      basePrice: 5000
+    },
+    // --- CONSUMABLES FOR MONSTER LOOT ---
+    {
+      id: 'con-healing-potion-medium',
+      name: 'Среднее зелье лечения',
+      type: 'CONSUMABLE',
+      category: 'POTION',
+      rarity: 'RARE',
+      stackSize: 5,
+      isUnique: false,
+      baseEssence: 50,
+      effects: JSON.stringify(['effect-medium-heal']),
+      description: JSON.stringify({
+        description: 'Восстанавливает 50 HP.',
+        targetType: 'SELF',
+        actionType: 'BONUS'
+      }),
+      basePrice: 150
+    },
+    {
+      id: 'con-healing-potion-large',
+      name: 'Большое зелье лечения',
+      type: 'CONSUMABLE',
+      category: 'POTION',
+      rarity: 'EPIC',
+      stackSize: 3,
+      isUnique: false,
+      baseEssence: 100,
+      effects: JSON.stringify(['effect-large-heal']),
+      description: JSON.stringify({
+        description: 'Восстанавливает 100 HP.',
+        targetType: 'SELF',
+        actionType: 'BONUS'
+      }),
+      basePrice: 400
+    },
+    {
+      id: 'con-strength-potion',
+      name: 'Зелье силы',
+      type: 'CONSUMABLE',
+      category: 'POTION',
+      rarity: 'RARE',
+      stackSize: 5,
+      isUnique: false,
+      description: JSON.stringify({
+        description: '+20 к попаданию на 3 хода.',
+        targetType: 'SELF',
+        actionType: 'BONUS'
+      }),
+      basePrice: 200
+    },
+    {
+      id: 'scroll-fireball',
+      name: 'Свиток огненного шара',
+      type: 'CONSUMABLE',
+      category: 'SCROLL',
+      rarity: 'RARE',
+      stackSize: 5,
+      isUnique: false,
+      baseEssence: 80,
+      penetration: 'MEDIUM',
+      distance: JSON.stringify({ minRange: 5, maxRange: 25 }),
+      description: JSON.stringify({
+        description: 'Выпускает огненный шар, наносящий урон огнём всем целям в области.',
+        targetType: 'AREA',
+        actionType: 'MAIN'
+      }),
+      basePrice: 300
+    },
+    {
+      id: 'scroll-ice-bolt',
+      name: 'Свиток ледяной стрелы',
+      type: 'CONSUMABLE',
+      category: 'SCROLL',
+      rarity: 'RARE',
+      stackSize: 5,
+      isUnique: false,
+      baseEssence: 70,
+      penetration: 'MEDIUM',
+      distance: JSON.stringify({ minRange: 5, maxRange: 25 }),
+      description: JSON.stringify({
+        description: 'Выпускает ледяную стрелу, наносящую урон холодом.',
+        targetType: 'TARGET',
+        actionType: 'MAIN'
+      }),
+      basePrice: 280
     }
   ];
 
