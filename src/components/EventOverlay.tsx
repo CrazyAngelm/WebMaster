@@ -9,19 +9,22 @@ import { EventService, EventResult, EventOutcome } from '../services/EventServic
 import { GameEvent } from '../types/game';
 
 export const EventOverlay: React.FC = () => {
-  const { activeEvent, handleEventChoice, character, setNotification } = useGameStore();
+  const { activeEvent, handleEventChoice, character, setNotification, inventory, itemTemplates } = useGameStore();
   const [eventResult, setEventResult] = useState<EventResult | null>(null);
   const [showResult, setShowResult] = useState(false);
 
   if (!activeEvent) return null;
 
   const handleChoice = async (choiceId: string) => {
-    const result = EventService.processChoice(character!, choiceId, activeEvent.id);
-    setEventResult(result);
-    setShowResult(true);
+    if (!character || !inventory || !activeEvent) return;
     
     // Apply the character changes
     await handleEventChoice(choiceId);
+    
+    // Get the result for display
+    const result = EventService.processChoice(character, inventory, choiceId, activeEvent.id, itemTemplates || new Map());
+    setEventResult(result);
+    setShowResult(true);
     
     // Show notification about changes
     if (result.outcomes.length > 0) {

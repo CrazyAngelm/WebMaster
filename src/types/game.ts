@@ -359,6 +359,11 @@ export interface GameEventChoice {
     value: number | UUID;
   };
   successChance?: number; // 0-100, chance of success for this choice
+  rewards?: {
+    type: 'ESSENCE' | 'ENERGY' | 'MONEY' | 'ITEM' | 'DAMAGE' | 'TEXT';
+    value: number | string;
+    description?: string;
+  }[];
 }
 
 export interface GameEvent {

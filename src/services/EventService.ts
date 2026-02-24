@@ -3,8 +3,9 @@
 // 🔗 Key dependencies: src/types/game.ts, src/services/StaticDataService.ts
 // 💡 Usage: Called during movement or exploration
 
-import { Character, GameEvent, UUID, GameEventChoice } from '../types/game';
+import { Character, GameEvent, UUID, GameEventChoice, Inventory } from '../types/game';
 import { StaticDataService } from './StaticDataService';
+import { TradeService } from './TradeService';
 
 export interface EventOutcome {
   type: 'ESSENCE' | 'ENERGY' | 'MONEY' | 'ITEM' | 'DAMAGE' | 'TEXT' | 'NEXT_EVENT';
@@ -15,6 +16,7 @@ export interface EventOutcome {
 export interface EventResult {
   success: boolean;
   character?: Character;
+  inventory?: Inventory; // Добавляем инвентарь в результат
   nextEventId?: UUID;
   outcomes: EventOutcome[];
   message: string;
@@ -49,10 +51,13 @@ export const EventService = {
    */
   processChoice(
     character: Character, 
+    inventory: Inventory,
     choiceId: UUID,
-    eventId?: UUID
+    eventId?: UUID,
+    itemTemplates?: Map<string, any>
   ): EventResult {
     const updatedCharacter = { ...character };
+    const updatedInventory = { ...inventory };
     const outcomes: EventOutcome[] = [];
     let message = "";
     let nextEventId: UUID | undefined;
@@ -242,9 +247,106 @@ export const EventService = {
       message = "Вы сделали свой выбор...";
     }
 
+    // Process dynamic rewards from choice configuration
+    if (choice?.rewards && isSuccess) {
+      for (const reward of choice.rewards) {
+        switch (reward.type) {
+          case 'MONEY':
+            const moneyAmount = reward.value as number;
+            updatedCharacter.money += moneyAmount;
+            outcomes.push({
+              type: 'MONEY',
+              value: moneyAmount,
+              description: reward.description || `Получено ${moneyAmount} золота`
+            });
+            break;
+
+          case 'ESSENCE':
+            const essenceAmount = reward.value as number;
+            updatedCharacter.stats.essence.current = Math.min(
+              updatedCharacter.stats.essence.max,
+              updatedCharacter.stats.essence.current + essenceAmount
+            );
+            outcomes.push({
+              type: 'ESSENCE',
+              value: essenceAmount,
+              description: reward.description || `Получено ${essenceAmount} эссенции`
+            });
+            break;
+
+          case 'ENERGY':
+            const energyAmount = reward.value as number;
+            updatedCharacter.stats.energy.current = Math.min(
+              updatedCharacter.stats.energy.max,
+              updatedCharacter.stats.energy.current + energyAmount
+            );
+            outcomes.push({
+              type: 'ENERGY',
+              value: energyAmount,
+              description: reward.description || `Получено ${energyAmount} энергии`
+            });
+            break;
+
+          case 'DAMAGE':
+            const damageAmount = reward.value as number;
+            updatedCharacter.stats.essence.current = Math.max(0, updatedCharacter.stats.essence.current - damageAmount);
+            outcomes.push({
+              type: 'DAMAGE',
+              value: damageAmount,
+              description: reward.description || `Получено ${damageAmount} урона`
+            });
+            break;
+
+          case 'ITEM':
+            const itemTemplateId = reward.value as string;
+            const itemTemplate = StaticDataService.getItemTemplate(itemTemplateId);
+            if (itemTemplate) {
+              // Add item to inventory through TradeService
+              const addResult = TradeService.addItemToInventory(
+                updatedInventory,
+                itemTemplateId,
+                1, // Default quantity
+                itemTemplates || new Map()
+              );
+              
+              if (addResult.success && addResult.inventory) {
+                Object.assign(updatedInventory, addResult.inventory);
+                outcomes.push({
+                  type: 'ITEM',
+                  value: itemTemplateId,
+                  description: reward.description || `Получен предмет: ${itemTemplate.name}`
+                });
+              } else {
+                outcomes.push({
+                  type: 'TEXT',
+                  value: '',
+                  description: addResult.reason || 'Не удалось добавить предмет в инвентарь'
+                });
+              }
+            } else {
+              outcomes.push({
+                type: 'TEXT',
+                value: '',
+                description: `Предмет с ID ${itemTemplateId} не найден`
+              });
+            }
+            break;
+
+          case 'TEXT':
+            outcomes.push({
+              type: 'TEXT',
+              value: '',
+              description: reward.description || (reward.value as string)
+            });
+            break;
+        }
+      }
+    }
+
     return {
       success,
       character: updatedCharacter,
+      inventory: updatedInventory,
       nextEventId,
       outcomes,
       message,

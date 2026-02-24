@@ -30,7 +30,7 @@ import type {
   // @ts-ignore
   CharacterSkill as PrismaCharacterSkill,
   // @ts-ignore
-  SkillTemplate as PrismaSkillTemplate 
+  SkillTemplate as PrismaSkillTemplate
 } from '@prisma/client';
 
 // * Local extended types to handle Prisma client inconsistency
@@ -199,20 +199,30 @@ export const startBattle = async (req: Request, res: Response) => {
         where: { id: enemyId }
       }).catch(() => null);
 
+      // Try to get NPCMonster first for combat stats
+      const npcMonster = await prisma.nPCMonster.findUnique({
+        where: { npcId: enemyId }
+      }).catch(() => null);
+
       const npcTemplate = npc?.templateId
         ? await prisma.nPCTemplate.findUnique({ where: { id: npc.templateId } }).catch(() => null)
         : await prisma.nPCTemplate.findUnique({ where: { id: enemyId } }).catch(() => null);
 
-      if (!npc && !npcTemplate) {
+      if (!npc && !npcTemplate && !npcMonster) {
         return res.status(404).json({ error: 'NPC not found' });
       }
 
-      const baseEssence = npcTemplate?.baseEssence ?? 80;
+      // Use NPCMonster if available, otherwise fallback to NPC template or defaults
+      const baseEssence = npcMonster?.essenceBonus ? 
+        (npcTemplate?.baseEssence ?? 80) + npcMonster.essenceBonus : 
+        (npcTemplate?.baseEssence ?? 80);
+
       const speedId = npcTemplate?.speedId ?? 'speed-ordinary';
 
-      enemyName = npc?.name || npcTemplate?.name || 'NPC';
+      enemyName = npc?.name || npcTemplate?.name || 
+        (enemyId.includes('-') ? enemyId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Противник');
       enemyHp = baseEssence;
-      enemyProtection = baseEssence; // Use same as essence for now
+      enemyProtection = baseEssence;
 
       // Create NPC character based on resolved data
       const npcCharacterId = `npc-battle-${enemyId}-${Date.now()}`;
@@ -224,10 +234,10 @@ export const startBattle = async (req: Request, res: Response) => {
       };
 
       const baseBonuses = {
-        evasion: 5,
-        accuracy: 5,
-        damageResistance: 0,
-        initiative: 0
+        evasion: 5 + (npcMonster?.protectionBonus || 0),
+        accuracy: 5 + (npcMonster?.accuracyBonus || 0),
+        damageResistance: 0 + (npcMonster?.protectionBonus || 0),
+        initiative: 0 + (npcMonster?.initiativeBonus || 0)
       };
 
       const npcCharacter = await prisma.character.create({
@@ -238,9 +248,11 @@ export const startBattle = async (req: Request, res: Response) => {
           raceId: 'race-human',
           rankId: 'rank-1',
           description: npc?.description || npcTemplate?.description || 'NPC противник',
-          bio: npcTemplate
-            ? `Создан для боя на основе шаблона ${npcTemplate.id}`
-            : `Создан для боя на основе NPC ${npc?.id || enemyId}`,
+          bio: npcMonster ? 
+            `Создан для боя на основе NPC ${npc?.id || enemyId}` :
+            npcTemplate ? 
+              `Создан для боя на основе шаблона ${npcTemplate.id}` :
+              `Создан для боя на основе NPC ${enemyId}`,
           stats: JSON.stringify(baseStats),
           location: JSON.stringify({
             locationId: 'combat-zone',

@@ -48,57 +48,26 @@ export class MockAIService implements AIService {
 
     const reputation = context.reputation || 0;
     
-    // Context-aware aggression detection (analyzing intent, not keywords)
-    const lowerMessage = playerMessage.toLowerCase();
-    
-    // Detect violent threats with targets
-    const violentWords = ['убить', 'убью', 'взорвать', 'уничтожить', 'смерть', 'погубить'];
-    const targetWords = ['всех', 'все', 'вас', 'город', 'здесь', 'нас', 'людей'];
-    
-    const hasViolence = violentWords.some(w => lowerMessage.includes(w));
-    const hasTarget = targetWords.some(w => lowerMessage.includes(w));
-    const isDirectThreat = hasViolence && hasTarget;
-    
-    // Detect provocations and challenges
-    const isProvocation = (
-      // Challenger tone
-      (lowerMessage.includes('атакуешь') || lowerMessage.includes('нападаешь')) &&
-      // Dismissive context
-      (lowerMessage.includes('ну и что') || lowerMessage.includes('что') || 
-       lowerMessage.includes('да') || lowerMessage.includes('ну'))
-    ) || (
-      // Questioning courage (classic provocation)
-      lowerMessage.includes('боишься') || lowerMessage.includes('трус') ||
-      lowerMessage.includes('не смеешь')
-    ) || (
-      // Defiant/dismissive aggression
-      (lowerMessage.includes('ну') || lowerMessage.includes('что')) &&
-      lowerMessage.length < 30 && // Short dismissive messages
-      (lowerMessage.includes('?') || lowerMessage.includes('!'))
-    );
-    
-    // Overall aggression assessment
-    const isAggressive = isDirectThreat || isProvocation || reputation <= -50;
-    
-    // Determine response based on reputation and message content
+    // Remove hardcoded aggression detection - let LLM decide based on context
+    // Simple reputation-based response logic
     let responseText: string;
     let emotion: any = 'neutral';
     let action: any = 'talk';
 
-    if (isAggressive || reputation <= -50) {
-      // Hostile responses
+    // Base response on reputation and context
+    if (reputation <= -50) {
+      // Very hostile responses for very bad reputation
       const hostileResponses = [
         'Убирайся прочь, пока я не вызвал стражу!',
         'Ты мне не нравишься. Исчезни.',
         'Следующее слово будет твоим последним.',
-        'Хватит меня донимать, негодяй!',
-        'Как пожелаешь! Защищайся, негодяй!'
+        'Хватит меня донимать, негодяй!'
       ];
       responseText = hostileResponses[Math.floor(Math.random() * hostileResponses.length)];
       emotion = 'angry';
       
-      // High chance to attack if reputation is very low OR player is being aggressive
-      if (isAggressive || Math.random() > 0.6) {
+      // High chance to attack if reputation is very low
+      if (Math.random() > 0.4) {
         action = 'attack';
       }
     } else if (reputation >= 50) {
@@ -112,12 +81,13 @@ export class MockAIService implements AIService {
       responseText = friendlyResponses[Math.floor(Math.random() * friendlyResponses.length)];
       emotion = 'happy';
     } else {
-      // Neutral responses
+      // Neutral responses - let LLM handle context
       const neutralResponses = [
         'Приветствую, путник. Добро пожаловать в наши земли.',
         'Хм, интересно... Расскажи мне больше о себе.',
         'Осторожнее будь в этих краях. Не все здесь дружелюбны.',
-        'А, новый искатель приключений? Удачи тебе, она понадобится.'
+        'А, новый искатель приключений? Удачи тебе, она понадобится.',
+        'Слушаю тебя внимательно. Что привело тебя ко мне?'
       ];
       responseText = neutralResponses[Math.floor(Math.random() * neutralResponses.length)];
     }
@@ -147,10 +117,6 @@ export class MockAIService implements AIService {
     } else if (reputation >= 0 && reputation < 50 && roll > 0.8 && action === 'talk') {
       response.action = 'trade';
       response.text = 'Хочешь что-нибудь купить? Заходи в магазин.';
-    } else if (reputation <= -20 && reputation > -50 && roll > 0.5 && action === 'attack') {
-      response.action = 'negotiate';
-      response.text = 'Подожди! Может, договоримся без крови?';
-      response.emotion = 'scared';
     } else if (reputation >= 0 && roll > 0.85 && action === 'talk') {
       response.action = 'inspect';
       response.text = 'Вижу твоё снаряжение. Неплохо подобрано, но есть над чем поработать.';

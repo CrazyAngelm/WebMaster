@@ -2328,6 +2328,69 @@ async function main() {
   }
   console.log(`Seeded ${npcs.length} NPCs`);
 
+  // --- NPC Monsters (must be after monsterTemplates) ---
+  const npcMonsters = [
+    {
+      npcId: 'npc-barkeep',
+      monsterId: 'mon-goblin-scout',
+      essenceBonus: 20,
+      protectionBonus: 10,
+      accuracyBonus: 5,
+      evasionBonus: 0,
+      initiativeBonus: 0,
+      description: 'Боевые характеристики для Марвин'
+    },
+    {
+      npcId: 'npc-blacksmith',
+      monsterId: 'mon-orc-scout',
+      essenceBonus: 40,
+      protectionBonus: 25,
+      accuracyBonus: 8,
+      evasionBonus: 2,
+      initiativeBonus: 5,
+      description: 'Боевые характеристики для Гордин'
+    },
+    {
+      npcId: 'npc-alchemist',
+      monsterId: 'mon-necromancer',
+      essenceBonus: 30,
+      protectionBonus: 15,
+      accuracyBonus: 10,
+      evasionBonus: 5,
+      initiativeBonus: 8,
+      description: 'Боевые характеристики для Элизия'
+    },
+    {
+      npcId: 'npc-guard',
+      monsterId: 'mon-orc',
+      essenceBonus: 50,
+      protectionBonus: 30,
+      accuracyBonus: 10,
+      evasionBonus: 5,
+      initiativeBonus: 10,
+      description: 'Боевые характеристики для Стражник Альрик'
+    },
+    {
+      npcId: 'npc-merchant',
+      monsterId: 'mon-bandit',
+      essenceBonus: 20,
+      protectionBonus: 10,
+      accuracyBonus: 5,
+      evasionBonus: 0,
+      initiativeBonus: 0,
+      description: 'Боевые характеристики для Торговец Брам'
+    }
+  ];
+
+  for (const nm of npcMonsters) {
+    await prisma.nPCMonster.upsert({
+      where: { npcId: nm.npcId },
+      update: nm,
+      create: nm,
+    });
+  }
+  console.log(`Seeded ${npcMonsters.length} NPC Monsters`);
+
   // --- Connections ---
   const connections = [
     { id: 'conn-1', fromLocationId: 'loc-outskirts', toLocationId: 'loc-city-gates' },

@@ -133,6 +133,7 @@ model MonsterTemplate {
   description  String?
   skills       String  // UUID[] (JSON string)
   lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
+  npcMonsters  NPCMonster[]
 }
 
 model NPCTemplate {
@@ -178,6 +179,21 @@ model Building {
   workstations  String  // string[] (JSON string)
 }
 
+model NPCMonster {
+  id            String   @id @default(uuid())
+  npcId         String   @unique
+  monsterId     String
+  monster       MonsterTemplate @relation(fields: [monsterId], references: [id])
+  essenceBonus  Int      @default(0)
+  protectionBonus Int    @default(0)
+  accuracyBonus  Int      @default(0)
+  evasionBonus  Int      @default(0)
+  initiativeBonus Int     @default(0)
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model NPC {
   id            String   @id @default(uuid())
   name          String
@@ -188,8 +204,11 @@ model NPC {
   locationId    String?
   npcType       String   // merchant, guard, questgiver, villager, mysterious
   templateId    String?  // Reference to NPCTemplate
+  monsterId     String?  // @unique - Reference to NPCMonster for combat stats
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@unique([monsterId])
 }
 
 model LocationConnection {

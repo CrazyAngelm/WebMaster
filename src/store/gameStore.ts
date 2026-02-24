@@ -1221,11 +1221,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   setActiveEvent: (event) => set({ activeEvent: event }),
 
   handleEventChoice: async (choiceId) => {
-    const { character, activeEvent } = get();
-    if (!character || !activeEvent) return;
+    const { character, activeEvent, inventory, itemTemplates } = get();
+    if (!character || !activeEvent || !inventory) return;
     const characterToProcess = { ...character, stats: { ...character.stats, essence: { ...character.stats.essence }, energy: { ...character.stats.energy }, protection: { ...character.stats.protection } } };
-    const { character: updatedCharacter, message } = EventService.processChoice(characterToProcess, choiceId);
-    set({ character: updatedCharacter, activeEvent: null });
+    const { character: updatedCharacter, inventory: updatedInventory, message } = EventService.processChoice(
+      characterToProcess, 
+      inventory, 
+      choiceId, 
+      activeEvent.id,
+      itemTemplates
+    );
+    set({ character: updatedCharacter, inventory: updatedInventory, activeEvent: null });
     await get().saveGame();
   },
 

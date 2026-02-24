@@ -130,42 +130,19 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
           case 'attack':
             // Change reputation negatively for aggression
             changeNPCReputation(npc.id, -20);
-            // Initiate combat and wait for it to start
+            // Initiate combat - server will handle NPC creation if needed
             try {
-              // Check if NPC has a valid server ID (not a temporary one)
-              const isTemporaryId = npc.id.startsWith('npc-') || npc.id.startsWith('npc-mock-') || npc.id.startsWith('generated-');
-              if (isTemporaryId) {
-                console.warn('[NPCDialog] NPC has temporary ID, attempting to persist first...');
-                // Re-fetch NPC to ensure it's persisted
-                const { NPCService } = await import('../services/NPCService');
-                const buildingId = npc.buildingId;
-                if (buildingId && character?.location.locationId) {
-                  const location = (await import('../services/StaticDataService')).StaticDataService.getLocation(character.location.locationId);
-                  const building = (await import('../services/StaticDataService')).StaticDataService.getBuilding(buildingId);
-                  if (location && building) {
-                    const persistedNPC = await NPCService.getNPCForBuilding(building, location);
-                    if (!persistedNPC.id.startsWith('npc-') && !persistedNPC.id.startsWith('npc-mock-') && !persistedNPC.id.startsWith('generated-')) {
-                      console.log('[NPCDialog] NPC persisted with new ID:', persistedNPC.id);
-                      await initiateCombatFromDialog(persistedNPC.id);
-                    } else {
-                      throw new Error('NPC could not be persisted with valid server ID');
-                    }
-                  } else {
-                    throw new Error('Could not find location or building for NPC persistence');
-                  }
-                } else {
-                  throw new Error('NPC is missing buildingId or location');
-                }
-              } else {
-                await initiateCombatFromDialog(npc.id);
-              }
+              console.log('[NPCDialog] Starting combat with NPC:', npc.id, npc.name);
+              await initiateCombatFromDialog(npc.id);
               // Close dialog and navigate to combat after battle starts
               onClose();
               onNavigateToCombat?.();
             } catch (error) {
-              console.error('Failed to initiate combat:', error);
+              console.error('[NPCDialog] Failed to initiate combat:', error);
               const errorMessage = error instanceof Error ? error.message : 'Не удалось начать бой';
               addNPCMessage(`Ошибка: ${errorMessage}. Попробуйте ещё раз.`);
+              addNPCDialogMessage(npc.id, 'npc', `Ошибка: ${errorMessage}`);
+              setLocalMessages(prev => [...prev, { role: 'npc', content: `Ошибка: ${errorMessage}` }]);
             }
             break;
             
