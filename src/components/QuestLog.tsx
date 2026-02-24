@@ -158,6 +158,34 @@ export const QuestLog: React.FC = () => {
                 ))}
               </div>
 
+              {quest.rewards && ((quest.rewards.money && quest.rewards.money > 0) || (quest.rewards.essence && quest.rewards.essence > 0) || (quest.rewards.items && quest.rewards.items.length > 0)) && (
+                <div className="space-y-2 mb-4 bg-amber-900/10 p-2 rounded border border-amber-700/30">
+                  <div className="text-[8px] text-amber-500 uppercase font-bold tracking-widest mb-1 flex items-center gap-1">
+                    <Scroll size={10} /> Награда
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-[10px]">
+                    {quest.rewards.money && quest.rewards.money > 0 && (
+                      <div className="flex items-center gap-1 text-yellow-400">
+                        <span className="font-bold">{quest.rewards.money}</span>
+                        <span className="text-gray-400">золота</span>
+                      </div>
+                    )}
+                    {quest.rewards.essence && quest.rewards.essence > 0 && (
+                      <div className="flex items-center gap-1 text-purple-400">
+                        <span className="font-bold">{quest.rewards.essence}</span>
+                        <span className="text-gray-400">эссенции</span>
+                      </div>
+                    )}
+                    {quest.rewards.items && quest.rewards.items.length > 0 && (
+                      <div className="flex items-center gap-1 text-blue-400">
+                        <span className="font-bold">{quest.rewards.items.length}</span>
+                        <span className="text-gray-400">предметов</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {quest.status === QuestStatus.READY_TO_COMPLETE && (
                 <div className="w-full py-2 px-3 text-[10px] font-bold uppercase tracking-widest bg-green-900/50 text-green-400 border border-green-700/50 rounded flex items-center justify-center gap-2">
                   <CheckCircle2 size={14} /> Поговорите с NPC чтобы получить награду

@@ -59,9 +59,18 @@ interface User {
   role: 'USER' | 'ADMIN' | 'OWNER';
 }
 
+interface LootItem {
+  templateId: string;
+  quantity: number;
+  name: string;
+  monsterName?: string;
+}
+
 interface GameNotification {
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'loot';
   message: string;
+  lootItems?: LootItem[];
+  totalValue?: number;
 }
 
 interface GameState {
@@ -219,7 +228,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!res.ok) throw new Error(data.error || 'Login failed');
     
     localStorage.setItem('token', data.token);
-    set({ user: data.user, token: data.token, authStatus: 'authenticated' });
+    // * Initialize real AI service with fresh token after successful login
+    aiService.setAuthToken(data.token);
+    set({ user: data.user, token: data.token, authStatus: 'authenticated', aiService });
     await get().initializeData();
     await get().fetchCharacters();
   },
@@ -242,7 +253,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (!res.ok) throw new Error(data.error || 'Registration failed');
     
     localStorage.setItem('token', data.token);
-    set({ user: data.user, token: data.token, authStatus: 'authenticated' });
+    // * Initialize real AI service with fresh token after successful registration
+    aiService.setAuthToken(data.token);
+    set({ user: data.user, token: data.token, authStatus: 'authenticated', aiService });
     await get().initializeData();
     set({ userCharacters: [] });
   },
@@ -265,6 +278,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       user: null, 
       token: null, 
       authStatus: 'unauthenticated', 
+      aiService: mockAIService,
       character: null, 
       inventory: null,
       userCharacters: [],
@@ -1118,15 +1132,31 @@ export const useGameStore = create<GameState>((set, get) => ({
       id: `quest-npc-${Date.now()}`,
       title: questData.title,
       description: questData.description,
-      objectives: questData.objectives.map((obj: any, idx: number) => ({
-        id: `obj-${Date.now()}-${idx}`,
-        type: obj.type,
-        targetId: obj.target || `target-${idx}`,
-        description: obj.target || 'Цель',
-        requiredAmount: obj.amount || 1,
-        currentAmount: 0,
-        isCompleted: false
-      })),
+      objectives: questData.objectives.map((obj: any, idx: number) => {
+        let description = obj.target || 'Цель';
+        
+        // Resolve target ID to proper name for COLLECT and KILL objectives
+        if (obj.type === 'COLLECT') {
+          const itemTemplate = StaticDataService.getItemTemplate(obj.target);
+          description = itemTemplate?.name || obj.target;
+        } else if (obj.type === 'KILL') {
+          const monsterTemplate = StaticDataService.getMonsterTemplate(obj.target);
+          description = monsterTemplate?.name || obj.target;
+        } else if (obj.type === 'VISIT') {
+          const location = StaticDataService.getLocation(obj.target);
+          description = location?.name || obj.target;
+        }
+        
+        return {
+          id: `obj-${Date.now()}-${idx}`,
+          type: obj.type,
+          targetId: obj.target || `target-${idx}`,
+          description: description,
+          requiredAmount: obj.amount || 1,
+          currentAmount: 0,
+          isCompleted: false
+        };
+      }),
       rewards: questData.rewards || {},
       status: QuestStatus.IN_PROGRESS,
       rankRequired: character.rankId ? parseInt(character.rankId) : 1,

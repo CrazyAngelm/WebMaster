@@ -2428,6 +2428,83 @@ export const getBattle = async (req: Request, res: Response) => {
     }
 };
 
+interface LootItem {
+    templateId: string;
+    chance: number;
+    minQuantity: number;
+    maxQuantity: number;
+}
+
+const generateLoot = (lootTableJson: string): LootItem[] => {
+    const lootTable: LootItem[] = JSON.parse(lootTableJson || '[]');
+    const droppedItems: LootItem[] = [];
+
+    for (const item of lootTable) {
+        if (Math.random() < item.chance) {
+            const quantity = item.minQuantity + Math.floor(Math.random() * (item.maxQuantity - item.minQuantity + 1));
+            droppedItems.push({
+                templateId: item.templateId,
+                chance: 1,
+                minQuantity: quantity,
+                maxQuantity: quantity
+            });
+        }
+    }
+
+    return droppedItems;
+};
+
+const addItemsToInventory = async (characterId: string, lootItems: LootItem[], itemTemplates: Map<string, any>): Promise<{ addedItems: any[], totalValue: number }> => {
+    const addedItems: any[] = [];
+    let totalValue = 0;
+
+    for (const lootItem of lootItems) {
+        const template = itemTemplates.get(lootItem.templateId);
+        if (!template) continue;
+
+        const quantity = lootItem.minQuantity;
+        totalValue += (template.basePrice || 0) * quantity;
+
+        const existingItem = await (prisma as any).inventoryItem.findFirst({
+            where: {
+                inventoryId: { isNot: null },
+                templateId: lootItem.templateId,
+                quantity: { lt: template.stackSize }
+            }
+        });
+
+        if (existingItem && template.stackSize > 1) {
+            const newQuantity = Math.min(existingItem.quantity + quantity, template.stackSize);
+            await (prisma as any).inventoryItem.update({
+                where: { id: existingItem.id },
+                data: { quantity: newQuantity }
+            });
+            addedItems.push({ templateId: lootItem.templateId, quantity: newQuantity - (existingItem.quantity - quantity), name: template.name });
+        } else {
+            let inventory = await (prisma as any).inventory.findUnique({
+                where: { characterId }
+            });
+
+            if (!inventory) {
+                inventory = await (prisma as any).inventory.create({
+                    data: { characterId, slots: 20 }
+                });
+            }
+
+            await (prisma as any).inventoryItem.create({
+                data: {
+                    inventoryId: inventory.id,
+                    templateId: lootItem.templateId,
+                    quantity: quantity
+                }
+            });
+            addedItems.push({ templateId: lootItem.templateId, quantity, name: template.name });
+        }
+    }
+
+    return { addedItems, totalValue };
+};
+
 export const endBattle = async (req: Request, res: Response) => {
     try {
         // @ts-ignore
@@ -2463,7 +2540,51 @@ export const endBattle = async (req: Request, res: Response) => {
             }
         }
 
-        res.json({ message: 'Battle ended' });
+        // * Process loot from dead monsters
+        let lootDropped: any[] = [];
+        let totalLootValue = 0;
+
+        if (playerParticipant && playerParticipant.characterId) {
+            const deadMonsters = battle.participants.filter((p: any) => 
+                p.monsterTemplateId && 
+                (getParticipantStatus(p) === ParticipantStatus.DEAD || p.currentHp <= 0)
+            );
+
+            if (deadMonsters.length > 0) {
+                const allTemplates = await prisma.itemTemplate.findMany();
+                const templateMap = new Map(allTemplates.map((t: any) => [t.id, t]));
+
+                for (const monster of deadMonsters) {
+                    const monsterTemplate = await (prisma as any).monsterTemplate.findUnique({
+                        where: { id: monster.monsterTemplateId }
+                    });
+
+                    if (monsterTemplate && monsterTemplate.lootTable) {
+                        const droppedItems = generateLoot(monsterTemplate.lootTable);
+                        
+                        if (droppedItems.length > 0) {
+                            const { addedItems, totalValue } = await addItemsToInventory(
+                                playerParticipant.characterId,
+                                droppedItems,
+                                templateMap
+                            );
+
+                            lootDropped = [...lootDropped, ...addedItems.map(item => ({
+                                ...item,
+                                monsterName: monsterTemplate.name
+                            }))];
+                            totalLootValue += totalValue;
+                        }
+                    }
+                }
+            }
+        }
+
+        res.json({ 
+            message: 'Battle ended',
+            lootDropped: lootDropped,
+            totalLootValue: totalLootValue
+        });
     } catch (error) {
         console.error('End battle error:', error);
         res.status(500).json({ error: 'Internal server error' });

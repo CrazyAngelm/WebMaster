@@ -64,6 +64,77 @@ async function main() {
       parameter: null,
       isNegative: false,
       description: 'Мгновенно восстанавливает 30 HP.'
+    },
+    // --- MONSTER EFFECTS ---
+    {
+      id: 'effect-bleed',
+      name: 'Кровотечение',
+      type: 'PERIODIC_DAMAGE',
+      duration: 3,
+      value: 8,
+      parameter: null,
+      isNegative: true,
+      description: 'Наносит 8 урона каждый ход от кровотечения.'
+    },
+    {
+      id: 'effect-damage-buff',
+      name: 'Ярость',
+      type: 'BUFF',
+      duration: 3,
+      value: 30,
+      parameter: 'damage',
+      isNegative: false,
+      description: 'Увеличивает урон на 30.'
+    },
+    {
+      id: 'effect-protection-buff',
+      name: 'Щит',
+      type: 'BUFF',
+      duration: 2,
+      value: 50,
+      parameter: 'protection',
+      isNegative: false,
+      description: 'Увеличивает защиту на 50.'
+    },
+    {
+      id: 'effect-fear',
+      name: 'Страх',
+      type: 'DEBUFF',
+      duration: 2,
+      value: -30,
+      parameter: 'evasion',
+      isNegative: true,
+      description: 'Снижает уклонение на 30 и точность на 20.'
+    },
+    {
+      id: 'effect-freeze',
+      name: 'Заморозка',
+      type: 'PERIODIC_DAMAGE',
+      duration: 2,
+      value: 12,
+      parameter: 'ice',
+      isNegative: true,
+      description: 'Наносит 12 урона холодом каждый ход.'
+    },
+    {
+      id: 'effect-medium-heal',
+      name: 'Среднее исцеление',
+      type: 'PERIODIC_HEAL',
+      duration: 1,
+      value: 50,
+      parameter: null,
+      isNegative: false,
+      description: 'Мгновенно восстанавливает 50 HP.'
+    },
+    {
+      id: 'effect-large-heal',
+      name: 'Большое исцеление',
+      type: 'PERIODIC_HEAL',
+      duration: 1,
+      value: 100,
+      parameter: null,
+      isNegative: false,
+      description: 'Мгновенно восстанавливает 100 HP.'
     }
   ];
 

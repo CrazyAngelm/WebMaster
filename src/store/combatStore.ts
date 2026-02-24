@@ -505,10 +505,23 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     // * Mark battle as finished on server if ID provided
     if (battleIdToEnd && token) {
       try {
-        await fetch(`${API_BASE}/battle/end/${battleIdToEnd}`, {
+        const response = await fetch(`${API_BASE}/battle/end/${battleIdToEnd}`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        
+        const data = await response.json();
+        
+        // * Show loot notification if items were dropped
+        if (data.lootDropped && data.lootDropped.length > 0) {
+          const lootNames = data.lootDropped.map((item: any) => `${item.name} x${item.quantity}`).join(', ');
+          setNotification({
+            type: 'loot',
+            message: `Выпавший лут: ${lootNames}`,
+            lootItems: data.lootDropped,
+            totalValue: data.totalLootValue || 0
+          });
+        }
       } catch (error) {
         console.error('Failed to end battle on server:', error);
       }

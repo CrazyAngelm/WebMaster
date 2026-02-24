@@ -998,85 +998,1027 @@ async function main() {
       name: 'Wolf',
       rankOrder: 1,
       baseEssence: 100,
-      speedId: 'speed-fast', // Increased speed
-      skills: JSON.stringify([]),
+      speedId: 'speed-fast',
+      skills: JSON.stringify(['skill-monster-bite', 'skill-monster-rage']),
       lootTable: JSON.stringify([
-        { templateId: 'mat-wolf-heart', chance: 0.3, minQuantity: 1, maxQuantity: 1 }
+        { templateId: 'mat-wolf-heart', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-wolf-pelt', chance: 0.5, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-meat', chance: 0.4, minQuantity: 1, maxQuantity: 2 }
       ])
     },
     {
       id: 'mon-boar',
       name: 'Boar',
       rankOrder: 1,
-      baseEssence: 120,
+      baseEssence: 130,
       speedId: 'speed-ordinary',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-charge']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-boar-tusk', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-meat', chance: 0.6, minQuantity: 1, maxQuantity: 3 },
+        { templateId: 'mat-leather-scraps', chance: 0.3, minQuantity: 1, maxQuantity: 2 }
+      ])
     },
     {
       id: 'mon-orc',
       name: 'Orc',
       rankOrder: 2,
-      baseEssence: 450,
+      baseEssence: 350,
       speedId: 'speed-slow',
-      skills: JSON.stringify([]),
+      skills: JSON.stringify(['skill-monster-rage', 'skill-monster-shield']),
       lootTable: JSON.stringify([
-        { templateId: 'mat-iron-ore', chance: 0.1, minQuantity: 1, maxQuantity: 2 }
+        { templateId: 'mat-orc-fang', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-iron-ore', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'wpn-thief-dagger', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
       ])
     },
     {
       id: 'mon-vampire',
       name: 'Vampire',
       rankOrder: 3,
-      baseEssence: 800,
+      baseEssence: 700,
       speedId: 'speed-very-fast',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-bite', 'skill-monster-regeneration', 'skill-monster-fear']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-vampire-fang', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
+        { templateId: 'con-healing-potion-medium', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
     },
     {
       id: 'mon-lich',
       name: 'Lich',
       rankOrder: 4,
-      baseEssence: 1100,
+      baseEssence: 1000,
       speedId: 'speed-ordinary',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-fire-breath', 'skill-monster-summon']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-lich-phylactery', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-magic-dust', chance: 0.4, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'scroll-fireball', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
     },
     {
       id: 'mon-death-knight',
       name: 'Death Knight',
       rankOrder: 5,
-      baseEssence: 1400,
+      baseEssence: 1300,
       speedId: 'speed-slow',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-shield', 'skill-monster-fear']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-death-knight-soul', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-adamantite-ore', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'wpn-gross-messer', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
+      ])
     },
     {
       id: 'mon-elder-dragon',
       name: 'Elder Dragon',
       rankOrder: 6,
-      baseEssence: 1800,
+      baseEssence: 1700,
       speedId: 'speed-ordinary',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-fire-breath', 'skill-monster-rage', 'skill-monster-regeneration']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elder-dragon-heart', chance: 0.1, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-dragon-scale', chance: 0.3, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-adamantite-ore', chance: 0.2, minQuantity: 2, maxQuantity: 3 }
+      ])
     },
     {
       id: 'mon-abyssal-horror',
       name: 'Abyssal Horror',
       rankOrder: 7,
-      baseEssence: 2300,
+      baseEssence: 2200,
       speedId: 'speed-ordinary',
-      skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      skills: JSON.stringify(['skill-monster-fear', 'skill-monster-poison-sting', 'skill-monster-summon']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-abyssal-essence', chance: 0.15, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-void-crystal', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'scroll-ice-bolt', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
     },
     {
       id: 'mon-world-eater',
       name: 'World Eater',
       rankOrder: 8,
-      baseEssence: 2800,
+      baseEssence: 2700,
+      speedId: 'speed-very-slow',
+      skills: JSON.stringify(['skill-monster-fire-breath', 'skill-monster-fear', 'skill-monster-regeneration']),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-world-eater-fragment', chance: 0.05, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-abyssal-essence', chance: 0.3, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'wpn-poleaxe', chance: 0.03, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 1 MONSTERS (80-250 essence) ---
+    {
+      id: 'mon-rat-giant',
+      name: 'Гигантская крыса',
+      rankOrder: 1,
+      baseEssence: 80,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-rat-tail', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-meat', chance: 0.3, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-slime-green',
+      name: 'Зелёный слайм',
+      rankOrder: 1,
+      baseEssence: 90,
       speedId: 'speed-very-slow',
       skills: JSON.stringify([]),
-      lootTable: JSON.stringify([])
+      lootTable: JSON.stringify([
+        { templateId: 'mat-slime-gel', chance: 0.6, minQuantity: 1, maxQuantity: 3 },
+        { templateId: 'mat-herbs-common', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-goblin-scout',
+      name: 'Гоблин-разведчик',
+      rankOrder: 1,
+      baseEssence: 110,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-goblin-ear', chance: 0.35, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-copper-ore', chance: 0.15, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-skeleton-warrior',
+      name: 'Скелет-воин',
+      rankOrder: 1,
+      baseEssence: 150,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-bone-common', chance: 0.5, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-iron-ore', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-zombie',
+      name: 'Зомби',
+      rankOrder: 1,
+      baseEssence: 170,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-bone-common', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-leather-scraps', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-goblin-warrior',
+      name: 'Гоблин-воин',
+      rankOrder: 1,
+      baseEssence: 190,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-goblin-ear', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-iron-ore', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'wpn-thief-dagger', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-spider-giant',
+      name: 'Гигантский паук',
+      rankOrder: 1,
+      baseEssence: 210,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-spider-venom', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-herbs-common', chance: 0.3, minQuantity: 1, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-bandit',
+      name: 'Разбойник',
+      rankOrder: 1,
+      baseEssence: 250,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-copper-ore', chance: 0.3, minQuantity: 1, maxQuantity: 3 },
+        { templateId: 'con-healing-potion-small', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'wpn-thief-dagger', chance: 0.08, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 2 MONSTERS (250-500 essence) ---
+    {
+      id: 'mon-goblin-chief',
+      name: 'Вождь гоблинов',
+      rankOrder: 2,
+      baseEssence: 280,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-goblin-ear', chance: 0.5, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-iron-ore', chance: 0.3, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'wpn-thief-dagger', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-orc-scout',
+      name: 'Орк-разведчик',
+      rankOrder: 2,
+      baseEssence: 320,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-orc-fang', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-iron-ore', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-ogre',
+      name: 'Огр',
+      rankOrder: 2,
+      baseEssence: 400,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-ogre-bone', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-leather-scraps', chance: 0.4, minQuantity: 2, maxQuantity: 4 }
+      ])
+    },
+    {
+      id: 'mon-ghost',
+      name: 'Призрак',
+      rankOrder: 2,
+      baseEssence: 380,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-ghost-essence', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-werewolf',
+      name: 'Оборотень',
+      rankOrder: 2,
+      baseEssence: 420,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-werewolf-claw', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-wolf-pelt', chance: 0.4, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-harpy',
+      name: 'Гарпия',
+      rankOrder: 2,
+      baseEssence: 360,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-herbs-common', chance: 0.3, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-leather-scraps', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-troll',
+      name: 'Тролль',
+      rankOrder: 2,
+      baseEssence: 480,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-troll-blood', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-bone-common', chance: 0.4, minQuantity: 3, maxQuantity: 5 }
+      ])
+    },
+    {
+      id: 'mon-minotaur',
+      name: 'Минотавр',
+      rankOrder: 2,
+      baseEssence: 450,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-ogre-bone', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-iron-ore', chance: 0.35, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'wpn-gross-messer', chance: 0.03, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-dark-spider',
+      name: 'Тёмный паук',
+      rankOrder: 2,
+      baseEssence: 340,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-spider-venom', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 3 MONSTERS (500-800 essence) ---
+    {
+      id: 'mon-orc-warlord',
+      name: 'Полководец орков',
+      rankOrder: 3,
+      baseEssence: 520,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-orc-fang', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-iron-ore', chance: 0.35, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'wpn-gross-messer', chance: 0.08, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-vampire-fledgling',
+      name: 'Молодой вампир',
+      rankOrder: 3,
+      baseEssence: 580,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-vampire-fang', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-magic-dust', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-demon-lesser',
+      name: 'Младший демон',
+      rankOrder: 3,
+      baseEssence: 620,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-magic-dust', chance: 0.3, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-golem-stone',
+      name: 'Каменный голем',
+      rankOrder: 3,
+      baseEssence: 700,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-golem-core', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-iron-ore', chance: 0.4, minQuantity: 3, maxQuantity: 5 }
+      ])
+    },
+    {
+      id: 'mon-elemental-fire',
+      name: 'Огненный элементаль',
+      rankOrder: 3,
+      baseEssence: 650,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-coal', chance: 0.5, minQuantity: 3, maxQuantity: 5 }
+      ])
+    },
+    {
+      id: 'mon-elemental-ice',
+      name: 'Ледяной элементаль',
+      rankOrder: 3,
+      baseEssence: 650,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-water', chance: 0.4, minQuantity: 2, maxQuantity: 4 }
+      ])
+    },
+    {
+      id: 'mon-necromancer',
+      name: 'Некромант',
+      rankOrder: 3,
+      baseEssence: 600,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-ghost-essence', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.4, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'scroll-fireball', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-basilisk',
+      name: 'Василиск',
+      rankOrder: 3,
+      baseEssence: 720,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-spider-venom', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-demon-horn', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-shadow-assassin',
+      name: 'Теневой ассасин',
+      rankOrder: 3,
+      baseEssence: 550,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-shadow-essence', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-ghost-essence', chance: 0.25, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 4 MONSTERS (800-1100 essence) ---
+    {
+      id: 'mon-demon',
+      name: 'Демон',
+      rankOrder: 4,
+      baseEssence: 850,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.4, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'scroll-fireball', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-golem-iron',
+      name: 'Железный голем',
+      rankOrder: 4,
+      baseEssence: 950,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-golem-core', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-iron-ore', chance: 0.5, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-adamantite-ore', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-vampire-elder',
+      name: 'Древний вампир',
+      rankOrder: 4,
+      baseEssence: 900,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-vampire-fang', chance: 0.35, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-magic-dust', chance: 0.35, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'con-healing-potion-large', chance: 0.2, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-dragon-young',
+      name: 'Молодой дракон',
+      rankOrder: 4,
+      baseEssence: 1050,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-dragon-scale', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-magic-dust', chance: 0.3, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-sphinx',
+      name: 'Сфинкс',
+      rankOrder: 4,
+      baseEssence: 880,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-magic-dust', chance: 0.45, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-elemental-core', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-ice-bolt', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-manticore',
+      name: 'Мантикора',
+      rankOrder: 4,
+      baseEssence: 920,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-spider-venom', chance: 0.35, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-werewolf-claw', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-leather-scraps', chance: 0.4, minQuantity: 3, maxQuantity: 5 }
+      ])
+    },
+    {
+      id: 'mon-chimera',
+      name: 'Химера',
+      rankOrder: 4,
+      baseEssence: 980,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-dragon-scale', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-spider-venom', chance: 0.3, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-archmage-dark',
+      name: 'Тёмный архимаг',
+      rankOrder: 4,
+      baseEssence: 820,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-magic-dust', chance: 0.5, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-void-crystal', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-fireball', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-wraith',
+      name: 'Призрачный страж',
+      rankOrder: 4,
+      baseEssence: 860,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-ghost-essence', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-shadow-essence', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-lich-phylactery', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 5 MONSTERS (1100-1400 essence) ---
+    {
+      id: 'mon-demon-greater',
+      name: 'Старший демон',
+      rankOrder: 5,
+      baseEssence: 1150,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-void-crystal', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-fireball', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-dragon-adult',
+      name: 'Взрослый дракон',
+      rankOrder: 5,
+      baseEssence: 1350,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-dragon-scale', chance: 0.35, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-elder-dragon-heart', chance: 0.08, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-adamantite-ore', chance: 0.2, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-lich-archmage',
+      name: 'Лич-архимаг',
+      rankOrder: 5,
+      baseEssence: 1200,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-lich-phylactery', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-void-crystal', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-fireball', chance: 0.3, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-titan',
+      name: 'Титан',
+      rankOrder: 5,
+      baseEssence: 1400,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.35, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-golem-core', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'wpn-poleaxe', chance: 0.03, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-phoenix',
+      name: 'Феникс',
+      rankOrder: 5,
+      baseEssence: 1180,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-elemental-core', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-magic-dust', chance: 0.4, minQuantity: 4, maxQuantity: 6 }
+      ])
+    },
+    {
+      id: 'mon-hydra',
+      name: 'Гидра',
+      rankOrder: 5,
+      baseEssence: 1320,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-spider-venom', chance: 0.45, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-dragon-scale', chance: 0.2, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-troll-blood', chance: 0.3, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-kraken',
+      name: 'Кракен',
+      rankOrder: 5,
+      baseEssence: 1280,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-water', chance: 0.5, minQuantity: 5, maxQuantity: 8 },
+        { templateId: 'mat-adamantite-ore', chance: 0.15, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-angel-fallen',
+      name: 'Падший ангел',
+      rankOrder: 5,
+      baseEssence: 1250,
+      speedId: 'speed-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-void-crystal', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'con-healing-potion-large', chance: 0.3, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-golem-adamantite',
+      name: 'Адамантитовый голем',
+      rankOrder: 5,
+      baseEssence: 1380,
+      speedId: 'speed-very-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.5, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-golem-core', chance: 0.3, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'wpn-poleaxe', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    // --- RANK 6 MONSTERS (1400-1800 essence) ---
+    {
+      id: 'mon-demon-lord',
+      name: 'Лорд демонов',
+      rankOrder: 6,
+      baseEssence: 1600,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.45, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-void-crystal', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'scroll-fireball', chance: 0.35, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-lich-king',
+      name: 'Король личей',
+      rankOrder: 6,
+      baseEssence: 1550,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-lich-phylactery', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-void-crystal', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-death-knight-soul', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-angel-dark',
+      name: 'Тёмный ангел',
+      rankOrder: 6,
+      baseEssence: 1500,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-void-crystal', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'con-healing-potion-large', chance: 0.35, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-giant-storm',
+      name: 'Штормовой великан',
+      rankOrder: 6,
+      baseEssence: 1750,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.4, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-elemental-core', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'wpn-poleaxe', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-behemoth',
+      name: 'Бегемот',
+      rankOrder: 6,
+      baseEssence: 1800,
+      speedId: 'speed-very-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.45, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-golem-core', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-elder-dragon-heart', chance: 0.08, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-leviathan',
+      name: 'Левиафан',
+      rankOrder: 6,
+      baseEssence: 1650,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-water', chance: 0.6, minQuantity: 6, maxQuantity: 10 },
+        { templateId: 'mat-adamantite-ore', chance: 0.2, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-djinn-noble',
+      name: 'Благородный джинн',
+      rankOrder: 6,
+      baseEssence: 1450,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-magic-dust', chance: 0.5, minQuantity: 5, maxQuantity: 8 },
+        { templateId: 'mat-elemental-core', chance: 0.25, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-ice-bolt', chance: 0.3, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-dragon-undead',
+      name: 'Нежить-дракон',
+      rankOrder: 6,
+      baseEssence: 1720,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-dragon-scale', chance: 0.3, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-lich-phylactery', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-death-knight-soul', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-elemental-prince',
+      name: 'Принц элементалей',
+      rankOrder: 6,
+      baseEssence: 1580,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-void-crystal', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'scroll-fireball', chance: 0.25, minQuantity: 2, maxQuantity: 2 }
+      ])
+    },
+    // --- RANK 7 MONSTERS (1800-2300 essence) ---
+    {
+      id: 'mon-dragon-ancient',
+      name: 'Древнейший дракон',
+      rankOrder: 7,
+      baseEssence: 2100,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elder-dragon-heart', chance: 0.15, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-dragon-scale', chance: 0.35, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-abyssal-essence', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-demon-prince',
+      name: 'Принц демонов',
+      rankOrder: 7,
+      baseEssence: 2000,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.5, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-void-crystal', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-abyssal-essence', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-titan-elder',
+      name: 'Древний титан',
+      rankOrder: 7,
+      baseEssence: 2300,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.5, minQuantity: 5, maxQuantity: 8 },
+        { templateId: 'mat-golem-core', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-elder-dragon-heart', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-phoenix-empyrean',
+      name: 'Огненный феникс',
+      rankOrder: 7,
+      baseEssence: 1950,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-elemental-core', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-abyssal-essence', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-kraken-elder',
+      name: 'Древний кракен',
+      rankOrder: 7,
+      baseEssence: 2150,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-water', chance: 0.7, minQuantity: 8, maxQuantity: 12 },
+        { templateId: 'mat-abyssal-essence', chance: 0.12, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-archdevil',
+      name: 'Архидьявол',
+      rankOrder: 7,
+      baseEssence: 2050,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.45, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-void-crystal', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'scroll-fireball', chance: 0.4, minQuantity: 2, maxQuantity: 4 }
+      ])
+    },
+    {
+      id: 'mon-void-walker',
+      name: 'Странник пустоты',
+      rankOrder: 7,
+      baseEssence: 1900,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-void-crystal', chance: 0.45, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-abyssal-essence', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-shadow-essence', chance: 0.3, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-lich-demigod',
+      name: 'Полубог-лич',
+      rankOrder: 7,
+      baseEssence: 2250,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-lich-phylactery', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-abyssal-essence', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-death-knight-soul', chance: 0.2, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-elemental-king',
+      name: 'Король элементалей',
+      rankOrder: 7,
+      baseEssence: 1850,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.5, minQuantity: 2, maxQuantity: 4 },
+        { templateId: 'mat-void-crystal', chance: 0.25, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'scroll-fireball', chance: 0.35, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    // --- RANK 8 MONSTERS (2300-3000 essence) ---
+    {
+      id: 'mon-dragon-god',
+      name: 'Бог-дракон',
+      rankOrder: 8,
+      baseEssence: 2800,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elder-dragon-heart', chance: 0.2, minQuantity: 1, maxQuantity: 1 },
+        { templateId: 'mat-dragon-scale', chance: 0.4, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-world-eater-fragment', chance: 0.08, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-titan-primordial',
+      name: 'Первородный титан',
+      rankOrder: 8,
+      baseEssence: 2900,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-adamantite-ore', chance: 0.6, minQuantity: 6, maxQuantity: 10 },
+        { templateId: 'mat-golem-core', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-world-eater-fragment', chance: 0.05, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-demon-overlord',
+      name: 'Повелитель демонов',
+      rankOrder: 8,
+      baseEssence: 2600,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-demon-horn', chance: 0.55, minQuantity: 4, maxQuantity: 6 },
+        { templateId: 'mat-void-crystal', chance: 0.45, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-abyssal-essence', chance: 0.25, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-void-lord',
+      name: 'Повелитель пустоты',
+      rankOrder: 8,
+      baseEssence: 2500,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-void-crystal', chance: 0.5, minQuantity: 3, maxQuantity: 4 },
+        { templateId: 'mat-abyssal-essence', chance: 0.3, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-world-eater-fragment', chance: 0.1, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-angel-seraph',
+      name: 'Серафим',
+      rankOrder: 8,
+      baseEssence: 2400,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.5, minQuantity: 3, maxQuantity: 4 },
+        { templateId: 'mat-void-crystal', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'con-healing-potion-large', chance: 0.45, minQuantity: 2, maxQuantity: 3 }
+      ])
+    },
+    {
+      id: 'mon-leviathan-ancient',
+      name: 'Древнейший левиафан',
+      rankOrder: 8,
+      baseEssence: 2750,
+      speedId: 'speed-slow',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.5, minQuantity: 3, maxQuantity: 4 },
+        { templateId: 'mat-water', chance: 0.8, minQuantity: 10, maxQuantity: 15 },
+        { templateId: 'mat-abyssal-essence', chance: 0.2, minQuantity: 1, maxQuantity: 2 }
+      ])
+    },
+    {
+      id: 'mon-phoenix-eternal',
+      name: 'Вечный феникс',
+      rankOrder: 8,
+      baseEssence: 2550,
+      speedId: 'speed-very-fast',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-phoenix-feather', chance: 0.55, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-elemental-core', chance: 0.4, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'mat-elder-dragon-heart', chance: 0.15, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-lich-god',
+      name: 'Бог-лич',
+      rankOrder: 8,
+      baseEssence: 2850,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-lich-phylactery', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-abyssal-essence', chance: 0.35, minQuantity: 1, maxQuantity: 2 },
+        { templateId: 'mat-world-eater-fragment', chance: 0.08, minQuantity: 1, maxQuantity: 1 }
+      ])
+    },
+    {
+      id: 'mon-elemental-titan',
+      name: 'Титан стихий',
+      rankOrder: 8,
+      baseEssence: 2650,
+      speedId: 'speed-ordinary',
+      skills: JSON.stringify([]),
+      lootTable: JSON.stringify([
+        { templateId: 'mat-elemental-core', chance: 0.55, minQuantity: 3, maxQuantity: 5 },
+        { templateId: 'mat-void-crystal', chance: 0.35, minQuantity: 2, maxQuantity: 3 },
+        { templateId: 'scroll-fireball', chance: 0.45, minQuantity: 3, maxQuantity: 5 }
+      ])
     }
   ];
 
@@ -1168,7 +2110,7 @@ async function main() {
   ];
 
   for (const n of npcTemplates) {
-    await prisma.npcTemplate.upsert({
+    await prisma.nPCTemplate.upsert({
       where: { id: n.id },
       update: n,
       create: n,
