@@ -15,7 +15,7 @@ import { MessageCircle, Loader2, Sword, Skull, MapPin, Search, Hand } from 'luci
 import { NPCData } from '../types/ai';
 
 export const WorldNavigation: React.FC = () => {
-  const { character, moveToLocation, enterBuilding, exitBuilding, activeQuests } = useGameStore();
+  const { character, moveToLocation, enterBuilding, exitBuilding, activeQuests, saveGame } = useGameStore();
   const [showDialog, setShowDialog] = useState(false);
   const [currentNPC, setCurrentNPC] = useState<NPCData | null>(null);
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
@@ -27,6 +27,7 @@ export const WorldNavigation: React.FC = () => {
   };
 
   const handleTradeRequest = (buildingId: string) => {
+    saveGame();
     enterBuilding(buildingId);
     setShowDialog(false);
     setCurrentNPC(null);
@@ -302,6 +303,7 @@ export const WorldNavigation: React.FC = () => {
           onClose={() => {
             setShowDialog(false);
             setCurrentNPC(null);
+            saveGame();
           }}
           onNavigateToCombat={handleNavigateToCombat}
           onTradeRequest={handleTradeRequest}

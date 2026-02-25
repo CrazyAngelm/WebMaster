@@ -182,6 +182,7 @@ model Building {
 model NPCMonster {
   id            String   @id @default(uuid())
   npcId         String   @unique
+  npc           NPC      @relation(fields: [npcId], references: [id], onDelete: Cascade)
   monsterId     String
   monster       MonsterTemplate @relation(fields: [monsterId], references: [id])
   essenceBonus  Int      @default(0)
@@ -204,11 +205,9 @@ model NPC {
   locationId    String?
   npcType       String   // merchant, guard, questgiver, villager, mysterious
   templateId    String?  // Reference to NPCTemplate
-  monsterId     String?  // @unique - Reference to NPCMonster for combat stats
+  npcMonster    NPCMonster?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  @@unique([monsterId])
 }
 
 model LocationConnection {

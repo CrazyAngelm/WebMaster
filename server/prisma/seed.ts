@@ -1,9 +1,22 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding static data...');
+
+  const systemPasswordHash = await bcrypt.hash('SYSTEM_NPC_PASSWORD', 10);
+  await prisma.user.upsert({
+    where: { login: 'system-npc' },
+    update: {},
+    create: {
+      id: 'system-npc',
+      login: 'system-npc',
+      passwordHash: systemPasswordHash,
+      role: 'SYSTEM'
+    }
+  });
 
   // --- Speeds ---
   const speeds = [
@@ -2647,6 +2660,53 @@ async function main() {
     });
   }
 
+  // --- Backfill NPC Combat Profiles ---
+  console.log('Backfilling NPC combat profiles...');
+  
+  const DEFAULT_MONSTER_TEMPLATE_BY_NPC_TYPE: Record<string, string> = {
+    guard: 'mon-goblin-warrior',
+    merchant: 'mon-bandit',
+    questgiver: 'mon-goblin-chief',
+    villager: 'mon-bandit',
+    mysterious: 'mon-vampire'
+  };
+  const DEFAULT_MONSTER_TEMPLATE = 'mon-bandit';
+
+  const allNPCs = await prisma.nPC.findMany();
+  
+  let backfilledCount = 0;
+  for (const npc of allNPCs) {
+    const existingMonster = await prisma.nPCMonster.findUnique({
+      where: { npcId: npc.id }
+    });
+    
+    if (!existingMonster) {
+      const monsterTemplateId = npc.npcType 
+        ? (DEFAULT_MONSTER_TEMPLATE_BY_NPC_TYPE[npc.npcType] || DEFAULT_MONSTER_TEMPLATE)
+        : DEFAULT_MONSTER_TEMPLATE;
+      
+      try {
+        await prisma.nPCMonster.create({
+          data: {
+            npcId: npc.id,
+            monsterId: monsterTemplateId,
+            essenceBonus: 0,
+            protectionBonus: 0,
+            accuracyBonus: 0,
+            evasionBonus: 0,
+            initiativeBonus: 0
+          }
+        });
+        
+        backfilledCount++;
+        console.log(`  Backfilled NPC: ${npc.name} (${npc.id})`);
+      } catch (e) {
+        console.error(`  Failed to backfill NPC: ${npc.name} (${npc.id})`, e);
+      }
+    }
+  }
+  
+  console.log(`Backfilled ${backfilledCount} NPCs.`);
   console.log('Seeding completed.');
 }
 

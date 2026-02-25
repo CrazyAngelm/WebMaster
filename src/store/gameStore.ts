@@ -53,6 +53,36 @@ const loadReputationFromStorage = (characterId: string) => {
   }
 };
 
+type DialogMessage = { role: 'player' | 'npc'; content: string; timestamp: number };
+
+// * Merges server and localStorage dialog history; prefers longer history per NPC
+const mergeDialogHistory = (
+  server: Record<string, DialogMessage[]>,
+  local: Record<string, DialogMessage[]>
+): Record<string, DialogMessage[]> => {
+  const merged = { ...server };
+  for (const [npcId, msgs] of Object.entries(local)) {
+    if (!Array.isArray(msgs)) continue;
+    const serverMsgs = Array.isArray(merged[npcId]) ? merged[npcId] : [];
+    if (msgs.length > serverMsgs.length) merged[npcId] = msgs;
+  }
+  return merged;
+};
+
+// * Merges server and localStorage reputation; prefers non-zero values per NPC
+const mergeReputation = (
+  server: Record<string, number>,
+  local: Record<string, number>
+): Record<string, number> => {
+  const merged = { ...server };
+  for (const [npcId, val] of Object.entries(local)) {
+    if (typeof val !== 'number') continue;
+    const serverVal = merged[npcId];
+    if (serverVal === undefined || serverVal === 0) merged[npcId] = val;
+  }
+  return merged;
+};
+
 interface User {
   id: string;
   login: string;
@@ -417,6 +447,13 @@ export const useGameStore = create<GameState>((set, get) => ({
         clearInterval(cooldownTickInterval);
       }
       
+      const serverDialogs = (character as any).npcDialogHistory || {};
+      const serverRep = (character as any).npcReputation || {};
+      const localDialogs = loadDialogsFromStorage(character.id);
+      const localRep = loadReputationFromStorage(character.id);
+      const mergedDialogs = mergeDialogHistory(serverDialogs, localDialogs);
+      const mergedRep = mergeReputation(serverRep, localRep);
+
       set({ 
         character: {
           ...character,
@@ -426,8 +463,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         }, 
         inventory: charWithSkills.inventory,
         activeQuests: character.activeQuests || [],
-        npcDialogHistory: character.npcDialogHistory || loadDialogsFromStorage(character.id),
-        npcReputation: character.npcReputation || loadReputationFromStorage(character.id),
+        npcDialogHistory: mergedDialogs,
+        npcReputation: mergedRep,
         isLoading: true 
       });
       
@@ -1245,6 +1282,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { npcDialogHistory } = get();
     const currentHistory = npcDialogHistory[npcId] || [];
     const newMessage = { role, content, timestamp: Date.now() };
+    
     
     // Keep only last 10 messages for memory management
     const MAX_HISTORY = 10;

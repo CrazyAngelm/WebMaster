@@ -92,62 +92,16 @@ const ensureDownedStatus = (participant: any, logs?: string[]): void => {
   }
 };
 
-// Helper function to create NPC character for battle
-const createNPCCharacterForBattle = async (npcId: string) => {
-  // For now, create a basic NPC character based on ID
-  // In future, this should fetch actual NPC data from database
-  const npcCharacterId = `npc-battle-${npcId}-${Date.now()}`;
-  
-  const baseStats = {
-    essence: { current: 60, max: 60 },
-    energy: { current: 50, max: 50 },
-    protection: { current: 40, max: 40 },
-    speedId: 'speed-ordinary'
-  };
-
-  const baseBonuses = {
-    evasion: 5,
-    accuracy: 5,
-    damageResistance: 0,
-    initiative: 0
-  };
-
-  // Create temporary NPC character
-  const npcCharacter = await (prisma as any).character.create({
-    data: {
-      id: npcCharacterId,
-      userId: 'system-npc', // Special user ID for NPCs
-      name: `NPC_${npcId}`,
-      raceId: 'race-human',
-      rankId: 'rank-1',
-      description: 'NPC противник',
-      bio: 'Создан для боя с игроком',
-      stats: JSON.stringify(baseStats),
-      inventoryId: null,
-      location: {
-        locationId: 'combat-zone',
-        position: 'battle'
-      },
-      isDead: false,
-      money: 0,
-      bonuses: JSON.stringify(baseBonuses),
-      professions: JSON.stringify([]),
-      activeQuests: JSON.stringify([])
-    }
-  });
-
-  return {
-    ...npcCharacter,
-    stats: baseStats,
-    bonuses: baseBonuses
-  };
-};
-
 export const startBattle = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
     const userId = req.userId;
     const { playerCharacterId, enemyId, isMonster, isNPC } = req.body;
+    const normalizedEnemyId = typeof enemyId === 'string' ? enemyId.trim() : '';
+
+    if (!normalizedEnemyId) {
+      return res.status(400).json({ error: 'Enemy ID is required' });
+    }
 
     // * Check if an active battle already exists for this character
     const existingBattle = await (prisma as any).battle.findFirst({
@@ -190,86 +144,45 @@ export const startBattle = async (req: Request, res: Response) => {
     let enemyProtection = 100;
     let enemyMonsterId: string | null = null;
     let enemyCharacterId: string | null = null;
+    let enemyBonuses = { accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 };
+    let enemyInitiativeBonus = 0;
 
     if (isNPC) {
-      // Create NPC enemy for battle.
-      // enemyId can be either NPC.id (static NPC) or NPCTemplate.id (direct template reference).
-      // Prefer NPC record (to preserve name/description), fallback to template, then defaults.
       const npc = await prisma.nPC.findUnique({
-        where: { id: enemyId }
-      }).catch(() => null);
-
-      // Try to get NPCMonster first for combat stats
-      const npcMonster = await prisma.nPCMonster.findUnique({
-        where: { npcId: enemyId }
-      }).catch(() => null);
-
-      const npcTemplate = npc?.templateId
-        ? await prisma.nPCTemplate.findUnique({ where: { id: npc.templateId } }).catch(() => null)
-        : await prisma.nPCTemplate.findUnique({ where: { id: enemyId } }).catch(() => null);
-
-      if (!npc && !npcTemplate && !npcMonster) {
+        where: { id: normalizedEnemyId }
+      });
+      if (!npc) {
         return res.status(404).json({ error: 'NPC not found' });
       }
 
-      // Use NPCMonster if available, otherwise fallback to NPC template or defaults
-      const baseEssence = npcMonster?.essenceBonus ? 
-        (npcTemplate?.baseEssence ?? 80) + npcMonster.essenceBonus : 
-        (npcTemplate?.baseEssence ?? 80);
-
-      const speedId = npcTemplate?.speedId ?? 'speed-ordinary';
-
-      enemyName = npc?.name || npcTemplate?.name || 
-        (enemyId.includes('-') ? enemyId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : 'Противник');
-      enemyHp = baseEssence;
-      enemyProtection = baseEssence;
-
-      // Create NPC character based on resolved data
-      const npcCharacterId = `npc-battle-${enemyId}-${Date.now()}`;
-      const baseStats = {
-        essence: { current: baseEssence, max: baseEssence },
-        energy: { current: 50, max: 50 },
-        protection: { current: baseEssence, max: baseEssence },
-        speedId
-      };
-
-      const baseBonuses = {
-        evasion: 5 + (npcMonster?.protectionBonus || 0),
-        accuracy: 5 + (npcMonster?.accuracyBonus || 0),
-        damageResistance: 0 + (npcMonster?.protectionBonus || 0),
-        initiative: 0 + (npcMonster?.initiativeBonus || 0)
-      };
-
-      const npcCharacter = await prisma.character.create({
-        data: {
-          id: npcCharacterId,
-          userId: 'system-npc',
-          name: enemyName,
-          raceId: 'race-human',
-          rankId: 'rank-1',
-          description: npc?.description || npcTemplate?.description || 'NPC противник',
-          bio: npcMonster ? 
-            `Создан для боя на основе NPC ${npc?.id || enemyId}` :
-            npcTemplate ? 
-              `Создан для боя на основе шаблона ${npcTemplate.id}` :
-              `Создан для боя на основе NPC ${enemyId}`,
-          stats: JSON.stringify(baseStats),
-          location: JSON.stringify({
-            locationId: 'combat-zone',
-            position: 'battle'
-          }) as string,
-          isDead: false,
-          money: 0,
-          bonuses: JSON.stringify(baseBonuses),
-          professions: JSON.stringify([]),
-          activeQuests: JSON.stringify([])
-        }
+      const npcMonster = await prisma.nPCMonster.findUnique({
+        where: { npcId: npc.id }
       });
+      if (!npcMonster) {
+        return res.status(409).json({ error: 'NPC combat profile missing' });
+      }
 
-      enemyCharacterId = npcCharacter.id;
+      const monsterTemplate = await prisma.monsterTemplate.findUnique({
+        where: { id: npcMonster.monsterId }
+      });
+      if (!monsterTemplate) {
+        return res.status(409).json({ error: 'NPC combat template missing' });
+      }
+
+      enemyName = npc.name;
+      enemyMonsterId = npcMonster.monsterId;
+      enemyHp = monsterTemplate.baseEssence + npcMonster.essenceBonus;
+      enemyProtection = monsterTemplate.baseEssence + npcMonster.protectionBonus;
+      enemyInitiativeBonus = npcMonster.initiativeBonus || 0;
+      enemyBonuses = {
+        accuracy: 5 + (npcMonster.accuracyBonus || 0),
+        evasion: 5 + (npcMonster.evasionBonus || 0),
+        initiative: enemyInitiativeBonus,
+        damageResistance: npcMonster.protectionBonus || 0
+      };
     } else if (isMonster) {
       const monsterTemplate = await (prisma as any).monsterTemplate.findUnique({
-        where: { id: enemyId }
+        where: { id: normalizedEnemyId }
       });
       if (!monsterTemplate) return res.status(404).json({ error: 'Monster template not found' });
       enemyName = monsterTemplate.name;
@@ -278,7 +191,7 @@ export const startBattle = async (req: Request, res: Response) => {
       enemyMonsterId = monsterTemplate.id;
     } else {
       const enemyChar = await (prisma as any).character.findUnique({
-        where: { id: enemyId }
+        where: { id: normalizedEnemyId }
       });
       if (!enemyChar) return res.status(404).json({ error: 'Enemy character not found' });
       const stats = JSON.parse(enemyChar.stats);
@@ -294,7 +207,7 @@ export const startBattle = async (req: Request, res: Response) => {
     // * Roll Initiative
     const playerInitRoll = DICE.roll(100);
     const playerInit = playerInitRoll + (playerBonuses.initiative || 0);
-    const enemyInit = DICE.roll(100);
+    const enemyInit = DICE.roll(100) + enemyInitiativeBonus;
 
     const initialRolls = [
       { sides: 100, result: playerInitRoll, label: `${playerChar.name}: Инициатива` },
@@ -325,7 +238,7 @@ export const startBattle = async (req: Request, res: Response) => {
         maxProtection: enemyProtection,
         isPlayer: false,
         distance: 25, // Updated spawn distance, total 50m
-        bonuses: JSON.stringify({ accuracy: 0, evasion: 0, initiative: 0, damageResistance: 0 }) // Monsters currently have no bonuses
+        bonuses: JSON.stringify(enemyBonuses)
       }
     ].sort((a, b) => b.initiative - a.initiative);
 

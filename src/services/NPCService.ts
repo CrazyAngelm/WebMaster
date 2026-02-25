@@ -17,6 +17,18 @@ interface CacheEntry {
 }
 
 class NPCServiceClass {
+  private isTransientNPCId(id: string): boolean {
+    return id.startsWith('npc-mock-') || id.startsWith('generated-') || /^npc-\d{10,}$/.test(id);
+  }
+
+  private deleteCachedNPC(cacheKey: string): void {
+    const cache = this.getCache();
+    if (cache[cacheKey]) {
+      delete cache[cacheKey];
+      this.setCache(cache);
+    }
+  }
+
   private getCache(): Record<string, CacheEntry> {
     try {
       const cached = localStorage.getItem(NPC_CACHE_KEY);
@@ -63,21 +75,9 @@ class NPCServiceClass {
 
   async getNPCForBuilding(building: Building, location: Location): Promise<NPCData> {
     const cacheKey = `building_${building.id}`;
-    
-    // 1. Check cache first
-    const cached = this.getCachedNPC(cacheKey);
-    if (cached) {
-      console.log('[NPCService] Returning cached NPC for building:', building.name);
-      const needsPersist = cached.id.startsWith('npc-') || cached.id.startsWith('npc-mock-') || cached.id.startsWith('generated-');
-      if (needsPersist) {
-        const persisted = await this.persistNPC({ ...cached, locationId: location.id, buildingId: building.id }, building.id);
-        this.cacheNPC(cacheKey, persisted);
-        return persisted;
-      }
-      return cached;
-    }
 
-    // 2. Try to get from API (static NPCs from DB)
+    // 1. Always prefer authoritative DB NPC for this building.
+    // This prevents stale local cache IDs after DB recreate/reset.
     try {
       const staticNPC = await this.fetchStaticNPC(building.id);
       if (staticNPC) {
@@ -85,7 +85,26 @@ class NPCServiceClass {
         return staticNPC;
       }
     } catch (error) {
-      console.log('[NPCService] No static NPC found, will generate');
+      console.log('[NPCService] Static NPC lookup failed, fallback to cache/generation');
+    }
+    
+    // 2. Check cache only when no static NPC exists
+    const cached = this.getCachedNPC(cacheKey);
+    if (cached) {
+      console.log('[NPCService] Returning cached NPC for building:', building.name);
+      const needsPersist = this.isTransientNPCId(cached.id);
+      if (needsPersist) {
+        try {
+          const persisted = await this.persistNPC({ ...cached, locationId: location.id, buildingId: building.id }, building.id);
+          this.cacheNPC(cacheKey, persisted);
+          return persisted;
+        } catch (error) {
+          this.deleteCachedNPC(cacheKey);
+          console.warn('[NPCService] Removed transient NPC from cache after persist failure:', error);
+        }
+      } else {
+        return cached;
+      }
     }
 
     // 3. Generate via LLM
@@ -96,20 +115,37 @@ class NPCServiceClass {
 
   async getNPCForLocation(location: Location): Promise<NPCData> {
     const cacheKey = `location_${location.id}`;
+
+    // 1. Always prefer authoritative DB NPC for this location.
+    try {
+      const staticNPC = await this.fetchStaticNPCByLocation(location.id);
+      if (staticNPC) {
+        this.cacheNPC(cacheKey, staticNPC);
+        return staticNPC;
+      }
+    } catch (error) {
+      console.log('[NPCService] Static location NPC lookup failed, fallback to cache/generation');
+    }
     
-    // Check cache
+    // 2. Check cache only when no static NPC exists
     const cached = this.getCachedNPC(cacheKey);
     if (cached) {
-      const needsPersist = cached.id.startsWith('npc-') || cached.id.startsWith('npc-mock-') || cached.id.startsWith('generated-');
+      const needsPersist = this.isTransientNPCId(cached.id);
       if (needsPersist) {
-        const persisted = await this.persistNPC({ ...cached, locationId: location.id });
-        this.cacheNPC(cacheKey, persisted);
-        return persisted;
+        try {
+          const persisted = await this.persistNPC({ ...cached, locationId: location.id });
+          this.cacheNPC(cacheKey, persisted);
+          return persisted;
+        } catch (error) {
+          this.deleteCachedNPC(cacheKey);
+          console.warn('[NPCService] Removed transient location NPC from cache after persist failure:', error);
+        }
+      } else {
+        return cached;
       }
-      return cached;
     }
 
-    // Generate via LLM
+    // 3. Generate via LLM
     const generatedNPC = await this.generateNPC(location);
     this.cacheNPC(cacheKey, generatedNPC);
     return generatedNPC;
@@ -147,9 +183,42 @@ class NPCServiceClass {
     }
   }
 
+  private async fetchStaticNPCByLocation(locationId: string): Promise<NPCData | null> {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/npcs/location/${locationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      if (!data || !data.name) return null;
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        personality: data.personality,
+        dialogueGreeting: data.greeting,
+        locationId: data.locationId,
+        buildingId: data.buildingId,
+        templateId: data.templateId || undefined,
+        npcType: data.npcType
+      };
+    } catch (error) {
+      console.log('[NPCService] Error fetching NPC by location:', error);
+      return null;
+    }
+  }
+
   private async persistNPC(npc: NPCData, buildingId?: string): Promise<NPCData> {
     const token = localStorage.getItem('token');
-    if (!token) return npc;
+    if (!token) {
+      throw new Error('Missing auth token. Cannot persist NPC to server.');
+    }
 
     try {
       const response = await fetch('/api/npcs', {
@@ -169,10 +238,16 @@ class NPCServiceClass {
         })
       });
 
-      if (!response.ok) return npc;
+      if (!response.ok) {
+        const details = await response.json().catch(() => null);
+        const message = details?.error || `HTTP ${response.status}`;
+        throw new Error(`Failed to persist NPC: ${message}`);
+      }
       const data = await response.json();
 
-      if (!data?.id) return npc;
+      if (!data?.id) {
+        throw new Error('Failed to persist NPC: server returned empty id');
+      }
       return {
         ...npc,
         id: data.id,
@@ -180,7 +255,7 @@ class NPCServiceClass {
       };
     } catch (error) {
       console.warn('[NPCService] Failed to persist NPC:', error);
-      return npc;
+      throw error instanceof Error ? error : new Error('Failed to persist NPC');
     }
   }
 
