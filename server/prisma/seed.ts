@@ -1,10 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
+// Import and call other seed functions
+import { seedSkills } from './seed-skills';
+import { seedEffects } from './seed-effects';
+
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding static data...');
+  
+  // * Effects must be seeded before skills (skills reference effect IDs)
+  await seedEffects();
+  await seedSkills();
 
   const systemPasswordHash = await bcrypt.hash('SYSTEM_NPC_PASSWORD', 10);
   await prisma.user.upsert({
@@ -2432,11 +2440,8 @@ async function main() {
     { rank: 6, minExp: 400, maxExp: 999999999, name: 'Прославленный мастер' },
   ];
 
-  for (const t of thresholds) {
-    await prisma.professionRankThreshold.create({
-      data: t
-    });
-  }
+  await prisma.professionRankThreshold.deleteMany({});
+  await prisma.professionRankThreshold.createMany({ data: thresholds });
 
   // --- Game Events ---
   const events = [

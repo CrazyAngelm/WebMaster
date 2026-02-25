@@ -19,7 +19,7 @@ interface CombatState {
   
   // Actions
   initiateBattle: (enemyId: string, isMonster: boolean, isNPC?: boolean) => Promise<void>;
-  nextTurn: () => Promise<void>;
+  nextTurn: (forceEndTurn?: boolean) => Promise<void>;
   executeAttack: (
     attackerId: string,
     targetId: string,
@@ -29,7 +29,7 @@ interface CombatState {
   useConsumable: (participantId: string, itemId: string, targetId?: string) => Promise<any>;
   blockWithShield: (participantId: string, actionType: 'MAIN' | 'BONUS') => Promise<any>;
   revive: (reviverId: string, targetId: string) => Promise<any>;
-  move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number) => Promise<void>;
+  move: (participantId: string, direction?: 'left' | 'right' | 'towards' | 'away', targetDistance?: number, actionType?: 'MAIN' | 'BONUS') => Promise<void>;
   endBattle: (battleId?: string) => Promise<void>;
   syncBattle: (battleId: string) => Promise<void>;
   checkActiveBattle: (characterId: string) => Promise<boolean>;
@@ -108,7 +108,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
   },
 
-  nextTurn: async () => {
+  nextTurn: async (forceEndTurn = false) => {
     const { battle } = get();
     const { token } = useGameStore.getState();
     if (!battle || !token) return;
@@ -120,7 +120,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ battleId: battle.id })
+        body: JSON.stringify({ battleId: battle.id, forceEndTurn })
       });
       
       const result = await res.json();
@@ -195,6 +195,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       return result;
     } catch (error) {
       console.error('Attack failed:', error);
+      throw error;
     }
   },
 
@@ -390,7 +391,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
     }
   },
 
-  move: async (participantId, direction, targetDistance) => {
+  move: async (participantId, direction, targetDistance, actionType?: 'MAIN' | 'BONUS') => {
     const { battle } = get();
     const { token } = useGameStore.getState();
     if (!battle || !token) return;
@@ -406,7 +407,8 @@ export const useCombatStore = create<CombatState>((set, get) => ({
           battleId: battle.id,
           participantId,
           direction,
-          targetDistance
+          targetDistance,
+          actionType
         })
       });
       
@@ -434,6 +436,7 @@ export const useCombatStore = create<CombatState>((set, get) => ({
       }
     } catch (error) {
       console.error('Move failed:', error);
+      throw error;
     }
   },
 

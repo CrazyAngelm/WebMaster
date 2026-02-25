@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function main() {
+async function seedSkills() {
   const skills = [
     {
       id: 'skill-fire-bolt',
@@ -244,11 +244,4 @@ async function main() {
   console.log('Basic skills seeded!');
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+export { seedSkills };

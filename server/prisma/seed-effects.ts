@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function main() {
+async function seedEffects() {
   const effects = [
     {
       id: 'effect-poison',
@@ -149,11 +149,4 @@ async function main() {
   console.log('Basic effects seeded!');
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+export { seedEffects };

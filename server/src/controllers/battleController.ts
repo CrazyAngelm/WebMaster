@@ -65,14 +65,16 @@ const formatBattle = (battle: any) => {
   return {
     ...battle,
     log: typeof battle.log === 'string' ? JSON.parse(battle.log) : battle.log,
-    participants: battle.participants.map((p: any) => ({
-      ...p,
-      bonuses: p.bonuses ? JSON.parse(p.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 },
-      activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : [],
-      isBlocking: p.isBlocking || false,
-      status: p.status || ParticipantStatus.ALIVE,
-      downedRoundsRemaining: p.downedRoundsRemaining ?? 0
-    }))
+    participants: battle.participants
+      .map((p: any) => ({
+        ...p,
+        bonuses: p.bonuses ? JSON.parse(p.bonuses) : { evasion: 0, accuracy: 0, damageResistance: 0, initiative: 0 },
+        activeEffects: p.activeEffects ? JSON.parse(p.activeEffects) : [],
+        isBlocking: p.isBlocking || false,
+        status: p.status || ParticipantStatus.ALIVE,
+        downedRoundsRemaining: p.downedRoundsRemaining ?? 0
+      }))
+      .sort((a: any, b: any) => b.initiative - a.initiative) // Ensure sorted by initiative (highest first)
   };
 };
 
@@ -287,7 +289,7 @@ export const startBattle = async (req: Request, res: Response) => {
 
 export const move = async (req: Request, res: Response) => {
   try {
-    const { battleId, participantId, direction, targetDistance } = req.body; // direction: 'left' | 'right' | 'towards' | 'away'
+    const { battleId, participantId, direction, targetDistance, actionType } = req.body; // direction: 'left' | 'right' | 'towards' | 'away'
 
     const battle = await (prisma as any).battle.findUnique({
       where: { id: battleId },
@@ -310,9 +312,17 @@ export const move = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
-    // * Check actions
-    if (participant.mainActions <= 0) {
-      return res.status(400).json({ error: 'No main actions left for movement' });
+    // * Check actions - support MAIN and BONUS action types
+    const requestedActionType = actionType || 'MAIN';
+    if (requestedActionType === 'MAIN') {
+      if (participant.mainActions <= 0) {
+        return res.status(400).json({ error: 'No main actions left for movement' });
+      }
+    } else {
+      // BONUS: allow if bonus actions available, or fallback to main if no bonus
+      if (participant.bonusActions <= 0 && participant.mainActions <= 0) {
+        return res.status(400).json({ error: 'No actions left for movement' });
+      }
     }
 
     // * Get movement distance based on speed
@@ -419,13 +429,29 @@ export const move = async (req: Request, res: Response) => {
       }
     }
 
+    // * Determine action cost based on actionType
+    let newMainActions = participant.mainActions;
+    let newBonusActions = participant.bonusActions;
+    
+    if (requestedActionType === 'MAIN') {
+      newMainActions = Math.max(0, participant.mainActions - 1);
+    } else {
+      // BONUS: spend bonus if available, otherwise spend main
+      if (participant.bonusActions > 0) {
+        newBonusActions = Math.max(0, participant.bonusActions - 1);
+      } else {
+        newMainActions = Math.max(0, participant.mainActions - 1);
+      }
+    }
+
     // * Update participant in DB
     const updatedParticipant = await (prisma as any).battleParticipant.update({
       where: { id: participant.id },
       data: {
         distance: newDistance,
         currentHp: participant.currentHp,
-        mainActions: participant.mainActions - 1,
+        mainActions: newMainActions,
+        bonusActions: newBonusActions,
         status: participant.status || ParticipantStatus.ALIVE,
         downedRoundsRemaining: participant.downedRoundsRemaining ?? 0
       }
@@ -1067,7 +1093,7 @@ export const resolveAttack = async (req: Request, res: Response) => {
 
 export const nextTurn = async (req: Request, res: Response) => {
     try {
-        const { battleId } = req.body;
+        const { battleId, forceEndTurn } = req.body;
         const battle = await (prisma as any).battle.findUnique({
             where: { id: battleId },
             include: { participants: true }
@@ -1075,7 +1101,23 @@ export const nextTurn = async (req: Request, res: Response) => {
 
         if (!battle) return res.status(404).json({ error: 'Battle not found' });
 
-        const totalParticipants = battle.participants.length;
+        // * Sort participants by initiative (highest first) to match formatBattle/client order
+        const sortedParticipants = [...battle.participants].sort((a: any, b: any) => b.initiative - a.initiative);
+
+        // Check if current participant has actions left (unless forceEndTurn is true)
+        const currentParticipant = sortedParticipants[battle.currentTurnIndex];
+        const hasActionsLeft = (currentParticipant?.mainActions ?? 0) > 0 || (currentParticipant?.bonusActions ?? 0) > 0;
+        
+        if (!forceEndTurn && hasActionsLeft) {
+            // Return current battle without switching turn
+            const refreshed = await (prisma as any).battle.findUnique({
+                where: { id: battle.id },
+                include: { participants: true }
+            });
+            return res.json({ battle: formatBattle(refreshed) });
+        }
+
+        const totalParticipants = sortedParticipants.length;
         let nextIndex = battle.currentTurnIndex;
         let nextParticipant: any = null;
         let wrappedRound = false;
@@ -1083,7 +1125,7 @@ export const nextTurn = async (req: Request, res: Response) => {
         for (let i = 0; i < totalParticipants; i++) {
           nextIndex = (nextIndex + 1) % totalParticipants;
           if (nextIndex === 0) wrappedRound = true;
-          const candidate = battle.participants[nextIndex];
+          const candidate = sortedParticipants[nextIndex];
           if (getParticipantStatus(candidate) === ParticipantStatus.ALIVE) {
             nextParticipant = candidate;
             break;

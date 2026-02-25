@@ -50,32 +50,64 @@ export const CombatScreen: React.FC = () => {
   
   // * Auto-handle enemy turns
   useEffect(() => {
-    if (battle && battle.status === BattleStatus.ACTIVE) {
-      const currentParticipant = battle.participants[battle.currentTurnIndex];
-      const isPlayerTurn = currentParticipant.characterId === character?.id;
+    if (!battle || battle.status !== BattleStatus.ACTIVE) return;
 
-      if (!isPlayerTurn) {
-        // * Enemy AI Turn
-        const timer = setTimeout(async () => {
-          const target = battle.participants.find(p => p.isPlayer && p.status !== 'DOWNED' && p.status !== 'DEAD');
-          if (target) {
-            // Check range
-            const dist = Math.abs(currentParticipant.distance - target.distance);
-            
-            // For now, AI only has unarmed melee (0-5m)
-            if (dist > 5) {
-              // Move TOWARDS player (smarter move)
-              await move(currentParticipant.id, 'towards');
-            } else {
-              await executeAttack(currentParticipant.id, target.id, null);
-            }
+    const currentParticipant = battle.participants[battle.currentTurnIndex];
+    if (!currentParticipant) return;
+
+    // Check if it's monster/npc turn (no characterId)
+    const isMonsterTurn = !currentParticipant.characterId;
+
+    if (isMonsterTurn) {
+      // Enemy AI Turn - execute all available actions
+      const timer = setTimeout(async () => {
+        const MAX_ITERATIONS = 10;
+        let participant = currentParticipant;
+        let target = battle.participants.find(p => p.isPlayer && p.status !== 'DOWNED' && p.status !== 'DEAD');
+
+        try {
+          if (!target) {
+            await nextTurn(true);
+            return;
           }
-          await nextTurn();
-        }, 1500); // 1.5s delay for readability
-        return () => clearTimeout(timer);
-      }
+
+          let iterations = 0;
+          while (
+            (participant.mainActions > 0 || participant.bonusActions > 0) &&
+            target &&
+            iterations < MAX_ITERATIONS
+          ) {
+            iterations += 1;
+            const dist = Math.abs(participant.distance - target.distance);
+
+            try {
+              // Priority: attack if in range and has main action
+              if (dist <= 5 && participant.mainActions > 0) {
+                await executeAttack(participant.id, target.id, null);
+              } else if (participant.mainActions > 0) {
+                await move(participant.id, 'towards', undefined, 'MAIN');
+              } else if (participant.bonusActions > 0) {
+                await move(participant.id, 'towards', undefined, 'BONUS');
+              }
+            } catch {
+              break;
+            }
+
+            // Refresh participant data from battle store
+            const updatedBattle = useCombatStore.getState().battle;
+            if (!updatedBattle) break;
+            participant = updatedBattle.participants.find((p: any) => p.id === currentParticipant.id) || participant;
+            target = updatedBattle.participants.find((p: any) => p.isPlayer && p.status !== 'DOWNED' && p.status !== 'DEAD');
+
+            if (updatedBattle.status !== BattleStatus.ACTIVE) break;
+          }
+        } finally {
+          await nextTurn(true);
+        }
+      }, 1500); // 1.5s delay for readability
+      return () => clearTimeout(timer);
     }
-  }, [battle?.currentTurnIndex, battle?.status]);
+  }, [battle?.id, battle?.currentTurnIndex]);
 
   // * Sync player health back to game store if changed
   useEffect(() => {
@@ -155,7 +187,6 @@ export const CombatScreen: React.FC = () => {
     const attackWeaponId = dualWieldPrimary?.id || equippedWeapon?.id || null;
     const result = await executeAttack(currentParticipant.id, target.id, attackWeaponId);
     recordActionResult(result);
-    await nextTurn();
   };
 
   const handleBlockWithShield = async (actionType: 'MAIN' | 'BONUS'): Promise<void> => {
@@ -178,7 +209,6 @@ export const CombatScreen: React.FC = () => {
       const result = await blockWithShield(playerParticipant.id, actionType);
       recordActionResult(result);
       setShowShieldBlockOptions(false);
-      await nextTurn();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось блокировать щитом';
       setNotification({ type: 'error', message });
@@ -194,7 +224,6 @@ export const CombatScreen: React.FC = () => {
 
     try {
       await revive(playerParticipant.id, reviveTarget.id);
-      await nextTurn();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось поднять союзника';
       setNotification({ type: 'error', message });
@@ -254,7 +283,6 @@ export const CombatScreen: React.FC = () => {
         result = await executeAttack(playerParticipant.id, center.id, aoeSelection.id);
         recordActionResult(result);
         setAoeSelection(null);
-        await nextTurn();
         return;
       } else if (aoeSelection.kind === 'skill') {
         result = await useSkill(playerParticipant.id, aoeSelection.id, center.id);
@@ -269,13 +297,12 @@ export const CombatScreen: React.FC = () => {
     }
   };
 
-  const handleMove = async (direction: 'left' | 'right' | 'towards' | 'away', targetDistance?: number): Promise<void> => {
+  const handleMove = async (direction: 'left' | 'right' | 'towards' | 'away', targetDistance?: number, actionType?: 'MAIN' | 'BONUS'): Promise<void> => {
     if (!battle || !character) return;
     const currentParticipant = battle.participants[battle.currentTurnIndex];
     if (!currentParticipant || !isPlayerTurn) return;
 
-    await move(currentParticipant.id, direction, targetDistance);
-    await nextTurn();
+    await move(currentParticipant.id, direction, targetDistance, actionType);
   };
 
   // * Get available targets for a skill
@@ -369,11 +396,6 @@ export const CombatScreen: React.FC = () => {
         type: 'success',
         message: `Способность применена: ${skillTemplate.name}`,
       });
-      
-      // * Only advance turn if skill was executed immediately (not casting)
-      if (result && !result.isCasting) {
-        await nextTurn();
-      }
     } catch (error) {
       // * Show error to user - action was not consumed
       setSkillError(error instanceof Error ? error.message : 'Не удалось применить способность');
@@ -497,9 +519,6 @@ export const CombatScreen: React.FC = () => {
         type: 'success',
         message: `Предмет использован: ${template.name}`,
       });
-      
-      // * Consumables always consume an action, so advance turn
-      await nextTurn();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Не удалось использовать предмет';
       setConsumableError(message);
@@ -691,7 +710,7 @@ export const CombatScreen: React.FC = () => {
       {/* Battle Scene (1D Line) */}
       <div className="relative h-64 bg-black/40 border-y border-fantasy-border/30 rounded-lg overflow-hidden flex flex-col justify-end pb-8">
         {/* Hint text */}
-        {isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && (
+        {isPlayerTurn && (playerParticipant?.mainActions! > 0 || playerParticipant?.bonusActions! > 0) && !isPlayerDowned && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-[9px] text-gray-400 uppercase tracking-wider pointer-events-none">
             Кликните по линии для перемещения
           </div>
@@ -701,20 +720,24 @@ export const CombatScreen: React.FC = () => {
         <div 
           className={clsx(
             "absolute inset-0 z-10 cursor-crosshair transition-colors",
-            isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && "hover:bg-fantasy-accent/5"
+            isPlayerTurn && (playerParticipant?.mainActions! > 0 || playerParticipant?.bonusActions! > 0) && !isPlayerDowned && "hover:bg-fantasy-accent/5"
           )}
           onClick={(e) => {
-            if (!isPlayerTurn || playerParticipant?.mainActions === 0 || aoeSelection || isPlayerDowned) return;
+            const hasMainAction = (playerParticipant?.mainActions || 0) > 0;
+            const hasBonusAction = (playerParticipant?.bonusActions || 0) > 0;
+            if (!isPlayerTurn || (!hasMainAction && !hasBonusAction) || aoeSelection || isPlayerDowned) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const percentage = (x / rect.width) * 100;
             const clickedDistance = ((percentage - 50) / 100) * 200; // -100 to 100 range
-            handleMove('towards', clickedDistance);
+            // Use MAIN action if available, otherwise use BONUS
+            const actionType = hasMainAction ? 'MAIN' : 'BONUS';
+            handleMove('towards', clickedDistance, actionType);
           }}
-          title={isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned ? "Кликните по линии для перемещения" : undefined}
+          title={isPlayerTurn && (playerParticipant?.mainActions! > 0 || playerParticipant?.bonusActions! > 0) && !isPlayerDowned ? "Кликните по линии для перемещения" : undefined}
         >
           {/* Visual reach indicator for movement */}
-          {isPlayerTurn && playerParticipant?.mainActions! > 0 && !isPlayerDowned && playerParticipant && (
+          {isPlayerTurn && (playerParticipant?.mainActions! > 0 || playerParticipant?.bonusActions! > 0) && !isPlayerDowned && playerParticipant && (
             <div 
               className="absolute bottom-0 h-1 bg-fantasy-accent/30 pointer-events-none transition-all"
               style={{ 
@@ -1062,7 +1085,7 @@ export const CombatScreen: React.FC = () => {
 
               <button 
                 disabled={!isPlayerTurn} 
-                onClick={() => nextTurn()}
+                onClick={() => nextTurn(true)}
                 className={clsx("fantasy-button flex items-center gap-2 py-1 px-4 text-sm", !isPlayerTurn && "opacity-30 cursor-not-allowed")}
               >
                 Завершить ход
