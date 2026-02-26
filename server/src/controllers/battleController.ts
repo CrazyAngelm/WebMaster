@@ -94,6 +94,12 @@ const ensureDownedStatus = (participant: any, logs?: string[]): void => {
   }
 };
 
+/** Returns the participant whose turn it is, using initiative-sorted order (matches formatBattle/client). */
+const getCurrentTurnParticipant = (battle: any): any => {
+  const sorted = [...(battle.participants || [])].sort((a: any, b: any) => b.initiative - a.initiative);
+  return sorted[battle.currentTurnIndex ?? 0] ?? null;
+};
+
 export const exploreBattle = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
@@ -488,8 +494,9 @@ export const move = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Cannot move while downed or dead' });
     }
 
-    // * Check turn
-    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+    // * Check turn - use initiative-sorted order (matches formatBattle/client)
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== participant.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
@@ -704,7 +711,8 @@ export const resolveAttack = async (req: Request, res: Response) => {
     }
 
     // * Check if it's the attacker's turn
-    if (battle.participants[battle.currentTurnIndex].id !== attacker.id) {
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== attacker.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
@@ -1551,7 +1559,8 @@ export const useSkill = async (req: Request, res: Response) => {
     }
 
     // * Check if it's the participant's turn
-    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== participant.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
@@ -2057,7 +2066,8 @@ export const useConsumable = async (req: Request, res: Response) => {
     }
 
     // * Check if it's the participant's turn
-    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== participant.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
@@ -2761,7 +2771,8 @@ export const reviveParticipant = async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Participants not found' });
     }
 
-    if (battle.participants[battle.currentTurnIndex].id !== reviver.id) {
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== reviver.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
@@ -2840,7 +2851,8 @@ export const blockWithShield = async (req: Request, res: Response) => {
     }
 
     // * Check if it's the participant's turn
-    if (battle.participants[battle.currentTurnIndex].id !== participant.id) {
+    const currentTurnParticipant = getCurrentTurnParticipant(battle);
+    if (currentTurnParticipant?.id !== participant.id) {
       return res.status(400).json({ error: "It's not your turn" });
     }
 
