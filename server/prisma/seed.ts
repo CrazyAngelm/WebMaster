@@ -168,7 +168,7 @@ async function main() {
       stackSize: 20,
       isUnique: false,
       description: 'Обычная руда, используемая для базовой ковки.',
-      basePrice: 10
+      basePrice: 5
     },
     {
       id: 'mat-iron-ore',
@@ -178,7 +178,7 @@ async function main() {
       stackSize: 20,
       isUnique: false,
       description: 'Прочная руда для качественного оружия и доспехов.',
-      basePrice: 50
+      basePrice: 30
     },
     {
       id: 'mat-linen-fabric',
@@ -187,7 +187,7 @@ async function main() {
       rarity: 'COMMON',
       stackSize: 30,
       isUnique: false,
-      basePrice: 5
+      basePrice: 2
     },
     {
       id: 'mat-wolf-heart',
@@ -196,7 +196,7 @@ async function main() {
       rarity: 'COMMON',
       stackSize: 10,
       isUnique: false,
-      basePrice: 20
+      basePrice: 10
     },
     {
       id: 'mat-tin-ore',
@@ -214,7 +214,7 @@ async function main() {
       rarity: 'MYTHIC',
       stackSize: 15,
       isUnique: false,
-      basePrice: 500
+      basePrice: 600
     },
     {
       id: 'mat-silk-fabric',
@@ -223,7 +223,7 @@ async function main() {
       rarity: 'EPIC',
       stackSize: 30,
       isUnique: false,
-      basePrice: 150
+      basePrice: 100
     },
     {
       id: 'mat-coal',
@@ -292,7 +292,7 @@ async function main() {
       maxEssence: 100,
       penetration: 'NONE',
       distance: 'CLOSE',
-      basePrice: 100
+      basePrice: 200
     },
     {
       id: 'wpn-gross-messer',
@@ -311,7 +311,7 @@ async function main() {
       initiativeBonus: 80,
       resistanceBonus: 0,
       description: '+80 Инициатива',
-      basePrice: 850
+      basePrice: 25500
     },
     {
       id: 'wpn-poleaxe',
@@ -330,7 +330,7 @@ async function main() {
       initiativeBonus: 30,
       resistanceBonus: 0,
       description: '+70 Точность, +30 Инициатива, +100 Защита',
-      basePrice: 2500
+      basePrice: 417500
     },
     {
       id: 'wpn-impaler-bow',
@@ -344,7 +344,7 @@ async function main() {
       maxEssence: 150,
       penetration: 'NONE',
       distance: 'MEDIUM',
-      basePrice: 120
+      basePrice: 325
     },
     {
       id: 'wpn-steel-hammer-poisoned',
@@ -360,7 +360,7 @@ async function main() {
       distance: JSON.stringify({ minRange: 0, maxRange: 5 }),
       effects: JSON.stringify(['effect-poison']),
       description: 'Тяжелый молот с отравленным наконечником. Наносит яд при попадании.',
-      basePrice: 300
+      basePrice: 2350
     },
     {
       id: 'arm-light-leather',
@@ -372,7 +372,7 @@ async function main() {
       isUnique: false,
       ignoreDamage: 0,
       baseDurability: 2,
-      basePrice: 50
+      basePrice: 100
     },
     {
       id: 'arm-medium-chain',
@@ -386,7 +386,7 @@ async function main() {
       hitPenalty: 50,
       evasionPenalty: 100,
       baseDurability: 3,
-      basePrice: 200
+      basePrice: 900
     },
     {
       id: 'arm-heavy-plate',
@@ -401,7 +401,7 @@ async function main() {
       evasionPenalty: 250,
       speedPenalty: 3,
       baseDurability: 4,
-      basePrice: 800
+      basePrice: 8000
     },
     {
       id: 'arm-super-heavy-bastion',
@@ -416,7 +416,7 @@ async function main() {
       evasionPenalty: 400,
       speedPenalty: 6,
       baseDurability: 6,
-      basePrice: 5000
+      basePrice: 320000
     },
     {
       id: 'con-simple-stew',
@@ -478,7 +478,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 2.',
-      basePrice: 500
+      basePrice: 3968
     },
     {
       id: 'con-spirit-potion',
@@ -489,7 +489,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 3.',
-      basePrice: 1500
+      basePrice: 7665
     },
     {
       id: 'con-phoenix-potion',
@@ -500,7 +500,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 4.',
-      basePrice: 5000
+      basePrice: 15600
     },
     {
       id: 'con-demonic-potion',
@@ -511,7 +511,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 5.',
-      basePrice: 15000
+      basePrice: 43500
     },
     {
       id: 'con-element-potion',
@@ -522,7 +522,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 1.',
-      basePrice: 50000
+      basePrice: 90000
     },
     {
       id: 'con-chaos-potion',
@@ -533,7 +533,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 2.',
-      basePrice: 100000
+      basePrice: 168000
     },
     {
       id: 'con-death-potion',
@@ -544,7 +544,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 3.',
-      basePrice: 250000
+      basePrice: 357000
     },
     {
       id: 'bag-linen-worn',
@@ -554,7 +554,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 3,
-      basePrice: 80
+      basePrice: 350
     },
     {
       id: 'bag-leather-sturdy',
@@ -564,7 +564,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 5,
-      basePrice: 450
+      basePrice: 4200
     },
     {
       id: 'bag-silk-fine',
@@ -574,7 +574,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 8,
-      basePrice: 1200
+      basePrice: 41000
     },
     {
       id: 'bag-void-small',
@@ -584,7 +584,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 12,
-      basePrice: 4000
+      basePrice: 205000
     },
     {
       id: 'bag-dragon-hide',
@@ -594,7 +594,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 16,
-      basePrice: 15000
+      basePrice: 1275000
     },
     {
       id: 'bag-divine-infinite',
@@ -604,7 +604,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 20,
-      basePrice: 100000
+      basePrice: 1275000
     },
     // --- MATERIALS FOR MONSTER LOOT ---
     // Rank 1 (COMMON)
@@ -677,7 +677,7 @@ async function main() {
       stackSize: 15,
       isUnique: false,
       description: 'Клык орка. Ценный материал для оружия.',
-      basePrice: 40
+      basePrice: 45
     },
     {
       id: 'mat-ogre-bone',
@@ -728,7 +728,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Клык вампира. Ценный материал.',
-      basePrice: 200
+      basePrice: 250
     },
     {
       id: 'mat-demon-horn',
@@ -789,7 +789,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Чешуя дракона. Невероятно прочная.',
-      basePrice: 600
+      basePrice: 1200
     },
     {
       id: 'mat-phoenix-feather',
@@ -830,7 +830,7 @@ async function main() {
       stackSize: 5,
       isUnique: false,
       description: 'Душа павшего рыцаря смерти.',
-      basePrice: 1500
+      basePrice: 5000
     },
     {
       id: 'mat-elder-dragon-heart',
@@ -840,7 +840,7 @@ async function main() {
       stackSize: 3,
       isUnique: false,
       description: 'Сердце древнего дракона. Пульсирует невероятной силой.',
-      basePrice: 2000
+      basePrice: 5000
     },
     {
       id: 'mat-abyssal-essence',
