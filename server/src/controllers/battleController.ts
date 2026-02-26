@@ -80,6 +80,11 @@ const formatBattle = (battle: any) => {
 
 const DOWNED_ROUNDS = 3;
 
+const ARENA_BOUNDS = {
+  min: -500, // meters
+  max: 500   // meters
+};
+
 const getParticipantStatus = (participant: any): ParticipantStatus => {
   return (participant?.status as ParticipantStatus) || ParticipantStatus.ALIVE;
 };
@@ -584,6 +589,13 @@ export const move = async (req: Request, res: Response) => {
         }
         break; // Only adjust for first enemy found (should be nearest)
       }
+    }
+
+    // * Arena boundary check: prevent movement beyond fixed limits
+    if (newDistance < ARENA_BOUNDS.min) {
+      newDistance = ARENA_BOUNDS.min;
+    } else if (newDistance > ARENA_BOUNDS.max) {
+      newDistance = ARENA_BOUNDS.max;
     }
 
     const log: string[] = [];

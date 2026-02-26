@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
 import { useDiceStore } from '../store/diceStore';
@@ -49,6 +49,9 @@ export const CombatScreen: React.FC = () => {
     radius: number;
   } | null>(null);
   const [aoeHoverCenterId, setAoeHoverCenterId] = useState<string | null>(null);
+  
+  // Viewport ref for scrolling
+  const viewportRef = useRef<HTMLDivElement>(null);
   
   // Состояние для данных об опасностях локации
   const [encountersData, setEncountersData] = useState<{
@@ -672,6 +675,22 @@ export const CombatScreen: React.FC = () => {
   const reviveTarget = downedAllies[0] || null;
   const canReviveTarget = !!(reviveTarget && playerParticipant && Math.abs(playerParticipant.distance - reviveTarget.distance) <= 5);
 
+  // * Auto-center player character after each turn
+  useEffect(() => {
+    if (!battle || !playerParticipant || !viewportRef.current) return;
+    
+    const arenaCenterPx = 1000; // Center of arena in pixels
+    const pixelsPerMeter = 2; // 2000px / 1000m = 2px per meter
+    const playerPosPx = arenaCenterPx + (playerParticipant.distance * pixelsPerMeter);
+    const viewportWidth = viewportRef.current.clientWidth;
+    const targetScrollLeft = playerPosPx - (viewportWidth / 2);
+    
+    viewportRef.current.scrollTo({
+      left: Math.max(0, Math.min(2000 - viewportWidth, targetScrollLeft)),
+      behavior: 'smooth'
+    });
+  }, [battle?.currentTurnIndex, battle?.participants, playerParticipant?.distance]);
+
   const equippedWeapons = inventory?.items.filter((i: any) => {
     const template = itemTemplates.get(i.templateId);
     return i.isEquipped && template?.type === 'WEAPON';
@@ -811,7 +830,63 @@ export const CombatScreen: React.FC = () => {
           </div>
         )}
 
-        {/* Clickable Line Layer */}
+        {/* Scrollable Viewport Container */}
+        <div
+          ref={viewportRef}
+          className="flex-1 overflow-x-auto overflow-y-hidden relative"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          onWheel={(e) => {
+            // Convert vertical scroll to horizontal scroll
+            if (viewportRef.current) {
+              e.preventDefault();
+              const scrollAmount = e.deltaY > 0 ? 50 : -50; // Adjust scroll speed
+              viewportRef.current.scrollLeft += scrollAmount;
+            }
+          }}
+        >
+          <style>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+
+          {/* Manual Scroll Controls */}
+          <div className="absolute top-2 right-2 z-20 flex gap-1">
+            <button
+              onClick={() => {
+                if (viewportRef.current) {
+                  viewportRef.current.scrollTo({
+                    left: Math.max(0, viewportRef.current.scrollLeft - 200),
+                    behavior: 'smooth'
+                  });
+                }
+              }}
+              className="p-1 bg-black/60 border border-fantasy-border/50 rounded hover:bg-black/80 transition-colors"
+              title="Прокрутить влево"
+            >
+              <ArrowLeft size={14} className="text-gray-400" />
+            </button>
+            <button
+              onClick={() => {
+                if (viewportRef.current) {
+                  viewportRef.current.scrollTo({
+                    left: Math.min(2000 - viewportRef.current.clientWidth, viewportRef.current.scrollLeft + 200),
+                    behavior: 'smooth'
+                  });
+                }
+              }}
+              className="p-1 bg-black/60 border border-fantasy-border/50 rounded hover:bg-black/80 transition-colors"
+              title="Прокрутить вправо"
+            >
+              <ArrowRight size={14} className="text-gray-400" />
+            </button>
+          </div>
+
+          {/* Arena Container - wider than viewport */}
+          <div
+            className="relative h-full"
+            style={{ width: '2000px', minWidth: '2000px' }}
+          >
         <div 
           className={clsx(
             "absolute inset-0 z-10 cursor-crosshair transition-colors",
@@ -860,9 +935,12 @@ export const CombatScreen: React.FC = () => {
         {/* Participants on the line */}
         <div className="relative w-full h-full">
           {battle.participants.map((p, idx) => {
-            // Map distance to percentage (center 0 is 50%)
-            // Range: -100m to 100m for visualization
-            const leftPos = 50 + (p.distance / 200) * 100;
+            // Map distance to pixels within arena (arena is 2000px wide, -500m to 500m range)
+            // Center (0m) is at 1000px (50% of 2000px)
+            // Each meter = 2px (2000px / 1000m total range)
+            const arenaCenterPx = 1000; // Center of arena in pixels
+            const pixelsPerMeter = 2; // 2000px / 1000m = 2px per meter
+            const leftPos = arenaCenterPx + (p.distance * pixelsPerMeter);
             const isCurrent = p.id === currentParticipant.id;
             const isDowned = p.status === 'DOWNED';
             const isDead = p.status === 'DEAD';
@@ -903,7 +981,7 @@ export const CombatScreen: React.FC = () => {
                   isDowned && !isDead && "opacity-80 grayscale"
                 )}
                 style={{ 
-                  left: `${leftPos}%`, 
+                  left: `${leftPos}px`, 
                   transform: 'translateX(-50%)',
                   bottom: `${verticalOffset}px`,
                   zIndex: zIndex
@@ -1008,6 +1086,8 @@ export const CombatScreen: React.FC = () => {
               </div>
             );
           })}
+        </div>
+        </div>
         </div>
       </div>
 
