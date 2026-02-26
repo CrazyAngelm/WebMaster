@@ -63,6 +63,7 @@ export const CombatScreen: React.FC = () => {
     }[];
   } | null>(null);
   const [encountersLoading, setEncountersLoading] = useState(false);
+  const [isSearchingConflict, setIsSearchingConflict] = useState(false);
   
   // * Auto-handle enemy turns
   useEffect(() => {
@@ -151,30 +152,20 @@ export const CombatScreen: React.FC = () => {
   // Загрузка данных об опасностях локации при монтировании или смене локации
   useEffect(() => {
     const currentLocId = character?.location?.locationId;
-    console.log('[CombatScreen] useEffect triggered, currentLocId:', currentLocId, 'character:', character);
-    if (!currentLocId) {
-      console.log('[CombatScreen] No locationId, skipping loadEncounters');
-      return;
-    }
-    
+    if (!currentLocId) return;
+
     const abortController = new AbortController();
-    
+
     const loadEncounters = async () => {
-      console.log('[CombatScreen] Loading encounters...');
       setEncountersLoading(true);
       try {
         const token = useGameStore.getState().token;
-        console.log('[CombatScreen] Token:', token ? 'exists' : 'missing');
         const res = await fetch('/api/battle/location/encounters', {
           headers: { 'Authorization': `Bearer ${token}` },
           signal: abortController.signal
         });
-        
-        console.log('[CombatScreen] Response status:', res.status);
         if (!res.ok) throw new Error('Network response was not ok');
-        
         const data = await res.json();
-        console.log('[CombatScreen] Encounters data:', data);
         setEncountersData(data);
       } catch (error) {
         if (error instanceof Error && error.name !== 'AbortError') {
@@ -193,7 +184,7 @@ export const CombatScreen: React.FC = () => {
 
   const handleStartBattle = async () => {
     if (!character) return;
-    
+    setIsSearchingConflict(true);
     try {
       // Используем новый эндпоинт для поиска случайных монстров
       const token = useGameStore.getState().token;
@@ -210,33 +201,41 @@ export const CombatScreen: React.FC = () => {
       }
       
       const result = await res.json();
-      
+
       if (result.status === 'empty') {
+        setIsSearchingConflict(false);
         // Никто не найден
         setNotification({
-          type: 'success',
-          message: result.message || 'В округе тихо...'
-        });
-      } else if (result.status === 'combat_started') {
-        // Бой начался - обновляем состояние через combatStore
+        type: 'success',
+        message: result.message || 'В округе тихо...'
+      });
+      } else if (result.status === 'combat_started' || result.battle) {
+        setIsSearchingConflict(false);
+        // * Battle started or resumed - update state immediately so UI renders without black screen
         useCombatStore.setState({ battle: result.battle, player: character });
-        
-        // Запускаем анимацию бросков инициативы
-        if (result.rolls && Array.isArray(result.rolls)) {
-          const { triggerRoll } = useDiceStore.getState();
-          await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
-        }
-        
-        // Обновляем данные персонажа
-        await useGameStore.getState().refreshCharacter();
+
+        // * Run dice rolls and character refresh in background (non-blocking)
+        const runPostBattle = async () => {
+          if (result.rolls && Array.isArray(result.rolls)) {
+            const { triggerRoll } = useDiceStore.getState();
+            await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
+          }
+          await useGameStore.getState().refreshCharacter();
+        };
+        runPostBattle().catch(err => console.error('[CombatScreen] Post-battle init error:', err));
+      } else {
+        setIsSearchingConflict(false);
       }
     } catch (error) {
+      setIsSearchingConflict(false);
       console.error('Failed to explore battle:', error);
       const message = error instanceof Error ? error.message : 'Не удалось искать конфликт';
       setNotification({
         type: 'error',
         message
       });
+    } finally {
+      setIsSearchingConflict(false);
     }
   };
 
@@ -636,7 +635,23 @@ export const CombatScreen: React.FC = () => {
     }
   }, [battle?.currentTurnIndex, battle?.participants, character?.id]);
 
-  if (!battle || !battle.participants || battle.participants.length === 0) {
+  // * Auto-center player character after each turn (must be before conditional return - Rules of Hooks)
+  const playerParticipantForEffect = battle?.participants?.find((p: any) => p.isPlayer);
+  useEffect(() => {
+    if (!battle || !playerParticipantForEffect || !viewportRef.current) return;
+    const arenaCenterPx = 1000;
+    const pixelsPerMeter = 2;
+    const playerPosPx = arenaCenterPx + (playerParticipantForEffect.distance * pixelsPerMeter);
+    const viewportWidth = viewportRef.current.clientWidth;
+    const targetScrollLeft = playerPosPx - (viewportWidth / 2);
+    viewportRef.current.scrollTo({
+      left: Math.max(0, Math.min(2000 - viewportWidth, targetScrollLeft)),
+      behavior: 'smooth'
+    });
+  }, [battle?.currentTurnIndex, battle?.participants, playerParticipantForEffect?.distance]);
+
+  const showEmptyState = !battle || !battle.participants || battle.participants.length === 0;
+  if (showEmptyState) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-3xl mx-auto border-2 border-dashed border-fantasy-border rounded bg-black/10 p-4">
         <Sword size={48} className="text-fantasy-border mb-4" />
@@ -648,22 +663,29 @@ export const CombatScreen: React.FC = () => {
         </div>
         
         <button 
+          type="button"
+          disabled={isSearchingConflict}
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
+            if (isSearchingConflict) return;
             handleStartBattle().catch(err => {
               console.error('Error in handleStartBattle button click:', err);
             });
           }} 
-          className="fantasy-button mt-2"
+          className={clsx(
+            "fantasy-button mt-2",
+            isSearchingConflict && "opacity-70 cursor-not-allowed"
+          )}
         >
-          Искать конфликт
+          {isSearchingConflict ? 'Поиск...' : 'Искать конфликт'}
         </button>
       </div>
     );
   }
 
-  const currentParticipant = battle.participants[battle.currentTurnIndex];
-  if (!currentParticipant) return null; // Should not happen with above check
+  const currentParticipant = battle.participants[battle.currentTurnIndex] ?? battle.participants[0];
+  if (!currentParticipant) return null;
 
   const isPlayerTurn = currentParticipant.characterId === character?.id;
 
@@ -674,22 +696,6 @@ export const CombatScreen: React.FC = () => {
   const downedAllies = battle.participants.filter((p: any) => p.isPlayer === playerParticipant?.isPlayer && p.id !== playerParticipant?.id && p.status === 'DOWNED');
   const reviveTarget = downedAllies[0] || null;
   const canReviveTarget = !!(reviveTarget && playerParticipant && Math.abs(playerParticipant.distance - reviveTarget.distance) <= 5);
-
-  // * Auto-center player character after each turn
-  useEffect(() => {
-    if (!battle || !playerParticipant || !viewportRef.current) return;
-    
-    const arenaCenterPx = 1000; // Center of arena in pixels
-    const pixelsPerMeter = 2; // 2000px / 1000m = 2px per meter
-    const playerPosPx = arenaCenterPx + (playerParticipant.distance * pixelsPerMeter);
-    const viewportWidth = viewportRef.current.clientWidth;
-    const targetScrollLeft = playerPosPx - (viewportWidth / 2);
-    
-    viewportRef.current.scrollTo({
-      left: Math.max(0, Math.min(2000 - viewportWidth, targetScrollLeft)),
-      behavior: 'smooth'
-    });
-  }, [battle?.currentTurnIndex, battle?.participants, playerParticipant?.distance]);
 
   const equippedWeapons = inventory?.items.filter((i: any) => {
     const template = itemTemplates.get(i.templateId);
@@ -736,7 +742,9 @@ export const CombatScreen: React.FC = () => {
     };
 
     if (p.isPlayer && character) {
-      return speedMap[character.stats.speedId] || 15;
+      const stats = character?.stats;
+      const speedId = typeof stats === 'object' && stats !== null ? (stats as any).speedId : undefined;
+      return (speedId && speedMap[speedId]) ?? 15;
     }
     
     if (p.name.toLowerCase().includes('wolf')) return 20;

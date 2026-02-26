@@ -9,6 +9,7 @@ import { Layout } from './components/Layout';
 import { useGameStore } from './store/gameStore';
 import { Inventory } from './components/Inventory';
 import { CombatScreen } from './components/CombatScreen';
+import { CombatErrorBoundary } from './components/CombatErrorBoundary';
 import { WorldNavigation } from './components/WorldNavigation';
 import { EventOverlay } from './components/EventOverlay';
 import { CraftingView } from './components/CraftingView';
@@ -190,7 +191,11 @@ function App() {
 
         {view === 'explore' && <WorldNavigation />}
         {view === 'inventory' && <Inventory />}
-        {view === 'combat' && <CombatScreen />}
+        {view === 'combat' && (
+          <CombatErrorBoundary>
+            <CombatScreen />
+          </CombatErrorBoundary>
+        )}
         {view === 'crafting' && <CraftingView />}
       </div>
     </Layout>
