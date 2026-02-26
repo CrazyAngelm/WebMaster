@@ -42,15 +42,15 @@ export class DeepSeekAIService implements AIService {
   }
 
   private buildNPCSystemPrompt(
-    npcName: string,
-    npcDescription: string,
-    personality: string,
+    npcData: NPCData,
     reputation: number = 0
   ): string {
     return NPC_PROMPTS.systemPrompt({
-      name: npcName,
-      description: npcDescription,
-      personality
+      name: npcData.name,
+      description: npcData.description,
+      personality: npcData.personality,
+      npcType: npcData.npcType,
+      merchantInventory: npcData.merchantInventory
     }, reputation);
   }
 
@@ -65,15 +65,13 @@ export class DeepSeekAIService implements AIService {
   }
 
   async generateResponse(
-    npcName: string,
-    npcDescription: string,
-    personality: string,
+    npcData: NPCData,
     playerMessage: string,
     context: GameContext & { reputation?: number },
     conversationHistory: ConversationMessage[]
   ): Promise<NPCResponse> {
     const reputation = context.reputation || 0;
-    const systemPrompt = this.buildNPCSystemPrompt(npcName, npcDescription, personality, reputation);
+    const systemPrompt = this.buildNPCSystemPrompt(npcData, reputation);
     const userPrompt = this.buildNPCUserPrompt(playerMessage, context, conversationHistory);
 
     try {

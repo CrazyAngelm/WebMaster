@@ -3,12 +3,13 @@
 // 🔗 Key dependencies: src/store/gameStore.ts, src/services/TradeService.ts
 // 💡 Usage: Displayed when character enters a building with a shop
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { TradeService } from '../services/TradeService';
 import { InventoryService } from '../services/InventoryService';
 import { ItemTemplate, Rarity, ItemType } from '../types/game';
+import { NPCData } from '../types/ai';
 import { 
   Search, 
   Filter, 
@@ -22,7 +23,11 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export const ShopView: React.FC = () => {
+interface ShopViewProps {
+  merchant?: NPCData | null;
+}
+
+export const ShopView: React.FC<ShopViewProps> = ({ merchant }) => {
   const { character, inventory, buyItem, sellItem, itemTemplates } = useGameStore();
   
   // * Filter and Sort State
@@ -40,10 +45,23 @@ export const ShopView: React.FC = () => {
     ? StaticDataService.getBuilding(character.location.buildingId) 
     : null;
 
-  // * Mock items for the shop
+  // * Get shop items - from merchant inventory or all items
   const shopItems = useMemo(() => {
-    return StaticDataService.getAllItemTemplates().filter(t => t.basePrice !== undefined);
-  }, []);
+    // If merchant has inventory, use it
+    if (merchant?.merchantInventory && merchant.merchantInventory.length > 0) {
+      return merchant.merchantInventory
+        .filter(inv => inv.item)
+        .map(inv => ({
+          ...inv.item!,
+          basePrice: inv.item!.basePrice || 0,
+          quantity: inv.quantity || 1
+        })) as (ItemTemplate & { quantity?: number })[];
+    }
+    // Otherwise, show all items with basePrice
+    return StaticDataService.getAllItemTemplates()
+      .filter(t => t.basePrice !== undefined)
+      .map(t => ({ ...t, quantity: 999 })) as (ItemTemplate & { quantity?: number })[];
+  }, [merchant]);
 
   const rarityColors: Record<Rarity, string> = {
     [Rarity.COMMON]: 'border-gray-500/30 text-gray-400',

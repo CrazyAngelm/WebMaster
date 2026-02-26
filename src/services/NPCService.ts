@@ -175,7 +175,18 @@ class NPCServiceClass {
         locationId: data.locationId,
         buildingId: data.buildingId,
         templateId: data.templateId || undefined,
-        npcType: data.npcType
+        npcType: data.npcType,
+        merchantInventory: data.merchantInventory?.map((inv: any) => ({
+          itemId: inv.itemId,
+          quantity: inv.quantity,
+          item: inv.item ? {
+            name: inv.item.name,
+            type: inv.item.type,
+            basePrice: inv.item.basePrice,
+            rarity: inv.item.rarity,
+            description: inv.item.description
+          } : undefined
+        })) || undefined
       };
     } catch (error) {
       console.log('[NPCService] Error fetching static NPC:', error);
@@ -206,7 +217,18 @@ class NPCServiceClass {
         locationId: data.locationId,
         buildingId: data.buildingId,
         templateId: data.templateId || undefined,
-        npcType: data.npcType
+        npcType: data.npcType,
+        merchantInventory: data.merchantInventory?.map((inv: any) => ({
+          itemId: inv.itemId,
+          quantity: inv.quantity,
+          item: inv.item ? {
+            name: inv.item.name,
+            type: inv.item.type,
+            basePrice: inv.item.basePrice,
+            rarity: inv.item.rarity,
+            description: inv.item.description
+          } : undefined
+        })) || undefined
       };
     } catch (error) {
       console.log('[NPCService] Error fetching NPC by location:', error);

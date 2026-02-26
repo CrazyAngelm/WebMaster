@@ -113,6 +113,7 @@ model ItemTemplate {
   basePrice         Int?
   shieldType        String? // 'LIGHT' | 'MEDIUM' | 'HEAVY' | 'SUPER_HEAVY'
   shieldEvasionPenalty Int? // Penalty to evasion (-30, -70, -150, 0)
+  merchantInventories NPCMerchantInventory[]
 }
 
 model Recipe {
@@ -209,8 +210,22 @@ model NPC {
   npcType       String   // merchant, guard, questgiver, villager, mysterious
   templateId    String?  // Reference to NPCTemplate
   npcMonster    NPCMonster?
+  merchantInventory NPCMerchantInventory[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model NPCMerchantInventory {
+  id        String       @id @default(uuid())
+  npcId     String
+  npc       NPC          @relation(fields: [npcId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      ItemTemplate @relation(fields: [itemId], references: [id])
+  quantity  Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([npcId, itemId])
 }
 
 model LocationConnection {

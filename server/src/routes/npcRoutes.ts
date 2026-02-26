@@ -10,7 +10,11 @@ import {
   getAllNPCs, 
   createNPC, 
   updateNPC, 
-  deleteNPC 
+  deleteNPC,
+  addMerchantItem,
+  removeMerchantItem,
+  updateMerchantItem,
+  getMerchantInventory
 } from '../controllers/npcController';
 import { authenticate } from '../middleware/authMiddleware';
 
@@ -22,5 +26,11 @@ router.get('/location/:locationId', authenticate, getNPCByLocation);
 router.post('/', authenticate, createNPC);
 router.put('/:id', authenticate, updateNPC);
 router.delete('/:id', authenticate, deleteNPC);
+
+// Merchant inventory endpoints
+router.get('/:npcId/inventory', authenticate, getMerchantInventory);
+router.post('/:npcId/inventory', authenticate, addMerchantItem);
+router.put('/:npcId/inventory/:itemId', authenticate, updateMerchantItem);
+router.delete('/:npcId/inventory/:itemId', authenticate, removeMerchantItem);
 
 export default router;

@@ -18,6 +18,7 @@ export const WorldNavigation: React.FC = () => {
   const { character, moveToLocation, enterBuilding, exitBuilding, activeQuests, saveGame } = useGameStore();
   const [showDialog, setShowDialog] = useState(false);
   const [currentNPC, setCurrentNPC] = useState<NPCData | null>(null);
+  const [currentMerchant, setCurrentMerchant] = useState<NPCData | null>(null);
   const [isLoadingNPC, setIsLoadingNPC] = useState(false);
   const [locationAction, setLocationAction] = useState<'search' | 'interact' | 'hunt' | null>(null);
 
@@ -26,14 +27,7 @@ export const WorldNavigation: React.FC = () => {
     window.dispatchEvent(event);
   };
 
-  const handleTradeRequest = (buildingId: string) => {
-    saveGame();
-    enterBuilding(buildingId);
-    setShowDialog(false);
-    setCurrentNPC(null);
-  };
-
-  const handleTalkToNPC = async (building: any) => {
+  const handleTalkToNPC = async (building: any, asMerchant: boolean = false) => {
     const currentCharacter = character;
     if (!currentCharacter || isLoadingNPC) {
       return;
@@ -48,11 +42,23 @@ export const WorldNavigation: React.FC = () => {
     try {
       const npc = await NPCService.getNPCForBuilding(building, currentLoc);
       setCurrentNPC(npc);
+      if (asMerchant && npc.npcType === 'merchant') {
+        setCurrentMerchant(npc);
+      }
       setShowDialog(true);
     } catch (error) {
       console.error('Error loading NPC:', error);
     } finally {
       setIsLoadingNPC(false);
+    }
+  };
+
+  const handleTradeRequest = (buildingId: string, merchant?: NPCData) => {
+    saveGame();
+    enterBuilding(buildingId);
+    setShowDialog(false);
+    if (merchant) {
+      setCurrentMerchant(merchant);
     }
   };
 
@@ -113,7 +119,7 @@ export const WorldNavigation: React.FC = () => {
 
         <div className="flex-1 overflow-hidden">
           {currentBuilding.hasShop ? (
-            <ShopView />
+            <ShopView merchant={currentMerchant} />
           ) : (
             <div className="fantasy-panel p-8 text-center text-gray-500 italic">
               Здесь пока нечего делать.

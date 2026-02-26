@@ -18,7 +18,7 @@ export interface ConversationMessage {
 }
 
 export type NPCEmotion = 'happy' | 'sad' | 'angry' | 'neutral' | 'surprised' | 'scared' | 'excited';
-export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest' | 'complete_quest' | 'gift' | 'inspect' | 'negotiate';
+export type NPCAction = 'attack' | 'flee' | 'trade' | 'talk' | 'idle' | 'offer_quest' | 'complete_quest' | 'gift' | 'inspect' | 'negotiate' | 'show_inventory' | 'buy_item' | 'sell_item';
 
 export interface NPCResponse {
   text: string;
@@ -46,6 +46,18 @@ export interface QuestObjectiveSuggestion {
   amount: number;
 }
 
+export interface NPCMerchantItem {
+  itemId: string;
+  quantity?: number;
+  item?: {
+    name: string;
+    type: string;
+    basePrice: number;
+    rarity: string;
+    description?: string;
+  };
+}
+
 export interface NPCData {
   id: string;
   name: string;
@@ -57,6 +69,7 @@ export interface NPCData {
   shopId?: string;
   templateId?: string;
   npcType?: 'merchant' | 'guard' | 'questgiver' | 'villager' | 'mysterious';
+  merchantInventory?: NPCMerchantItem[];
 }
 
 export interface GeneratedQuest {

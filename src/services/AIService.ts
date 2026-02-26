@@ -24,9 +24,7 @@ export interface AIService {
    * Generates an NPC response to a player message.
    */
   generateResponse(
-    npcName: string,
-    npcDescription: string,
-    personality: string,
+    npcData: NPCData,
     playerMessage: string,
     context: GameContext,
     conversationHistory: ConversationMessage[]

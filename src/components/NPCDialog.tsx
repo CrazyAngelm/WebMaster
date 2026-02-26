@@ -4,7 +4,7 @@
 // 💡 Usage: Used in world navigation for talking to NPCs
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, MessageCircle, Sparkles } from 'lucide-react';
+import { X, MessageCircle, Sparkles, Hand } from 'lucide-react';
 import { useDialogStore } from '../store/dialogStore';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
@@ -16,7 +16,7 @@ interface NPCDialogProps {
   npc: NPCData;
   onClose: () => void;
   onNavigateToCombat?: () => void;
-  onTradeRequest?: (buildingId: string) => void;
+  onTradeRequest?: (buildingId: string, merchant?: NPCData) => void;
 }
 
 export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateToCombat, onTradeRequest }) => {
@@ -39,6 +39,8 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showQuestOffer, setShowQuestOffer] = useState(false);
   const [pendingQuest, setPendingQuest] = useState<NPCResponse['questSuggestion'] | null>(null);
+  const [showTradeOffer, setShowTradeOffer] = useState(false);
+  const [pendingBuildingId, setPendingBuildingId] = useState<string | null>(null);
   const [localMessages, setLocalMessages] = useState<{role: 'player' | 'npc'; content: string}[]>([]);
 
   // Initialize with greeting on mount - load from history if exists
@@ -112,9 +114,7 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
       };
 
       const response = await service.generateResponse(
-        npc.name,
-        npc.description,
-        npc.personality,
+        npc,
         playerMessage,
         context,
         history
@@ -147,15 +147,53 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
             break;
             
           case 'trade': {
-            const building = npc.buildingId ? StaticDataService.getBuilding(npc.buildingId) : null;
-            if (building?.hasShop && onTradeRequest && npc.buildingId) {
-              onTradeRequest(npc.buildingId);
+            const building = npc.buildingId ? StaticDataService.getBuilding(npc.buildingId) : undefined;
+            
+            if ((building?.hasShop || (npc.npcType === 'merchant' && npc.merchantInventory?.length)) && npc.buildingId) {
+              // Show trade confirmation UI
+              setPendingBuildingId(npc.buildingId);
+              setShowTradeOffer(true);
+              
+              const offerMsg = `${npc.name} предлагает вам посмотреть его товары. Перейти к торговле?`;
+              addNPCMessage(offerMsg);
+              addNPCDialogMessage(npc.id, 'npc', offerMsg);
+              setLocalMessages(prev => [...prev, { role: 'npc', content: offerMsg }]);
             } else {
               const noShopMsg = 'Здесь нет магазина.';
               addNPCMessage(noShopMsg);
               addNPCDialogMessage(npc.id, 'npc', noShopMsg);
               setLocalMessages(prev => [...prev, { role: 'npc', content: noShopMsg }]);
             }
+            break;
+          }
+
+          case 'show_inventory': {
+            // Inventory data is already included in LLM system prompt
+            // LLM should include the inventory list in its response text
+            // No automatic message added here - response.text contains everything
+            break;
+          }
+
+          case 'buy_item': {
+            // Handle buying item from merchant
+            if (response.itemOffer && npc.merchantInventory) {
+              const inv = npc.merchantInventory.find(i => i.itemId === response.itemOffer?.templateId);
+              if (inv) {
+                const buyMsg = `Вы хотите купить ${inv.item?.name || inv.itemId} за ${inv.item?.basePrice || 0} монет? (функция в разработке)`;
+                addNPCMessage(buyMsg);
+                addNPCDialogMessage(npc.id, 'npc', buyMsg);
+                setLocalMessages(prev => [...prev, { role: 'npc', content: buyMsg }]);
+              }
+            }
+            break;
+          }
+
+          case 'sell_item': {
+            // Handle selling item to merchant
+            const sellMsg = 'Что вы хотите продать? (функция в разработке)';
+            addNPCMessage(sellMsg);
+            addNPCDialogMessage(npc.id, 'npc', sellMsg);
+            setLocalMessages(prev => [...prev, { role: 'npc', content: sellMsg }]);
             break;
           }
 
@@ -304,6 +342,23 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
     setPendingQuest(null);
   };
 
+  const acceptTrade = () => {
+    if (!pendingBuildingId) return;
+    
+    onTradeRequest?.(pendingBuildingId, npc);
+    setShowTradeOffer(false);
+    setPendingBuildingId(null);
+  };
+
+  const declineTrade = () => {
+    const declineMsg = 'Может, в другой раз.';
+    addNPCMessage(declineMsg);
+    addNPCDialogMessage(npc.id, 'npc', declineMsg);
+    setLocalMessages(prev => [...prev, { role: 'npc', content: declineMsg }]);
+    setShowTradeOffer(false);
+    setPendingBuildingId(null);
+  };
+
   if (!npc) return null;
 
   return (
@@ -416,6 +471,48 @@ export const NPCDialog: React.FC<NPCDialogProps> = ({ npc, onClose, onNavigateTo
               </button>
               <button 
                 onClick={declineQuest}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors text-sm"
+              >
+                ❌ Отказаться
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Trade Offer - Inline in chat */}
+        {showTradeOffer && pendingBuildingId && (
+          <div className="mx-4 mb-4 p-4 bg-fantasy-surface border border-amber-500/50 rounded-lg shadow-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Hand size={18} className="text-amber-500" />
+              <h3 className="text-lg font-serif text-amber-500">🛒 Предложение торговли</h3>
+            </div>
+            <div className="space-y-2 mb-4">
+              <p className="text-gray-300 text-sm">
+                {npc.name} предлагает вам посмотреть его товары.
+              </p>
+              {npc.merchantInventory && npc.merchantInventory.length > 0 && (
+                <div className="text-sm text-gray-400 mt-2">
+                  <p className="font-semibold text-gray-300">Ассортимент:</p>
+                  <ul className="list-disc list-inside text-xs">
+                    {npc.merchantInventory.slice(0, 5).map((inv, idx) => (
+                      <li key={idx}>{inv.item?.name || inv.itemId} - {inv.item?.basePrice || 0} монет</li>
+                    ))}
+                    {npc.merchantInventory.length > 5 && (
+                      <li>...и еще {npc.merchantInventory.length - 5} товаров</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={acceptTrade}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded transition-colors text-sm font-bold"
+              >
+                🛒 Перейти к торговле
+              </button>
+              <button 
+                onClick={declineTrade}
                 className="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors text-sm"
               >
                 ❌ Отказаться

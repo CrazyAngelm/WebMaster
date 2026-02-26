@@ -28,7 +28,14 @@ export const getNPCByBuilding = async (req: Request, res: Response): Promise<voi
     const { buildingId } = req.params;
 
     const npc = await prisma.nPC.findFirst({
-      where: { buildingId }
+      where: { buildingId },
+      include: { 
+        merchantInventory: {
+          include: {
+            item: true
+          }
+        }
+      }
     });
 
     if (!npc) {
@@ -53,7 +60,14 @@ export const getNPCByLocation = async (req: Request, res: Response): Promise<voi
     const { locationId } = req.params;
 
     const npc = await prisma.nPC.findFirst({
-      where: { locationId }
+      where: { locationId },
+      include: { 
+        merchantInventory: {
+          include: {
+            item: true
+          }
+        }
+      }
     });
 
     if (!npc) {
@@ -207,5 +221,75 @@ export const deleteNPC = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Error deleting NPC:', error);
     res.status(500).json({ error: 'Failed to delete NPC' });
+  }
+};
+
+export const getMerchantInventory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { npcId } = req.params;
+
+    const inventory = await prisma.nPCMerchantInventory.findMany({
+      where: { npcId }
+    });
+
+    res.json(inventory);
+  } catch (error) {
+    console.error('Error fetching merchant inventory:', error);
+    res.status(500).json({ error: 'Failed to fetch merchant inventory' });
+  }
+};
+
+export const addMerchantItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { npcId } = req.params;
+    const { itemId, quantity } = req.body;
+
+    const item = await prisma.nPCMerchantInventory.create({
+      data: {
+        npcId,
+        itemId,
+        quantity: quantity || 1
+      }
+    });
+
+    res.json(item);
+  } catch (error) {
+    console.error('Error adding merchant item:', error);
+    res.status(500).json({ error: 'Failed to add merchant item' });
+  }
+};
+
+export const updateMerchantItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { npcId, itemId } = req.params;
+    const { price, quantity } = req.body;
+
+    const item = await prisma.nPCMerchantInventory.update({
+      where: { npcId_itemId: { npcId, itemId } },
+      data: {
+        ...(price !== undefined && { price }),
+        ...(quantity !== undefined && { quantity })
+      }
+    });
+
+    res.json(item);
+  } catch (error) {
+    console.error('Error updating merchant item:', error);
+    res.status(500).json({ error: 'Failed to update merchant item' });
+  }
+};
+
+export const removeMerchantItem = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { npcId, itemId } = req.params;
+
+    await prisma.nPCMerchantInventory.delete({
+      where: { npcId_itemId: { npcId, itemId } }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing merchant item:', error);
+    res.status(500).json({ error: 'Failed to remove merchant item' });
   }
 };

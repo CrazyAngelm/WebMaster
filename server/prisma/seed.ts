@@ -2781,7 +2781,82 @@ async function main() {
   }
   
   console.log(`Backfilled ${backfilledCount} NPCs.`);
+  
+  // Seed merchant inventory
+  await seedMerchantInventory();
+  
   console.log('Seeding completed.');
+}
+
+async function seedMerchantInventory() {
+  console.log('Seeding merchant inventory...');
+  
+  // Get all merchant NPCs
+  const merchants = await prisma.nPC.findMany({
+    where: { npcType: 'merchant' }
+  });
+  
+  // Unique inventory for each merchant type - using real item IDs from ItemTemplate
+  const merchantInventories: Record<string, { itemId: string; quantity: number }[]> = {
+    // Barkeep/Tavern - food and materials
+    'npc-barkeep': [
+      { itemId: 'mat-meat', quantity: 20 },
+      { itemId: 'mat-water', quantity: 15 },
+      { itemId: 'mat-herbs-common', quantity: 10 }
+    ],
+    // Blacksmith - weapons and armor
+    'npc-blacksmith': [
+      { itemId: 'wpn-thief-dagger', quantity: 3 },
+      { itemId: 'wpn-gross-messer', quantity: 2 },
+      { itemId: 'wpn-poleaxe', quantity: 2 },
+      { itemId: 'arm-light-leather', quantity: 5 },
+      { itemId: 'arm-medium-chain', quantity: 3 }
+    ],
+    // Alchemist - materials
+    'npc-alchemist': [
+      { itemId: 'mat-herbs-common', quantity: 15 },
+      { itemId: 'mat-magic-dust', quantity: 15 },
+      { itemId: 'mat-leather-scraps', quantity: 10 }
+    ],
+    // General merchant - materials and misc
+    'npc-merchant': [
+      { itemId: 'mat-copper-ore', quantity: 20 },
+      { itemId: 'mat-iron-ore', quantity: 10 },
+      { itemId: 'mat-coal', quantity: 15 },
+      { itemId: 'mat-linen-fabric', quantity: 5 }
+    ]
+  };
+  
+  for (const merchant of merchants) {
+    // Check if merchant already has inventory
+    const existingInventory = await prisma.nPCMerchantInventory.findMany({
+      where: { npcId: merchant.id }
+    });
+    
+    if (existingInventory.length === 0) {
+      // Get unique inventory for this merchant or use default
+      const inventory = merchantInventories[merchant.id] || [
+        { itemId: 'item-apple', quantity: 10 },
+        { itemId: 'item-health-potion', quantity: 5 }
+      ];
+      
+      // Add inventory to merchant (only itemId and quantity - other fields come from ItemTemplate)
+      for (const item of inventory) {
+        await prisma.nPCMerchantInventory.create({
+          data: {
+            npcId: merchant.id,
+            itemId: item.itemId,
+            quantity: item.quantity
+          }
+        });
+      }
+      console.log(`Added inventory to merchant: ${merchant.name} (${merchant.id})`);
+    } else {
+      console.log(`Merchant already has inventory: ${merchant.name} (${merchant.id})`);
+    }
+  }
+  
+  console.log(`Seeded inventory for ${merchants.length} merchants.`);
 }
 
 main()

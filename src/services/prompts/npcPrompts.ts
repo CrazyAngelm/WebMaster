@@ -3,12 +3,27 @@
 // 🔗 Key dependencies: types/ai, types/game
 // 💡 Usage: Used by DeepSeekAIService to build prompts
 
-import { NPCData, ConversationMessage, GameContext } from '../../types/ai';
+import { NPCData, NPCMerchantItem, ConversationMessage, GameContext } from '../../types/ai';
 import { Location, Inventory, ItemTemplate, ItemType } from '../../types/game';
 import { StaticDataService } from '../StaticDataService';
 
+/**
+ * Форматирует инвентарь торговца для передачи в LLM.
+ * Использует компактный формат для экономии токенов.
+ */
+export const formatInventoryForLLM = (inventory?: NPCMerchantItem[]): string => {
+  if (!inventory || inventory.length === 0) {
+    return "В данный момент товаров нет.";
+  }
+
+  return inventory
+    .map((inv) => `${inv.item?.name || inv.itemId}: ${inv.item?.basePrice || 0} монет (${inv.item?.type || 'unknown'})${inv.quantity ? ` [в наличии: ${inv.quantity}]` : ''}`)
+    .join(' | ');
+};
+
 export const NPC_PROMPTS = {
-  systemPrompt: (npc: Pick<NPCData, 'name' | 'description' | 'personality'>, reputation: number = 0) => `
+  systemPrompt: (npc: Pick<NPCData, 'name' | 'description' | 'personality' | 'npcType' | 'merchantInventory'>, reputation: number = 0) => {
+    let prompt = `
 Ты — ${npc.name}. ${npc.description}
 
 Твой характер: ${npc.personality}.
@@ -21,12 +36,35 @@ export const NPC_PROMPTS = {
 3. Анализируй КОНТЕКСТ и НАМЕРЕНИЯ игрока, а не отдельные слова
 4. Учитывай, что в RPG контексте "убить монстров" - это нормальный квест, а не угроза
 5. Отвечай на русском языке естественно
+`;
 
+    // Добавляем информацию об инвентаре для торговцев
+    if (npc.npcType === 'merchant' && npc.merchantInventory && npc.merchantInventory.length > 0) {
+      const formattedInventory = formatInventoryForLLM(npc.merchantInventory);
+      prompt += `
+ТВОЙ АССОРТИМЕНТ ТОВАРОВ НА ПРОДАЖУ: ${formattedInventory}
+
+СТРОГИЕ ПРАВИЛА ТОРГОВЛИ:
+1. Ты можешь называть цены и обсуждать ТОЛЬКО товары из списка выше
+2. НИ В КОЕМ СЛУЧАЕ не придумывай товары, которых нет в списке
+3. Не меняй цены, указанные в ассортименте
+
+ВАЖНО - КОГДА КАКОЕ ДЕЙСТВИЕ ИСПОЛЬЗОВАТЬ:
+- show_inventory: ВКЛЮЧИ список товаров прямо в текст ответа. Используй когда игрок ПРОСИТ ПОКАЗАТЬ товары ("что у тебя есть?", "покажи ассортимент", "чем торгуешь?"). В ответном тексте перечисли свои товары с ценами.
+- trade: Используй когда игрок ХОЧЕТ ОТКРЫТЬ торговое меню ("давай поторгуем", "хочу купить", "открой магазин", "покажи меню"). Верни action: 'trade' - это откроет интерфейс торговли.
+- buy_item: Используй когда игрок СОГЛАШАЕТСЯ КУПИТЬ конкретный товар из твоего ассортимента. Верни action: 'buy_item' и itemOffer с templateId товара.
+`;
+    }
+
+    prompt += `
 Действия (action):
 - talk: обычный разговор
 - attack: напасть на игрока (только при реальной угрозе тебе или другим)
 - flee: убежать (если испуган или слаб)
-- trade: предложить торговлю (если торговец)
+- trade: открыть торговое меню (для торговцев - когда игрок хочет войти в магазин)
+- show_inventory: показать ассортимент в ответном тексте (для торговцев - когда игрок спрашивает что есть)
+- buy_item: продать товар игроку (используй с itemOffer)
+- sell_item: купить предмет у игрока
 - offer_quest: предложить квест
 - complete_quest: принять выполненный квест
 - gift: подарить предмет игроку
@@ -41,24 +79,33 @@ export const NPC_PROMPTS = {
 - "убью всех в этом городе!" → это угроза людям → action: "attack" (для стражника)
 
 Используй свой характер и роль для определения ответа. Стражник защищает порядок, торговец хочет продать, квестодатель даёт задания.
+`;
 
+    if (npc.npcType !== 'merchant' || !npc.merchantInventory || npc.merchantInventory.length === 0) {
+      prompt += `
 Предметы для подарка (gift): только из списка ID расходников: ${((): string => {
-    const consumables = StaticDataService.getAllItemTemplates()
-      .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined)
-      .slice(0, 10);
-    return consumables.map(t => `${t.id} (${t.name})`).join(', ') || 'нет доступных';
-  })()}
+        const consumables = StaticDataService.getAllItemTemplates()
+          .filter(t => t.type === ItemType.CONSUMABLE && t.basePrice !== undefined)
+          .slice(0, 10);
+        return consumables.map(t => `${t.id} (${t.name})`).join(', ') || 'нет доступных';
+      })()}
+`;
+    }
 
+    prompt += `
 Формат ответа (JSON):
 {
   "text": "твой ответ",
   "emotion": "happy|sad|angry|neutral|surprised|scared|excited",
-  "action": "talk|attack|flee|trade|offer_quest|gift|inspect|negotiate|idle",
+  "action": "talk|attack|flee|trade|show_inventory|buy_item|sell_item|offer_quest|gift|inspect|negotiate|idle",
   "questSuggestion": { ... },
   "itemOffer": { "templateId": "id-предмета", "quantity": 1 }
 }
-questSuggestion и itemOffer — опционально, только при action offer_quest или gift
-`,
+questSuggestion и itemOffer — опционально, только при action offer_quest, gift, buy_item или sell_item
+`;
+
+    return prompt;
+  },
 
   contextPrompt: (context: GameContext & {
     reputation?: number;

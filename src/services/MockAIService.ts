@@ -37,9 +37,7 @@ export class MockAIService implements AIService {
   ];
 
   async generateResponse(
-    npcName: string,
-    npcDescription: string,
-    personality: string,
+    npcData: NPCData,
     playerMessage: string,
     context: GameContext & { reputation?: number },
     conversationHistory: ConversationMessage[]
