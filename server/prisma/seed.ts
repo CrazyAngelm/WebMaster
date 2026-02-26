@@ -178,7 +178,7 @@ async function main() {
       stackSize: 20,
       isUnique: false,
       description: 'Прочная руда для качественного оружия и доспехов.',
-      basePrice: 30
+      basePrice: 20
     },
     {
       id: 'mat-linen-fabric',
@@ -214,7 +214,7 @@ async function main() {
       rarity: 'MYTHIC',
       stackSize: 15,
       isUnique: false,
-      basePrice: 600
+      basePrice: 240
     },
     {
       id: 'mat-silk-fabric',
@@ -223,7 +223,7 @@ async function main() {
       rarity: 'EPIC',
       stackSize: 30,
       isUnique: false,
-      basePrice: 100
+      basePrice: 50
     },
     {
       id: 'mat-coal',
@@ -278,7 +278,7 @@ async function main() {
       rarity: 'RARE',
       stackSize: 100,
       isUnique: false,
-      basePrice: 50
+      basePrice: 30
     },
     {
       id: 'wpn-thief-dagger',
@@ -292,7 +292,7 @@ async function main() {
       maxEssence: 100,
       penetration: 'NONE',
       distance: 'CLOSE',
-      basePrice: 200
+      basePrice: 90
     },
     {
       id: 'wpn-gross-messer',
@@ -311,7 +311,7 @@ async function main() {
       initiativeBonus: 80,
       resistanceBonus: 0,
       description: '+80 Инициатива',
-      basePrice: 25500
+      basePrice: 5000
     },
     {
       id: 'wpn-poleaxe',
@@ -330,7 +330,7 @@ async function main() {
       initiativeBonus: 30,
       resistanceBonus: 0,
       description: '+70 Точность, +30 Инициатива, +100 Защита',
-      basePrice: 417500
+      basePrice: 26400
     },
     {
       id: 'wpn-impaler-bow',
@@ -344,7 +344,7 @@ async function main() {
       maxEssence: 150,
       penetration: 'NONE',
       distance: 'MEDIUM',
-      basePrice: 325
+      basePrice: 260
     },
     {
       id: 'wpn-steel-hammer-poisoned',
@@ -360,7 +360,7 @@ async function main() {
       distance: JSON.stringify({ minRange: 0, maxRange: 5 }),
       effects: JSON.stringify(['effect-poison']),
       description: 'Тяжелый молот с отравленным наконечником. Наносит яд при попадании.',
-      basePrice: 2350
+      basePrice: 300
     },
     {
       id: 'arm-light-leather',
@@ -372,7 +372,7 @@ async function main() {
       isUnique: false,
       ignoreDamage: 0,
       baseDurability: 2,
-      basePrice: 100
+      basePrice: 40
     },
     {
       id: 'arm-medium-chain',
@@ -386,7 +386,7 @@ async function main() {
       hitPenalty: 50,
       evasionPenalty: 100,
       baseDurability: 3,
-      basePrice: 900
+      basePrice: 400
     },
     {
       id: 'arm-heavy-plate',
@@ -401,7 +401,7 @@ async function main() {
       evasionPenalty: 250,
       speedPenalty: 3,
       baseDurability: 4,
-      basePrice: 8000
+      basePrice: 4000
     },
     {
       id: 'arm-super-heavy-bastion',
@@ -416,7 +416,7 @@ async function main() {
       evasionPenalty: 400,
       speedPenalty: 6,
       baseDurability: 6,
-      basePrice: 320000
+      basePrice: 60000
     },
     {
       id: 'con-simple-stew',
@@ -432,7 +432,7 @@ async function main() {
         targetType: 'SELF',
         actionType: 'BONUS'
       }),
-      basePrice: 15
+      basePrice: 60
     },
     {
       id: 'con-healing-potion-small',
@@ -449,7 +449,7 @@ async function main() {
         targetType: 'SELF',
         actionType: 'BONUS'
       }),
-      basePrice: 50
+      basePrice: 60
     },
     {
       id: 'scroll-simple-bolt',
@@ -474,66 +474,66 @@ async function main() {
       name: 'Зелье сущности',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'RARE',
+      rarity: 'COMMON',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 2.',
-      basePrice: 3968
+      basePrice: 510
     },
     {
       id: 'con-spirit-potion',
       name: 'Концентрированное зелье духа',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'EPIC',
+      rarity: 'RARE',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 3.',
-      basePrice: 7665
+      basePrice: 1860
     },
     {
       id: 'con-phoenix-potion',
       name: 'Зелье феникса',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'MYTHIC',
+      rarity: 'EPIC',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 4.',
-      basePrice: 15600
+      basePrice: 6800
     },
     {
       id: 'con-demonic-potion',
       name: 'Зелье демонической сущности',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'LEGENDARY',
+      rarity: 'MYTHIC',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга 5.',
-      basePrice: 43500
+      basePrice: 6675
     },
     {
       id: 'con-element-potion',
       name: 'Зелье заключённого элемента',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'DIVINE',
+      rarity: 'LEGENDARY',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 1.',
-      basePrice: 90000
+      basePrice: 10650
     },
     {
       id: 'con-chaos-potion',
       name: 'Зелье хаоса',
       type: 'CONSUMABLE',
       category: 'POTION',
-      rarity: 'DIVINE',
+      rarity: 'LEGENDARY',
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 2.',
-      basePrice: 168000
+      basePrice: 15525
     },
     {
       id: 'con-death-potion',
@@ -544,7 +544,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       description: 'Требуется для прорыва ранга чемпиона 3.',
-      basePrice: 357000
+      basePrice: 32100
     },
     {
       id: 'bag-linen-worn',
@@ -554,7 +554,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 3,
-      basePrice: 350
+      basePrice: 150
     },
     {
       id: 'bag-leather-sturdy',
@@ -564,7 +564,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 5,
-      basePrice: 4200
+      basePrice: 800
     },
     {
       id: 'bag-silk-fine',
@@ -574,7 +574,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 8,
-      basePrice: 41000
+      basePrice: 2400
     },
     {
       id: 'bag-void-small',
@@ -584,7 +584,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 12,
-      basePrice: 205000
+      basePrice: 7200
     },
     {
       id: 'bag-dragon-hide',
@@ -594,7 +594,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 16,
-      basePrice: 1275000
+      basePrice: 24000
     },
     {
       id: 'bag-divine-infinite',
@@ -604,7 +604,7 @@ async function main() {
       stackSize: 1,
       isUnique: false,
       slotCount: 20,
-      basePrice: 1275000
+      basePrice: 96000
     },
     // --- MATERIALS FOR MONSTER LOOT ---
     // Rank 1 (COMMON)
@@ -677,7 +677,7 @@ async function main() {
       stackSize: 15,
       isUnique: false,
       description: 'Клык орка. Ценный материал для оружия.',
-      basePrice: 45
+      basePrice: 30
     },
     {
       id: 'mat-ogre-bone',
@@ -717,7 +717,7 @@ async function main() {
       stackSize: 15,
       isUnique: false,
       description: 'Кровь тролля. Обладает регенерирующими свойствами.',
-      basePrice: 90
+      basePrice: 60
     },
     // Rank 3 (EPIC)
     {
@@ -728,7 +728,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Клык вампира. Ценный материал.',
-      basePrice: 250
+      basePrice: 125
     },
     {
       id: 'mat-demon-horn',
@@ -738,7 +738,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Рог демона. Используется для создания мощного оружия.',
-      basePrice: 250
+      basePrice: 480
     },
     {
       id: 'mat-elemental-core',
@@ -789,7 +789,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Чешуя дракона. Невероятно прочная.',
-      basePrice: 1200
+      basePrice: 1500
     },
     {
       id: 'mat-phoenix-feather',
@@ -799,7 +799,7 @@ async function main() {
       stackSize: 10,
       isUnique: false,
       description: 'Перо феника. Светится вечным пламенем.',
-      basePrice: 550
+      basePrice: 750
     },
     {
       id: 'mat-golem-core',
@@ -830,7 +830,7 @@ async function main() {
       stackSize: 5,
       isUnique: false,
       description: 'Душа павшего рыцаря смерти.',
-      basePrice: 5000
+      basePrice: 1500
     },
     {
       id: 'mat-elder-dragon-heart',
@@ -840,7 +840,7 @@ async function main() {
       stackSize: 3,
       isUnique: false,
       description: 'Сердце древнего дракона. Пульсирует невероятной силой.',
-      basePrice: 5000
+      basePrice: 1500
     },
     {
       id: 'mat-abyssal-essence',
@@ -850,7 +850,7 @@ async function main() {
       stackSize: 5,
       isUnique: false,
       description: 'Чистая эссенция Бездны.',
-      basePrice: 3000
+      basePrice: 900
     },
     {
       id: 'mat-world-eater-fragment',
@@ -860,7 +860,7 @@ async function main() {
       stackSize: 3,
       isUnique: false,
       description: 'Фрагмент сущности Пожирателя Миров.',
-      basePrice: 5000
+      basePrice: 1500
     },
     // --- CONSUMABLES FOR MONSTER LOOT ---
     {
