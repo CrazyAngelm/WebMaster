@@ -94,6 +94,187 @@ const ensureDownedStatus = (participant: any, logs?: string[]): void => {
   }
 };
 
+export const exploreBattle = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    console.log('[exploreBattle] userId:', userId);
+    
+    // Получаем персонажа из токена
+    const character = await (prisma as any).character.findFirst({
+      where: { userId },
+      include: { inventory: true }
+    });
+
+    if (!character) {
+      console.log('[exploreBattle] Character not found for userId:', userId);
+      return res.status(404).json({ error: 'Character not found' });
+    }
+    console.log('[exploreBattle] character:', character.id, 'name:', character.name);
+
+    // Проверяем, нет ли активного боя
+    const existingBattle = await (prisma as any).battle.findFirst({
+      where: {
+        status: BattleStatus.ACTIVE,
+        participants: {
+          some: { characterId: character.id }
+        }
+      },
+      include: { participants: true }
+    });
+
+    if (existingBattle) {
+      const hasDeadParticipant = existingBattle.participants.some((p: any) => getParticipantStatus(p) === ParticipantStatus.DEAD);
+      if (hasDeadParticipant) {
+        await (prisma as any).battle.update({
+          where: { id: existingBattle.id },
+          data: { status: BattleStatus.FINISHED }
+        });
+      } else {
+        return res.json({
+          battle: formatBattle(existingBattle),
+          message: 'Active battle resumed'
+        });
+      }
+    }
+
+    // Получаем локацию персонажа
+    let characterLocation, locationId;
+    try {
+      characterLocation = JSON.parse(character.location);
+      locationId = characterLocation.locationId;
+      console.log('[exploreBattle] locationId:', locationId);
+    } catch (parseError) {
+      console.error('[exploreBattle] Failed to parse character location:', parseError);
+      return res.status(500).json({ error: 'Character location data corrupted' });
+    }
+
+    // Получаем всех монстров для этой локации
+    const locationMonsters = await (prisma as any).locationMonster.findMany({
+      where: { locationId },
+      include: { monster: true }
+    });
+    console.log('[exploreBattle] locationMonsters found:', locationMonsters.length);
+
+    if (locationMonsters.length === 0) {
+      return res.json({
+        status: 'empty',
+        message: 'В этой локации нет монстров для встречи.'
+      });
+    }
+
+    // Рулетка для выбора монстра
+    const roll = Math.floor(Math.random() * 100) + 1; // 1-100
+    console.log('[exploreBattle] roll:', roll);
+    let currentSum = 0;
+    let selectedMonster: any = null;
+
+    for (const locationMonster of locationMonsters) {
+      // Валидация шанса
+      if (locationMonster.chance < 0 || locationMonster.chance > 100) {
+        console.error('[exploreBattle] Invalid chance:', locationMonster.chance, 'for monster:', locationMonster.monsterId);
+        continue;
+      }
+      currentSum += locationMonster.chance;
+      if (roll <= currentSum) {
+        selectedMonster = locationMonster.monster;
+        console.log('[exploreBattle] Selected monster:', selectedMonster?.name, 'at threshold:', currentSum);
+        break;
+      }
+    }
+
+    // Если никто не выпал (попал в пустые проценты)
+    if (!selectedMonster) {
+      console.log('[exploreBattle] No monster selected, empty encounter');
+      return res.json({
+        status: 'empty',
+        message: 'В округе тихо... Вы никого не встретили.'
+      });
+    }
+
+    // Создаем бой с выбранным монстром
+    const playerStats = JSON.parse(character.stats);
+    const playerBonuses = JSON.parse(character.bonuses);
+
+    // Генерируем инициативу
+    const playerInitRoll = DICE.roll(100);
+    const playerInit = playerInitRoll + (playerBonuses.initiative || 0);
+    const enemyInit = DICE.roll(100);
+
+    const initialRolls = [
+      { sides: 100, result: playerInitRoll, label: `${character.name}: Инициатива` },
+      { sides: 100, result: enemyInit, label: `${selectedMonster.name}: Инициатива` }
+    ];
+
+    const participants = [
+      {
+        characterId: character.id,
+        name: character.name,
+        initiative: playerInit,
+        currentHp: playerStats.essence.current,
+        currentProtection: playerStats.protection.current,
+        maxHp: playerStats.essence.max,
+        maxProtection: playerStats.protection.max,
+        isPlayer: true,
+        distance: -25,
+        bonuses: character.bonuses
+      },
+      {
+        characterId: null,
+        monsterTemplateId: selectedMonster.id,
+        name: selectedMonster.name,
+        initiative: enemyInit,
+        currentHp: selectedMonster.baseEssence,
+        currentProtection: selectedMonster.baseEssence,
+        maxHp: selectedMonster.baseEssence,
+        maxProtection: selectedMonster.baseEssence,
+        isPlayer: false,
+        distance: 25,
+        bonuses: JSON.stringify({ accuracy: 5, evasion: 5, initiative: 0, damageResistance: 0 })
+      }
+    ].sort((a, b) => b.initiative - a.initiative);
+
+    const battle = await (prisma as any).battle.create({
+      data: {
+        locationId: locationId,
+        status: BattleStatus.ACTIVE,
+        currentTurnIndex: 0,
+        log: JSON.stringify(['Бой начался!']),
+        participants: {
+          create: participants.map(p => ({
+            characterId: p.characterId,
+            monsterTemplateId: p.monsterTemplateId,
+            name: p.name,
+            initiative: p.initiative,
+            currentHp: p.currentHp,
+            currentProtection: p.currentProtection,
+            maxHp: p.maxHp,
+            maxProtection: p.maxProtection,
+            isPlayer: p.isPlayer,
+            distance: p.distance,
+            bonuses: p.bonuses,
+            isBlocking: false,
+            status: ParticipantStatus.ALIVE,
+            downedRoundsRemaining: 0
+          }))
+        }
+      },
+      include: { participants: true }
+    });
+
+    res.status(201).json({
+      status: 'combat_started',
+      battle: formatBattle(battle),
+      rolls: initialRolls
+    });
+
+  } catch (error) {
+    console.error('Explore battle error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: errorMessage || 'Internal server error' });
+  }
+};
+
 export const startBattle = async (req: Request, res: Response) => {
   try {
     // @ts-ignore
@@ -2734,6 +2915,57 @@ export const blockWithShield = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Block with shield error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const getLocationEncounters = async (req: Request, res: Response) => {
+  try {
+    // @ts-ignore
+    const userId = req.userId;
+    console.log('[getLocationEncounters] userId:', userId);
+    
+    const character = await (prisma as any).character.findFirst({
+      where: { userId },
+      select: { location: true }
+    });
+
+    if (!character) {
+      console.log('[getLocationEncounters] Character not found for userId:', userId);
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    let characterLocation;
+    try {
+      characterLocation = JSON.parse(character.location);
+      console.log('[getLocationEncounters] locationId:', characterLocation.locationId);
+    } catch (parseError) {
+      console.error('[getLocationEncounters] Failed to parse character location:', parseError);
+      return res.status(500).json({ error: 'Character location data corrupted' });
+    }
+
+    const locationId = characterLocation.locationId;
+    
+    const locationMonsters = await (prisma as any).locationMonster.findMany({
+      where: { locationId },
+      include: { monster: { select: { id: true, name: true, rankOrder: true, icon: true } } }
+    });
+    console.log('[getLocationEncounters] locationMonsters found:', locationMonsters.length);
+
+    const totalMonsterChance = locationMonsters.reduce((sum: number, lm: any) => sum + lm.chance, 0);
+    const emptyChance = Math.max(0, 100 - totalMonsterChance);
+
+    res.json({
+      locationId,
+      emptyChance,
+      encounters: locationMonsters.map((lm: any) => ({
+        monsterId: lm.monsterId,
+        chance: lm.chance
+      }))
+    });
+
+  } catch (error) {
+    console.error('getLocationEncounters error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

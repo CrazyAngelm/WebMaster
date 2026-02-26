@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useCombatStore } from '../store/combatStore';
 import { useGameStore } from '../store/gameStore';
+import { useDiceStore } from '../store/diceStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut, Crosshair, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { BattleStatus, CharacterSkill, ParticipantStatus } from '../types/game';
+import { ThreatPanel } from './ThreatPanel';
 
 const UserIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -47,6 +49,17 @@ export const CombatScreen: React.FC = () => {
     radius: number;
   } | null>(null);
   const [aoeHoverCenterId, setAoeHoverCenterId] = useState<string | null>(null);
+  
+  // Состояние для данных об опасностях локации
+  const [encountersData, setEncountersData] = useState<{
+    locationId: string;
+    emptyChance: number;
+    encounters: {
+      monsterId: string;
+      chance: number;
+    }[];
+  } | null>(null);
+  const [encountersLoading, setEncountersLoading] = useState(false);
   
   // * Auto-handle enemy turns
   useEffect(() => {
@@ -132,15 +145,91 @@ export const CombatScreen: React.FC = () => {
     }
   }, [battle?.participants, battle?.status, character?.id]); // Added character?.id to dependencies
 
+  // Загрузка данных об опасностях локации при монтировании или смене локации
+  useEffect(() => {
+    const currentLocId = character?.location?.locationId;
+    console.log('[CombatScreen] useEffect triggered, currentLocId:', currentLocId, 'character:', character);
+    if (!currentLocId) {
+      console.log('[CombatScreen] No locationId, skipping loadEncounters');
+      return;
+    }
+    
+    const abortController = new AbortController();
+    
+    const loadEncounters = async () => {
+      console.log('[CombatScreen] Loading encounters...');
+      setEncountersLoading(true);
+      try {
+        const token = useGameStore.getState().token;
+        console.log('[CombatScreen] Token:', token ? 'exists' : 'missing');
+        const res = await fetch('/api/battle/location/encounters', {
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: abortController.signal
+        });
+        
+        console.log('[CombatScreen] Response status:', res.status);
+        if (!res.ok) throw new Error('Network response was not ok');
+        
+        const data = await res.json();
+        console.log('[CombatScreen] Encounters data:', data);
+        setEncountersData(data);
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('[CombatScreen] Failed to load encounters:', error);
+        }
+      } finally {
+        setEncountersLoading(false);
+      }
+    };
+    
+    loadEncounters();
+    
+    // Очистка при размонтировании или смене локации
+    return () => abortController.abort();
+  }, [character?.location?.locationId]); // ✅ Правильная зависимость!
+
   const handleStartBattle = async () => {
     if (!character) return;
     
     try {
-      // For testing, we use a known monster template ID from seed.ts
-      await initiateBattle('mon-wolf', true);
+      // Используем новый эндпоинт для поиска случайных монстров
+      const token = useGameStore.getState().token;
+      const res = await fetch('/api/battle/explore', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!res.ok) {
+        throw new Error('Не удалось искать конфликт');
+      }
+      
+      const result = await res.json();
+      
+      if (result.status === 'empty') {
+        // Никто не найден
+        setNotification({
+          type: 'success',
+          message: result.message || 'В округе тихо...'
+        });
+      } else if (result.status === 'combat_started') {
+        // Бой начался - обновляем состояние через combatStore
+        useCombatStore.setState({ battle: result.battle, player: character });
+        
+        // Запускаем анимацию бросков инициативы
+        if (result.rolls && Array.isArray(result.rolls)) {
+          const { triggerRoll } = useDiceStore.getState();
+          await Promise.all(result.rolls.map((r: any) => triggerRoll(r.sides, r.result, r.label)));
+        }
+        
+        // Обновляем данные персонажа
+        await useGameStore.getState().refreshCharacter();
+      }
     } catch (error) {
-      console.error('Failed to start battle:', error);
-      const message = error instanceof Error ? error.message : 'Не удалось начать бой';
+      console.error('Failed to explore battle:', error);
+      const message = error instanceof Error ? error.message : 'Не удалось искать конфликт';
       setNotification({
         type: 'error',
         message
@@ -546,9 +635,15 @@ export const CombatScreen: React.FC = () => {
 
   if (!battle || !battle.participants || battle.participants.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-fantasy-border rounded bg-black/10">
+      <div className="flex flex-col items-center justify-center min-h-[400px] w-full max-w-3xl mx-auto border-2 border-dashed border-fantasy-border rounded bg-black/10 p-4">
         <Sword size={48} className="text-fantasy-border mb-4" />
         <h3 className="text-xl font-serif text-gray-500 mb-4 uppercase tracking-widest">Нет активного боя</h3>
+        
+        {/* ✅ Мгновенная панель опасностей */}
+        <div className="w-full max-w-md mx-auto">
+          <ThreatPanel encountersData={encountersData} loading={encountersLoading} />
+        </div>
+        
         <button 
           onClick={(e) => {
             e.preventDefault();
@@ -556,7 +651,7 @@ export const CombatScreen: React.FC = () => {
               console.error('Error in handleStartBattle button click:', err);
             });
           }} 
-          className="fantasy-button"
+          className="fantasy-button mt-2"
         >
           Искать конфликт
         </button>

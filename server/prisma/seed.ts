@@ -1019,6 +1019,7 @@ async function main() {
       name: 'Wolf',
       rankOrder: 1,
       baseEssence: 100,
+      icon: '🐺',
       speedId: 'speed-fast',
       skills: JSON.stringify(['skill-monster-bite', 'skill-monster-rage']),
       lootTable: JSON.stringify([
@@ -1032,6 +1033,7 @@ async function main() {
       name: 'Boar',
       rankOrder: 1,
       baseEssence: 130,
+      icon: '🐗',
       speedId: 'speed-ordinary',
       skills: JSON.stringify(['skill-monster-charge']),
       lootTable: JSON.stringify([
@@ -1137,7 +1139,8 @@ async function main() {
       name: 'Гигантская крыса',
       rankOrder: 1,
       baseEssence: 80,
-      speedId: 'speed-very-fast',
+      icon: '🐀',
+      speedId: 'speed-fast',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
         { templateId: 'mat-rat-tail', chance: 0.4, minQuantity: 1, maxQuantity: 2 },
@@ -1149,6 +1152,7 @@ async function main() {
       name: 'Зелёный слайм',
       rankOrder: 1,
       baseEssence: 90,
+      icon: '🐌',
       speedId: 'speed-very-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1161,6 +1165,7 @@ async function main() {
       name: 'Гоблин-разведчик',
       rankOrder: 1,
       baseEssence: 110,
+      icon: '👺',
       speedId: 'speed-fast',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1173,6 +1178,7 @@ async function main() {
       name: 'Скелет-воин',
       rankOrder: 1,
       baseEssence: 150,
+      icon: '💀',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1185,6 +1191,7 @@ async function main() {
       name: 'Зомби',
       rankOrder: 1,
       baseEssence: 170,
+      icon: '🧠',
       speedId: 'speed-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1197,6 +1204,7 @@ async function main() {
       name: 'Гоблин-воин',
       rankOrder: 1,
       baseEssence: 190,
+      icon: '⚔️',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1210,6 +1218,7 @@ async function main() {
       name: 'Гигантский паук',
       rankOrder: 1,
       baseEssence: 210,
+      icon: '🕷️',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1222,6 +1231,7 @@ async function main() {
       name: 'Разбойник',
       rankOrder: 1,
       baseEssence: 250,
+      icon: '🗡️',
       speedId: 'speed-fast',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1236,6 +1246,7 @@ async function main() {
       name: 'Вождь гоблинов',
       rankOrder: 2,
       baseEssence: 280,
+      icon: '👑',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1249,6 +1260,7 @@ async function main() {
       name: 'Орк-разведчик',
       rankOrder: 2,
       baseEssence: 320,
+      icon: '👹',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1261,6 +1273,7 @@ async function main() {
       name: 'Огр',
       rankOrder: 2,
       baseEssence: 400,
+      icon: '👹',
       speedId: 'speed-slow',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1273,6 +1286,7 @@ async function main() {
       name: 'Призрак',
       rankOrder: 2,
       baseEssence: 380,
+      icon: '👻',
       speedId: 'speed-very-fast',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -1420,6 +1434,7 @@ async function main() {
       name: 'Некромант',
       rankOrder: 3,
       baseEssence: 600,
+      icon: '🧙‍♂️',
       speedId: 'speed-ordinary',
       skills: JSON.stringify([]),
       lootTable: JSON.stringify([
@@ -2411,6 +2426,60 @@ async function main() {
     });
   }
   console.log(`Seeded ${npcMonsters.length} NPC Monsters`);
+
+  // --- Location Monsters ---
+  const locationMonsters = [
+    // Окраины Хорниграда (GREEN zone) - сумма 90%
+    { locationId: 'loc-outskirts', monsterId: 'mon-wolf', chance: 40 },
+    { locationId: 'loc-outskirts', monsterId: 'mon-rat-giant', chance: 30 },
+    { locationId: 'loc-outskirts', monsterId: 'mon-boar', chance: 20 },
+    // Остальные 10% - пустая встреча
+
+    // Городские ворота (GREEN zone) - сумма 85%
+    { locationId: 'loc-city-gates', monsterId: 'mon-bandit', chance: 35 },
+    { locationId: 'loc-city-gates', monsterId: 'mon-goblin-warrior', chance: 30 },
+    { locationId: 'loc-city-gates', monsterId: 'mon-rat-giant', chance: 20 },
+    // Остальные 15% - пустая встреча
+
+    // Торговый район (GREEN zone) - сумма 80%
+    { locationId: 'loc-merchant-district', monsterId: 'mon-goblin-scout', chance: 30 },
+    { locationId: 'loc-merchant-district', monsterId: 'mon-skeleton-warrior', chance: 25 },
+    { locationId: 'loc-merchant-district', monsterId: 'mon-rat-giant', chance: 25 },
+    // Остальные 20% - пустая встреча
+
+    // Заброшенный лес (YELLOW zone) - сумма 80%
+    { locationId: 'loc-forsaken-woods', monsterId: 'mon-necromancer', chance: 25 },
+    { locationId: 'loc-forsaken-woods', monsterId: 'mon-orc-scout', chance: 35 },
+    { locationId: 'loc-forsaken-woods', monsterId: 'mon-ghost', chance: 20 },
+    // Остальные 20% - пустая встреча
+  ];
+
+  // Валидация суммы шансов для каждой локации
+  const locationSums: Record<string, number> = {};
+  for (const lm of locationMonsters) {
+    locationSums[lm.locationId] = (locationSums[lm.locationId] || 0) + lm.chance;
+  }
+
+  for (const [locationId, sum] of Object.entries(locationSums)) {
+    if (sum > 100) {
+      throw new Error(`Location ${locationId} chance sum ${sum}% exceeds 100%`);
+    }
+    console.log(`Location ${locationId}: ${sum}% monsters, ${100 - sum}% empty encounter`);
+  }
+
+  for (const lm of locationMonsters) {
+    await prisma.locationMonster.upsert({
+      where: { 
+        locationId_monsterId: {
+          locationId: lm.locationId,
+          monsterId: lm.monsterId
+        }
+      },
+      update: lm,
+      create: lm,
+    });
+  }
+  console.log(`Seeded ${locationMonsters.length} Location Monsters`);
 
   // --- Connections ---
   const connections = [

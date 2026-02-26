@@ -10,6 +10,7 @@ export const AuthView: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'USER' | 'ADMIN' | 'OWNER'>('USER');
   const [error, setError] = useState('');
   
@@ -18,6 +19,12 @@ export const AuthView: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    // Валидация совпадения паролей при регистрации
+    if (!isLogin && password !== confirmPassword) {
+      setError('Пароли не совпадают');
+      return;
+    }
     
     try {
       if (isLogin) {
@@ -61,6 +68,20 @@ export const AuthView: React.FC = () => {
               required
             />
           </div>
+          
+          {!isLogin && (
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase tracking-widest mb-1">Подтвердите пароль</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-fantasy-dark border border-fantasy-border p-2 text-white focus:border-fantasy-accent outline-none"
+                placeholder="Введите пароль еще раз"
+                required
+              />
+            </div>
+          )}
           
           {!isLogin && (
             <div>

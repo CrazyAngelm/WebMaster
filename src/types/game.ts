@@ -383,6 +383,7 @@ export interface MonsterTemplate {
   rankOrder: number; // 1 to 6 (Champion ranks)
   baseEssence: number;
   description?: string;
+  icon?: string;
   skills: UUID[];
   lootTable: {
     templateId: UUID;

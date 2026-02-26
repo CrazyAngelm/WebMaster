@@ -131,9 +131,11 @@ model MonsterTemplate {
   baseEssence  Int
   speedId      String  @default("speed-ordinary")
   description  String?
+  icon         String? @default("👾")
   skills       String  // UUID[] (JSON string)
   lootTable    String  // { templateId, chance, minQuantity, maxQuantity }[] (JSON string)
   npcMonsters  NPCMonster[]
+  locationMonsters LocationMonster[]
 }
 
 model NPCTemplate {
@@ -166,6 +168,7 @@ model Location {
   description String
   zoneType    String
   buildings   String // UUID[] (JSON string)
+  locationMonsters LocationMonster[]
 }
 
 model Building {
@@ -322,4 +325,16 @@ model BattleParticipant {
   isBlocking        Boolean   @default(false) // Active shield block flag
   status            String    @default("ALIVE") // ALIVE | DOWNED | DEAD
   downedRoundsRemaining Int   @default(0)
+}
+
+model LocationMonster {
+  id         String          @id @default(uuid())
+  locationId String
+  monsterId  String
+  chance     Int             // Шанс в процентах (1-100)
+  
+  location   Location        @relation(fields: [locationId], references: [id])
+  monster    MonsterTemplate @relation(fields: [monsterId], references: [id])
+
+  @@unique([locationId, monsterId])
 }

@@ -4,11 +4,18 @@
 // 💡 Usage: Integrated into main Express app
 
 import { Router } from 'express';
-import { startBattle, resolveAttack, move, nextTurn, getBattle, getActiveBattle, endBattle, useSkill, useConsumable, blockWithShield, reviveParticipant } from '../controllers/battleController';
+import { startBattle, exploreBattle, resolveAttack, move, nextTurn, getBattle, getActiveBattle, endBattle, useSkill, useConsumable, blockWithShield, reviveParticipant, getLocationEncounters } from '../controllers/battleController';
 import { authenticate } from '../middleware/authMiddleware';
 
 const router = Router();
 
+// Test endpoint
+router.get('/test', (req, res) => {
+  res.json({ message: 'Battle routes working!' });
+});
+
+router.get('/location/encounters', authenticate, getLocationEncounters);
+router.post('/explore', authenticate, exploreBattle);
 router.post('/start', authenticate, startBattle);
 router.post('/attack', authenticate, resolveAttack);
 router.post('/move', authenticate, move);
