@@ -3,7 +3,7 @@
 // 🔗 Key dependencies: src/store/gameStore.ts, src/services/StaticDataService.ts
 // 💡 Usage: Main view for world exploration
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { StaticDataService } from '../services/StaticDataService';
 import { WorldService } from '../services/WorldService';
@@ -71,16 +71,39 @@ export const WorldNavigation: React.FC = () => {
     // For search/interact, show dialog or update UI
   };
 
-  if (!character) return null;
+  const buildingId = character?.location?.buildingId;
+  const locationId = character?.location?.locationId;
+  const currentLoc = locationId ? StaticDataService.getLocation(locationId) : null;
+  const currentBuilding = buildingId ? StaticDataService.getBuilding(buildingId) : null;
 
-  const currentLoc = StaticDataService.getLocation(character.location.locationId);
+  // * Load merchant when entering a building with shop (direct entry)
+  useEffect(() => {
+    if (!character || !currentLoc) return;
+    if (!currentBuilding) {
+      setCurrentMerchant(null);
+      return;
+    }
+    if (!currentBuilding.hasShop) {
+      setCurrentMerchant(null);
+      return;
+    }
+    let cancelled = false;
+    NPCService.getNPCForBuilding(currentBuilding, currentLoc)
+      .then((npc) => {
+        if (!cancelled) setCurrentMerchant(npc);
+      })
+      .catch((err) => {
+        console.error('[WorldNavigation] Error loading merchant for building:', err);
+        if (!cancelled) setCurrentMerchant(null);
+      });
+    return () => { cancelled = true; };
+  }, [buildingId, locationId, currentBuilding?.hasShop]);
+
+  if (!character) return null;
   const connections = StaticDataService.getConnections(character.location.locationId);
   const buildings = StaticDataService.getAllBuildings().filter(
     b => b.locationId === character.location.locationId
   );
-  const currentBuilding = character.location.buildingId 
-    ? StaticDataService.getBuilding(character.location.buildingId)
-    : null;
 
   // * Safety check: if location not found, show error message
   if (!currentLoc) {
@@ -119,7 +142,10 @@ export const WorldNavigation: React.FC = () => {
 
         <div className="flex-1 overflow-hidden">
           {currentBuilding.hasShop ? (
-            <ShopView merchant={currentMerchant} />
+            <ShopView
+              merchant={currentMerchant}
+              merchantLoading={!currentMerchant}
+            />
           ) : (
             <div className="fantasy-panel p-8 text-center text-gray-500 italic">
               Здесь пока нечего делать.

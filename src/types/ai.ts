@@ -50,6 +50,7 @@ export interface NPCMerchantItem {
   itemId: string;
   quantity?: number;
   item?: {
+    id?: string;
     name: string;
     type: string;
     basePrice: number;

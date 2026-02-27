@@ -2798,32 +2798,39 @@ async function seedMerchantInventory() {
   
   // Unique inventory for each merchant type - using real item IDs from ItemTemplate
   const merchantInventories: Record<string, { itemId: string; quantity: number }[]> = {
-    // Barkeep/Tavern - food and materials
+    // Barkeep/Tavern - food, drinks and basic supplies
     'npc-barkeep': [
-      { itemId: 'mat-meat', quantity: 20 },
-      { itemId: 'mat-water', quantity: 15 },
-      { itemId: 'mat-herbs-common', quantity: 10 }
+      { itemId: 'con-simple-stew', quantity: 15 },
+      { itemId: 'mat-meat', quantity: 25 },
+      { itemId: 'mat-water', quantity: 30 },
+      { itemId: 'mat-herbs-common', quantity: 20 },
+      { itemId: 'bag-linen-worn', quantity: 8 },
+      { itemId: 'mat-leather-scraps', quantity: 15 },
+      { itemId: 'mat-coal', quantity: 20 }
     ],
-    // Blacksmith - weapons and armor
+    // Blacksmith - weapons and armor (appropriate for low level)
     'npc-blacksmith': [
-      { itemId: 'wpn-thief-dagger', quantity: 3 },
-      { itemId: 'wpn-gross-messer', quantity: 2 },
-      { itemId: 'wpn-poleaxe', quantity: 2 },
-      { itemId: 'arm-light-leather', quantity: 5 },
-      { itemId: 'arm-medium-chain', quantity: 3 }
+      { itemId: 'wpn-thief-dagger', quantity: 5 },
+      { itemId: 'wpn-impaler-bow', quantity: 3 },
+      { itemId: 'wpn-steel-hammer-poisoned', quantity: 2 },
+      { itemId: 'arm-light-leather', quantity: 8 },
+      { itemId: 'bag-leather-sturdy', quantity: 4 }
     ],
-    // Alchemist - materials
+    // Alchemist - potions and scrolls (specialist)
     'npc-alchemist': [
-      { itemId: 'mat-herbs-common', quantity: 15 },
-      { itemId: 'mat-magic-dust', quantity: 15 },
-      { itemId: 'mat-leather-scraps', quantity: 10 }
+      { itemId: 'con-healing-potion-small', quantity: 12 },
+      { itemId: 'con-healing-potion-medium', quantity: 6 },
+      { itemId: 'con-strength-potion', quantity: 4 },
+      { itemId: 'con-essence-potion', quantity: 3 },
+      { itemId: 'scroll-simple-bolt', quantity: 8 }
     ],
-    // General merchant - materials and misc
+    // General merchant - basic crafting materials
     'npc-merchant': [
-      { itemId: 'mat-copper-ore', quantity: 20 },
-      { itemId: 'mat-iron-ore', quantity: 10 },
-      { itemId: 'mat-coal', quantity: 15 },
-      { itemId: 'mat-linen-fabric', quantity: 5 }
+      { itemId: 'mat-copper-ore', quantity: 30 },
+      { itemId: 'mat-tin-ore', quantity: 20 },
+      { itemId: 'mat-linen-fabric', quantity: 15 },
+      { itemId: 'mat-wolf-heart', quantity: 12 },
+      { itemId: 'mat-coal', quantity: 25 }
     ]
   };
   

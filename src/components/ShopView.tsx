@@ -19,15 +19,17 @@ import {
   ChevronRight,
   TrendingUp,
   Tag,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface ShopViewProps {
   merchant?: NPCData | null;
+  merchantLoading?: boolean;
 }
 
-export const ShopView: React.FC<ShopViewProps> = ({ merchant }) => {
+export const ShopView: React.FC<ShopViewProps> = ({ merchant, merchantLoading = false }) => {
   const { character, inventory, buyItem, sellItem, itemTemplates } = useGameStore();
   
   // * Filter and Sort State
@@ -257,7 +259,12 @@ export const ShopView: React.FC<ShopViewProps> = ({ merchant }) => {
 
         <div className="fantasy-panel flex-1 overflow-y-auto p-4 custom-scrollbar bg-black/20">
           <div className="grid grid-cols-1 gap-3">
-            {filteredShopItems.length === 0 ? (
+            {merchantLoading ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-4 text-gray-500">
+                <Loader2 className="animate-spin text-fantasy-accent" size={32} />
+                <span className="text-sm italic">Загрузка ассортимента...</span>
+              </div>
+            ) : filteredShopItems.length === 0 ? (
               <div className="text-gray-600 text-center py-12 italic text-sm">
                 Ничего не найдено по вашему запросу.
               </div>

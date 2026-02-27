@@ -9,6 +9,7 @@ import { clsx } from 'clsx';
 import { InventoryService } from '../services/InventoryService';
 import { TradeService } from '../services/TradeService';
 import { StaticDataService } from '../services/StaticDataService';
+import { parseDescription } from '../utils/descriptionHelper';
 
 type SortBy = 'recent' | 'name' | 'rarity' | 'quantity' | 'value';
 type SlotFilter = 'all' | 'equipped' | 'unequipped' | 'sellable';
@@ -351,7 +352,7 @@ export const Inventory: React.FC = () => {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3">
         {filteredItems.length === 0 && (
           <div className="col-span-full text-center text-gray-500 py-12 bg-black/20 border border-fantasy-border/40 rounded">
             Нет предметов по выбранным фильтрам.
@@ -369,45 +370,45 @@ export const Inventory: React.FC = () => {
             <div
               key={item.id}
               className={clsx(
-                "relative p-3 rounded border shadow-sm transition-all bg-fantasy-surface/40 hover:bg-fantasy-surface/70 cursor-pointer",
+                "relative p-2 rounded border shadow-sm transition-all bg-fantasy-surface/40 hover:bg-fantasy-surface/70 cursor-pointer",
                 rarityTone[template.rarity],
                 isFocused && "ring-2 ring-fantasy-accent",
                 item.isEquipped && "shadow-[0_0_10px_rgba(197,160,89,0.25)]"
               )}
               onClick={() => setSelectedItemId(item.id)}
             >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded bg-black/30 border border-fantasy-border/50 flex items-center justify-center">
-                    {getItemIcon(template.type)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-white leading-tight line-clamp-1">{template.name}</div>
-                    <div className="text-[9px] uppercase tracking-widest text-gray-400 flex items-center gap-1">
-                      <Tag size={10} /> {translateItemType(template.type)}
-                    </div>
+              {/* Checkbox in top-right corner */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleBulk(item.id);
+                }}
+                className="absolute top-2 right-2 text-fantasy-accent hover:text-white transition-colors"
+                title="Выбрать для групповых действий"
+              >
+                {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+              </button>
+
+              <div className="flex items-start gap-2 mb-2">
+                <div className="w-10 h-10 rounded bg-black/30 border border-fantasy-border/50 flex items-center justify-center flex-shrink-0">
+                  {getItemIcon(template.type)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-white leading-tight line-clamp-1">{template.name}</div>
+                  <div className="text-[9px] uppercase tracking-widest text-gray-400 flex items-center gap-1">
+                    <Tag size={10} /> {translateItemType(template.type)}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleBulk(item.id);
-                  }}
-                  className="text-fantasy-accent hover:text-white transition-colors"
-                  title="Выбрать для групповых действий"
-                >
-                  {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                </button>
               </div>
 
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1">
                 <div className="text-[10px] uppercase font-bold text-gray-300">{translateRarity(template.rarity)}</div>
                 {item.quantity > 1 && (
                   <div className="text-[10px] text-fantasy-accent font-bold bg-black/30 px-2 py-0.5 rounded">x{item.quantity}</div>
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-gray-200 mb-2">
+              <div className="flex items-center justify-between text-[11px] text-gray-200 mb-1">
                 <div className="flex items-center gap-1">
                   <Hammer size={12} className="text-gray-400" />
                   {template.baseDurability ? `${item.currentDurability || 0}/${template.baseDurability}` : '∞'}
@@ -452,7 +453,7 @@ export const Inventory: React.FC = () => {
           {/* Item Description */}
           {selectedItem.template.description && (
             <div className="text-xs text-gray-400 italic bg-black/20 p-2 rounded border border-fantasy-border/20 leading-relaxed">
-              {selectedItem.template.description}
+              {parseDescription(selectedItem.template.description)}
             </div>
           )}
 
@@ -725,7 +726,7 @@ const ToggleButton: React.FC<{ active: boolean; onClick: () => void; label: stri
 );
 
 const Badge: React.FC<{ label: string; tone: string }> = ({ label, tone }) => (
-  <span className={clsx("px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-widest", tone)}>
+  <span className={clsx("px-1.5 py-0.5 rounded border text-[8px] font-bold uppercase tracking-widest leading-none", tone)}>
     {label}
   </span>
 );

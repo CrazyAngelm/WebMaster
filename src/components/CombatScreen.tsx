@@ -7,6 +7,7 @@ import { Sword, Shield, Zap, Skull, ChevronRight, ArrowLeft, ArrowRight, LogOut,
 import { clsx } from 'clsx';
 import { BattleStatus, CharacterSkill, ParticipantStatus } from '../types/game';
 import { ThreatPanel } from './ThreatPanel';
+import { parseDescription } from '../utils/descriptionHelper';
 
 const UserIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -1790,16 +1791,9 @@ export const CombatScreen: React.FC = () => {
                                   x{item.quantity}
                                 </span>
                               </div>
-                              {template.description && typeof template.description === 'string' && (
+                              {template.description && (
                                 <p className="text-xs text-gray-400 mb-2">
-                                  {(() => {
-                                    try {
-                                      const parsed = JSON.parse(template.description as string);
-                                      return parsed.description || template.description;
-                                    } catch {
-                                      return template.description;
-                                    }
-                                  })()}
+                                  {parseDescription(template.description)}
                                 </p>
                               )}
 

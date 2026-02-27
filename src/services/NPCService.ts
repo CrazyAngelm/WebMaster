@@ -180,6 +180,7 @@ class NPCServiceClass {
           itemId: inv.itemId,
           quantity: inv.quantity,
           item: inv.item ? {
+            id: inv.item?.id ?? inv.itemId,
             name: inv.item.name,
             type: inv.item.type,
             basePrice: inv.item.basePrice,
@@ -222,6 +223,7 @@ class NPCServiceClass {
           itemId: inv.itemId,
           quantity: inv.quantity,
           item: inv.item ? {
+            id: inv.item?.id ?? inv.itemId,
             name: inv.item.name,
             type: inv.item.type,
             basePrice: inv.item.basePrice,
